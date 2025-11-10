@@ -1,0 +1,68 @@
+﻿# Build results
+bin/
+obj/
+
+# User-specific files
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# Database files
+*.db
+*.db-shm
+*.db-wal
+
+# Logs and temporary files
+logs/
+*.log
+*.pid
+*-last-run.txt
+
+# Environment files
+.env
+
+# Google Service Account credentials
+jumpchainsearch-8836c27314df.json
+*service-account*.json
+
+# IDE files
+.vs/
+.vscode/
+*.swp
+*.swo
+
+# NuGet Packages
+*.nupkg
+packages/
+
+# Tesseract data (too large for git)
+tessdata/
+
+# Temporary and generated files
+cleanup-project.ps1
+restart-server.ps1
+drive-scan.ps1
+*.tmp
+*.temp
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.Python
+venv/
+env/
+
+# Node modules (if any)
+node_modules/
+
+# Archives and installers
+*.exe
+*.msi
+*.zip
+*.tar.gz

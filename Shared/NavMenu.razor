@@ -1,0 +1,153 @@
+﻿<div class="sidebar-header @(collapseNavMenu ? "collapsed" : "expanded")" @onclick="ToggleNavMenu">
+    <div class="sidebar-brand">
+        @if (!collapseNavMenu)
+        {
+            <span class="brand-text">JumpChain Search</span>
+        }
+        <button class="sidebar-toggle" title="@(collapseNavMenu ? "Expand sidebar" : "Collapse sidebar")">
+            <span class="oi @(collapseNavMenu ? "oi-chevron-right" : "oi-chevron-left")" aria-hidden="true"></span>
+        </button>
+    </div>
+</div>
+
+<div class="@NavMenuCssClass nav-scrollable">
+    <nav class="flex-column">
+        @if (!collapseNavMenu)
+        {
+            <div class="nav-section-header">
+                <span class="text-muted small">NAVIGATION</span>
+            </div>
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
+                    <span class="oi oi-home" aria-hidden="true"></span> 
+                    <span class="nav-text">Search</span>
+                </NavLink>
+            </div>
+            <div class="nav-section-header">
+                <span class="text-muted small">APPEARANCE</span>
+            </div>
+            <div class="nav-item px-3">
+                <div class="theme-selector">
+                    <label class="nav-text small text-muted">Theme</label>
+                    <select class="form-select form-select-sm" @onchange="OnThemeChanged" value="@selectedTheme">
+                        <option value="material">Material Dark</option>
+                        <option value="gruvbox">Gruvbox Dark</option>
+                        <option value="nord">Nord Dark</option>
+                        <option value="onedark">One Dark</option>
+                        <option value="dracula">Dracula</option>
+                    </select>
+                </div>
+            </div>
+            <div class="nav-section-header">
+                <span class="text-muted small">TOOLS</span>
+            </div>
+            
+            <!-- Interactive UI Tools -->
+            <div class="nav-item px-3">
+                <a class="nav-link" href="/api/browser/ui" target="_blank">
+                    <span class="oi oi-book" aria-hidden="true"></span> 
+                    <span class="nav-text">Text Browser</span>
+                </a>
+            </div>
+            <div class="nav-item px-3">
+                <a class="nav-link" href="/admin" target="_blank">
+                    <span class="oi oi-cog" aria-hidden="true"></span> 
+                    <span class="nav-text">Admin Portal</span>
+                </a>
+            </div>
+            
+            <!-- Quick Status (JSON) -->
+            <div class="nav-subsection-header">
+                <span class="text-muted smaller">Status & Debug</span>
+            </div>
+            <div class="nav-item px-3">
+                <a class="nav-link" href="/api/extraction/status" target="_blank">
+                    <span class="oi oi-bar-chart" aria-hidden="true"></span> 
+                    <span class="nav-text">Extraction Status</span>
+                </a>
+            </div>
+            <div class="nav-item px-3">
+                <a class="nav-link" href="/api/drive/test-auth" target="_blank">
+                    <span class="oi oi-key" aria-hidden="true"></span> 
+                    <span class="nav-text">Auth Status</span>
+                </a>
+            </div>
+        }
+    </nav>
+</div>
+
+@using Microsoft.JSInterop
+@inject IJSRuntime JSRuntime
+
+@code {
+    [Parameter] public EventCallback<bool> OnToggle { get; set; }
+    
+    private bool collapseNavMenu = true; // Start collapsed by default
+    private string selectedTheme = "material";
+
+    private string? NavMenuCssClass => collapseNavMenu ? "collapsed" : "expanded";
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            // Load saved theme from localStorage
+            try
+            {
+                var savedTheme = await JSRuntime.InvokeAsync<string>("localStorage.getItem", "jumpchain-theme");
+                if (!string.IsNullOrEmpty(savedTheme))
+                {
+                    selectedTheme = savedTheme;
+                    StateHasChanged();
+                }
+                await ApplyTheme(selectedTheme);
+            }
+            catch
+            {
+                // Fallback to material if localStorage isn't available
+                selectedTheme = "material";
+                await ApplyTheme(selectedTheme);
+            }
+        }
+    }
+
+    private async Task ToggleNavMenu()
+    {
+        collapseNavMenu = !collapseNavMenu;
+        // Send the expanded state (true when expanded, false when collapsed)
+        await OnToggle.InvokeAsync(!collapseNavMenu);
+    }
+
+    private async Task OnThemeChanged(ChangeEventArgs e)
+    {
+        selectedTheme = e.Value?.ToString() ?? "material";
+        await ApplyTheme(selectedTheme);
+        
+        // Save to localStorage
+        await JSRuntime.InvokeVoidAsync("localStorage.setItem", "jumpchain-theme", selectedTheme);
+    }
+
+    private async Task ApplyTheme(string theme)
+    {
+        try
+        {
+            // Remove existing theme classes
+            await JSRuntime.InvokeVoidAsync("eval", @"
+                document.body.className = document.body.className.replace(/theme-\w+/g, '');
+            ");
+            
+            // Apply new theme class if not material (material is default)
+            if (theme != "material")
+            {
+                await JSRuntime.InvokeVoidAsync("eval", $@"
+                    document.body.classList.add('theme-{theme}');
+                ");
+            }
+        }
+        catch (Exception ex)
+        {
+            // Silently handle JS errors
+            Console.WriteLine($"Theme application error: {ex.Message}");
+        }
+    }
+}

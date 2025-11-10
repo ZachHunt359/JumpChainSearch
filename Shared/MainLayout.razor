@@ -1,0 +1,31 @@
+﻿@inherits LayoutComponentBase
+
+<PageTitle>JumpChain Search</PageTitle>
+
+<div class="page">
+    <div class="sidebar @(sidebarExpanded ? "expanded" : "collapsed")" id="sidebar">
+        <NavMenu OnToggle="HandleSidebarToggle" />
+    </div>
+
+    <main>
+        <div class="top-row px-4">
+            <a href="https://github.com/ZachHunt359/JumpChainSearch" target="_blank" title="View on GitHub">
+                <span class="oi oi-external-link" aria-hidden="true"></span> GitHub
+            </a>
+        </div>
+
+        <article class="content px-4">
+            @Body
+        </article>
+    </main>
+</div>
+
+@code {
+    private bool sidebarExpanded = false; // Start collapsed
+
+    private void HandleSidebarToggle(bool expanded)
+    {
+        sidebarExpanded = expanded;
+        StateHasChanged();
+    }
+}

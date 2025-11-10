@@ -1,0 +1,197 @@
+/* Sidebar Header */
+.sidebar-header {
+    height: 3.5rem;
+    background-color: var(--bg-secondary);
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    align-items: center;
+    padding: 0 0.5rem;
+    cursor: pointer;
+    position: relative;
+}
+
+.sidebar-header:hover {
+    background-color: var(--bg-tertiary);
+}
+
+/* Collapsed sidebar header styling */
+.sidebar-header.collapsed .sidebar-brand {
+    justify-content: center;
+}
+
+.sidebar-header.collapsed .brand-text {
+    display: none;
+}
+
+.sidebar-brand {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+}
+
+/* Ensure toggle is always visible */
+.sidebar-toggle {
+    flex-shrink: 0;
+}
+
+.brand-text {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    white-space: nowrap;
+    margin-right: 1rem;
+}
+
+.sidebar-toggle {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    font-size: 1.2rem;
+    padding: 0.5rem;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 40px;
+    height: 40px;
+    cursor: pointer;
+}
+
+.sidebar-toggle:hover {
+    background-color: var(--accent-primary);
+    color: var(--text-primary);
+}
+
+/* Navigation Styles */
+.nav-scrollable {
+    height: calc(100vh - 3.5rem);
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+.nav-scrollable.collapsed {
+    display: none;
+}
+
+.nav-scrollable.expanded {
+    display: block;
+}
+
+.nav-section-header {
+    padding: 1rem 1rem 0.5rem;
+    margin-top: 0.5rem;
+}
+
+.nav-section-header:first-child {
+    margin-top: 0;
+}
+
+.nav-subsection-header {
+    padding: 0.5rem 1rem 0.25rem;
+    margin-top: 0.25rem;
+}
+
+.nav-subsection-header .smaller {
+    font-size: 0.75rem;
+}
+
+.nav-item {
+    font-size: 0.9rem;
+    padding: 0.25rem 0;
+}
+
+.nav-item ::deep a {
+    color: var(--text-secondary);
+    border-radius: 6px;
+    height: 2.5rem;
+    display: flex;
+    align-items: center;
+    line-height: 2.5rem;
+    padding: 0 1rem;
+    margin: 0 0.5rem;
+    text-decoration: none;
+    transition: all 0.2s ease;
+}
+
+.nav-item ::deep a:hover {
+    background-color: var(--accent-primary);
+    color: var(--text-primary);
+}
+
+.nav-item ::deep a.active {
+    background-color: var(--accent-primary);
+    color: var(--text-primary);
+}
+
+.nav-text {
+    margin-left: 0.75rem;
+}
+
+.nav-placeholder {
+    padding: 0.5rem 1rem;
+    font-style: italic;
+}
+
+.theme-selector {
+    padding: 0.5rem 1rem;
+}
+
+.theme-selector label {
+    display: block;
+    margin-bottom: 0.25rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.theme-selector .form-select {
+    background-color: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    color: var(--text-secondary);
+    font-size: 0.8rem;
+}
+
+.theme-selector .form-select:focus {
+    background-color: var(--bg-tertiary);
+    border-color: var(--accent-primary);
+    box-shadow: 0 0 0 0.2rem var(--accent-secondary);
+}
+
+.theme-selector .form-select option {
+    background-color: var(--bg-tertiary);
+    color: var(--text-secondary);
+}
+
+.oi {
+    width: 1.25rem;
+    font-size: 1rem;
+    vertical-align: middle;
+}
+
+/* Mobile Styles */
+@media (max-width: 640.98px) {
+    .sidebar-header {
+        justify-content: center;
+    }
+    
+    .brand-text {
+        display: none;
+    }
+    
+    .nav-scrollable.collapsed {
+        display: none;
+    }
+    
+    .nav-scrollable.expanded {
+        display: block;
+        position: fixed;
+        top: 3.5rem;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: var(--bg-secondary);
+        z-index: 1000;
+    }
+}

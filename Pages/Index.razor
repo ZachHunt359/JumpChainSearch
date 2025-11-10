@@ -1,0 +1,1955 @@
+﻿@page "/"
+@using System.Text.Json
+@using System.Text.Json.Serialization
+@inject HttpClient Http
+@inject IJSRuntime JSRuntime
+@inject NavigationManager NavigationManager
+
+<PageTitle>JumpChain Search</PageTitle>
+
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col-12 text-center">
+            <h1 class="display-4 mb-3">🚀 JumpChain Search</h1>
+            <p class="lead text-muted">Real-time search across 7,283+ JumpChain documents</p>
+        </div>
+    </div>
+
+    <div class="row mb-4">
+        <div class="col-md-10 offset-md-1">
+            <div class="search-container">
+                <div class="input-group input-group-lg">
+                    <span class="input-group-text bg-primary text-white">
+                        <i class="fas fa-search"></i>
+                    </span>
+                    <input type="text" class="form-control" placeholder="Search for jumps, supplements, gauntlets... (type to search instantly)" 
+                           @bind="searchQuery" @bind:event="oninput" @onkeyup="OnSearchInput">
+                </div>
+                
+                @if (isSearching)
+                {
+                    <div class="search-status mt-2">
+                        <small class="text-muted">
+                            <span class="spinner-border spinner-border-sm me-1"></span>
+                            Searching...
+                        </small>
+                    </div>
+                }
+                else if (!string.IsNullOrEmpty(searchQuery) && searchResults.Any())
+                {
+                    <div class="search-status mt-2">
+                        <small class="text-success">
+                            <i class="fas fa-check-circle me-1"></i>
+                            Found <strong>@searchResults.Count()</strong> documents matching "@searchQuery"
+                        </small>
+                    </div>
+                }
+                else if (!string.IsNullOrEmpty(searchQuery) && !searchResults.Any() && !isSearching)
+                {
+                    <div class="search-status mt-2">
+                        <small class="text-warning">
+                            <i class="fas fa-exclamation-triangle me-1"></i>
+                            No documents found for "@searchQuery"
+                        </small>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+
+    <!-- Tag Filter Panel -->
+    @if (availableTags.Any() || selectedTags.Any())
+    {
+        <div class="row mb-3">
+            <div class="col-12">
+                <div class="tag-filter-wrapper">
+                    <h6 class="mb-3">
+                        <i class="fas fa-filter me-2"></i>Filter by Tags
+                        @if (HasAnyTagFilters())
+                        {
+                            <button class="btn btn-outline-secondary btn-sm ms-2" @onclick="ClearAllTags">
+                                <i class="fas fa-times me-1"></i>Clear All
+                            </button>
+                        }
+                    </h6>
+                    
+                    @if (HasAnyTagFilters())
+                    {
+                        <div class="selected-tags mb-3">
+                            <small class="text-muted d-block mb-2">Active Filters:</small>
+                            @if (includedTags.Any())
+                            {
+                                <div class="mb-1">
+                                    <small class="text-success fw-bold">Include:</small>
+                                    @foreach (var tag in includedTags)
+                                    {
+                                        <span class="badge bg-success me-1 mb-1 clickable-tag" @onclick="() => ToggleTagFilter(tag)" title="Click to exclude this tag instead">
+                                            @tag <i class="fas fa-check ms-1"></i>
+                                        </span>
+                                    }
+                                </div>
+                            }
+                            @if (excludedTags.Any())
+                            {
+                                <div class="mb-1">
+                                    <small class="text-danger fw-bold">Exclude:</small>
+                                    @foreach (var tag in excludedTags)
+                                    {
+                                        <span class="badge bg-danger me-1 mb-1 clickable-tag" @onclick="() => ToggleTagFilter(tag)" title="Click to remove this filter">
+                                            @tag <i class="fas fa-times ms-1"></i>
+                                        </span>
+                                    }
+                                </div>
+                            }
+                        </div>
+                    }
+                    
+                    @if (availableTags.Any())
+                    {
+                        <div class="tag-filter-compact">
+                            @foreach (var category in availableTags.GroupBy(t => t.Category).OrderBy(g => GetCategoryOrder(g.Key)))
+                            {
+                                <div class="tag-category-inline mb-2">
+                                    <span class="category-label">@category.Key:</span>
+                                    @foreach (var tag in category.OrderByDescending(t => t.Count))
+                                    {
+                                        <span class="badge @GetTagFilterClass(tag.Name) me-1 mb-1 clickable-tag" 
+                                              @onclick="() => ToggleTagFilter(tag.Name)"
+                                              title="@GetTagFilterTitle(tag.Name, tag.Count)">
+                                            @tag.Name (@tag.Count)
+                                        </span>
+                                    }
+                                </div>
+                            }
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    }
+
+    @if (searchResults.Any())
+    {
+        <!-- Pagination controls - Top -->
+        <div class="row mb-3">
+            <div class="col-12">
+                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                    <div class="pagination-info">
+                        <span class="text-muted">
+                            Showing <strong>@((currentPage - 1) * pageSize + 1)</strong> - <strong>@Math.Min(currentPage * pageSize, totalResults)</strong> of <strong>@totalResults</strong>
+                        </span>
+                    </div>
+                    <div class="d-flex align-items-center gap-2">
+                        <label class="mb-0 me-2 text-muted">Results per page:</label>
+                        <select class="form-select form-select-sm" style="width: auto;" @onchange="OnPageSizeChanged">
+                            @foreach (var size in pageSizeOptions)
+                            {
+                                <option value="@size" selected="@(size == pageSize)">@size</option>
+                            }
+                        </select>
+                    </div>
+                    @RenderPaginationControls()
+                </div>
+            </div>
+        </div>
+        
+        <div class="row">
+            <div class="col-12">
+                <div class="results-container">
+                    @foreach (var document in searchResults)
+                    {
+                        <div class="result-item mb-3">
+                            <div class="card shadow-sm clickable-card" @onclick="() => ShowDocumentDetails(document)">
+                                <div class="card-body">
+                                    <div class="row">
+                                        <div class="col-md-8">
+                                            <h6 class="card-title text-primary mb-1">
+                                                <i class="fas @GetFileIcon(document.MimeType) me-1"></i>
+                                                @document.Name
+                                                @if (document.HasMultipleUrls)
+                                                {
+                                                    <span class="badge bg-info ms-2" title="Available on multiple drives">
+                                                        <i class="fas fa-clone me-1"></i>@(document.Urls.Count + 1) sources
+                                                    </span>
+                                                }
+                                            </h6>
+                                            <div class="document-meta mb-2 small text-muted">
+                                                <i class="fas fa-weight me-1"></i> @FormatFileSize(document.Size)
+                                                <span class="mx-2">•</span>
+                                                <i class="fas fa-calendar me-1"></i> @document.ModifiedTime.ToString("MMM dd, yyyy")
+                                                <span class="mx-2">•</span>
+                                                <i class="fas fa-hdd me-1"></i> @document.SourceDrive
+                                            </div>
+                                            @if (!string.IsNullOrEmpty(document.Description))
+                                            {
+                                                <p class="card-text small text-secondary mb-2">@document.Description</p>
+                                            }
+                                            @if (document.Tags != null && document.Tags.Any())
+                                            {
+                                                <div class="tags-container mb-2">
+                                                    @foreach (var tag in document.Tags.Take(8)) // Show fewer tags to save space
+                                                    {
+                                                        <span class="badge @GetTagColor(tag) me-1 mb-1 clickable-tag" 
+                                                              @onclick:stopPropagation="true"
+                                                              @onclick="() => ToggleTagFilter(tag)" 
+                                                              title="Click to filter by this tag">
+                                                            @tag
+                                                        </span>
+                                                    }
+                                                    @if (document.Tags.Count > 8)
+                                                    {
+                                                        <span class="badge bg-secondary">+@(document.Tags.Count - 8) more</span>
+                                                    }
+                                                </div>
+                                            }
+                                        </div>
+                                        <div class="col-md-4 text-md-end">
+                                            <div class="d-flex flex-column gap-1 align-items-end">
+                                                @if (!string.IsNullOrEmpty(document.WebViewLink))
+                                                {
+                                                    <a href="@document.WebViewLink" target="_blank" class="btn btn-primary btn-sm"
+                                                       @onclick:stopPropagation="true">
+                                                        <i class="fas fa-external-link-alt me-1"></i> Open
+                                                    </a>
+                                                }
+                                                <small class="text-muted">
+                                                    <i class="fas fa-info-circle me-1"></i>Click for details
+                                                </small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+        
+        <!-- Pagination controls - Bottom -->
+        <div class="row mt-3">
+            <div class="col-12">
+                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                    <div class="pagination-info">
+                        <span class="text-muted">
+                            Showing <strong>@((currentPage - 1) * pageSize + 1)</strong> - <strong>@Math.Min(currentPage * pageSize, totalResults)</strong> of <strong>@totalResults</strong>
+                        </span>
+                    </div>
+                    @RenderPaginationControls()
+                </div>
+            </div>
+        </div>
+    }
+    else if (!string.IsNullOrEmpty(searchQuery) && !isSearching)
+    {
+        <div class="row">
+            <div class="col-12 text-center">
+                <div class="alert alert-warning">
+                    <h5><i class="fas fa-search"></i> No results found</h5>
+                    <p>No documents match "<strong>@searchQuery</strong>". Try different search terms.</p>
+                </div>
+            </div>
+        </div>
+    }
+    else if (string.IsNullOrEmpty(searchQuery))
+    {
+        <div class="row">
+            <div class="col-12 text-center">
+                <div class="welcome-section">
+                    <div class="mb-4">
+                        <h3><i class="fas fa-rocket me-2"></i>Start Your JumpChain Adventure</h3>
+                        <p class="text-muted">Search through thousands of JumpChain documents instantly</p>
+                    </div>
+                    <div class="row text-start">
+                        <div class="col-md-4">
+                            <div class="card border-0 shadow-sm">
+                                <div class="card-body text-center">
+                                    <i class="fas fa-search fa-2x text-primary mb-2"></i>
+                                    <h6>Instant Search</h6>
+                                    <small class="text-muted">Results appear as you type</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card border-0 shadow-sm">
+                                <div class="card-body text-center">
+                                    <i class="fas fa-database fa-2x text-success mb-2"></i>
+                                    <h6>7,283+ Documents</h6>
+                                    <small class="text-muted">Across multiple Google Drives</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card border-0 shadow-sm">
+                                <div class="card-body text-center">
+                                    <i class="fas fa-external-link-alt fa-2x text-info mb-2"></i>
+                                    <h6>Direct Links</h6>
+                                    <small class="text-muted">Open documents directly in Google Drive</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+<!-- Document Details Modal -->
+@if (selectedDocument != null && showModal)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="fas @GetFileIcon(selectedDocument.MimeType) me-2"></i>
+                        @selectedDocument.Name
+                    </h5>
+                    <button type="button" class="btn-close" @onclick="CloseModal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row">
+                        <!-- Thumbnail/Icon Column -->
+                        <div class="col-md-4 mb-3">
+                            <div class="thumbnail-container">
+                                @{
+                                    var generatedThumbnail = GenerateGoogleDriveThumbnail(selectedDocument.WebViewLink, selectedDocument.MimeType);
+                                    var hasApiThumbnail = selectedDocument.HasThumbnail && !string.IsNullOrEmpty(selectedDocument.ThumbnailLink);
+                                    var thumbnailUrl = hasApiThumbnail ? selectedDocument.ThumbnailLink : generatedThumbnail;
+                                }
+
+                                @if (!string.IsNullOrEmpty(thumbnailUrl))
+                                {
+                                    <!-- Show thumbnail as image (either from API or generated) -->
+                                    <div class="position-relative">
+                                        <img src="@thumbnailUrl" 
+                                             alt="Document preview" 
+                                             class="img-fluid rounded shadow-sm thumbnail-image" 
+                                             style="max-height: 200px; width: 100%; object-fit: contain; background: #f8f9fa;"
+                                             onload="this.nextElementSibling.style.display='none';"
+                                             onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" />
+                                        
+                                        <!-- Fallback file icon (shown while loading or on error) -->
+                                        <div class="file-icon-fallback d-flex flex-column align-items-center justify-content-center" 
+                                             style="min-height: 200px; background: var(--bs-light); border-radius: 8px; border: 2px dashed var(--bs-border-color);">
+                                            <i class="fas @GetFileIcon(selectedDocument.MimeType) fa-4x text-primary mb-2"></i>
+                                            <div class="text-muted small fw-medium">@GetFileTypeLabel(selectedDocument.MimeType)</div>
+                                            <div class="text-muted small">@FormatFileSize(selectedDocument.Size)</div>
+                                        </div>
+                                    </div>
+                                }
+                                else
+                                {
+                                    <!-- Show file type icon when no thumbnail is possible -->
+                                    <div class="file-icon-container d-flex flex-column align-items-center justify-content-center" 
+                                         style="min-height: 200px; background: var(--bs-light); border-radius: 8px; border: 2px dashed var(--bs-border-color);">
+                                        <i class="fas @GetFileIcon(selectedDocument.MimeType) fa-5x text-primary mb-2"></i>
+                                        <div class="text-muted small fw-medium">@GetFileTypeLabel(selectedDocument.MimeType)</div>
+                                        <div class="text-muted small">@FormatFileSize(selectedDocument.Size)</div>
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                        
+                        <!-- Document Info Column -->
+                        <div class="col-md-8">
+                            <div class="document-details">
+                                <h6 class="text-primary mb-3">
+                                    <i class="fas fa-info-circle me-1"></i>Document Information
+                                </h6>
+                                
+                                <div class="info-grid">
+                                    <div class="row mb-2">
+                                        <div class="col-4 fw-bold text-muted">Size:</div>
+                                        <div class="col-8">@FormatFileSize(selectedDocument.Size)</div>
+                                    </div>
+                                    <div class="row mb-2">
+                                        <div class="col-4 fw-bold text-muted">Modified:</div>
+                                        <div class="col-8">@selectedDocument.ModifiedTime.ToString("MMMM dd, yyyy 'at' hh:mm tt")</div>
+                                    </div>
+                                    <div class="row mb-2">
+                                        <div class="col-4 fw-bold text-muted">Type:</div>
+                                        <div class="col-8">@GetFileTypeDescription(selectedDocument.MimeType)</div>
+                                    </div>
+                                    <div class="row mb-2">
+                                        <div class="col-4 fw-bold text-muted">Primary Drive:</div>
+                                        <div class="col-8">@selectedDocument.SourceDrive</div>
+                                    </div>
+                                    @if (!string.IsNullOrEmpty(selectedDocument.FolderPath))
+                                    {
+                                        <div class="row mb-2">
+                                            <div class="col-4 fw-bold text-muted">Path:</div>
+                                            <div class="col-8 small text-break">@selectedDocument.FolderPath</div>
+                                        </div>
+                                    }
+                                </div>
+                                
+                                @if (!string.IsNullOrEmpty(selectedDocument.Description))
+                                {
+                                    <div class="mt-3">
+                                        <h6 class="text-primary">
+                                            <i class="fas fa-file-text me-1"></i>Description
+                                        </h6>
+                                        <p class="text-secondary">@selectedDocument.Description</p>
+                                    </div>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Access Links Section -->
+                    <div class="mt-4">
+                        <h6 class="text-primary mb-3">
+                            <i class="fas fa-link me-1"></i>Access Links
+                            @if (selectedDocument.HasMultipleUrls)
+                            {
+                                <span class="badge bg-info ms-2">@(selectedDocument.Urls.Count + 1) sources available</span>
+                            }
+                        </h6>
+                        
+                        <div class="links-container">
+                            <!-- Primary Link -->
+                            <div class="card border-primary mb-2">
+                                <div class="card-body p-3">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <div>
+                                            <h6 class="card-title mb-1 text-primary">
+                                                <i class="fas fa-star me-1"></i>Primary Source
+                                            </h6>
+                                            <small class="text-muted">@selectedDocument.SourceDrive</small>
+                                            @if (!string.IsNullOrEmpty(selectedDocument.FolderPath))
+                                            {
+                                                <br><small class="text-muted">@selectedDocument.FolderPath</small>
+                                            }
+                                        </div>
+                                        <a href="@selectedDocument.WebViewLink" target="_blank" class="btn btn-primary">
+                                            <i class="fas fa-external-link-alt me-1"></i> Open
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Additional URLs -->
+                            @if (selectedDocument.HasMultipleUrls && selectedDocument.Urls.Any())
+                            {
+                                @foreach (var (url, index) in selectedDocument.Urls.Select((url, i) => (url, i)))
+                                {
+                                    <div class="card border-secondary mb-2">
+                                        <div class="card-body p-3">
+                                            <div class="d-flex justify-content-between align-items-center">
+                                                <div>
+                                                    <h6 class="card-title mb-1">
+                                                        <i class="fas fa-clone me-1"></i>Alternative Source @(index + 1)
+                                                    </h6>
+                                                    <small class="text-muted">@url.SourceDrive</small>
+                                                    @if (!string.IsNullOrEmpty(url.FolderPath))
+                                                    {
+                                                        <br><small class="text-muted">@url.FolderPath</small>
+                                                    }
+                                                </div>
+                                                <a href="@url.WebViewLink" target="_blank" class="btn btn-outline-primary">
+                                                    <i class="fas fa-external-link-alt me-1"></i> Open
+                                                </a>
+                                            </div>
+                                        </div>
+                                    </div>
+                                }
+                            }
+                        </div>
+                    </div>
+                    
+                    <!-- Tags Section -->
+                    @if (selectedDocument.Tags != null && selectedDocument.Tags.Any())
+                    {
+                        <div class="mt-4">
+                            <h6 class="text-primary mb-3">
+                                <i class="fas fa-tags me-1"></i>Tags (@selectedDocument.Tags.Count)
+                            </h6>
+                            <div class="tags-container-modal">
+                                @foreach (var tag in selectedDocument.Tags)
+                                {
+                                    <span class="badge @GetTagColor(tag) me-1 mb-1 position-relative tag-with-remove">
+                                        <span class="clickable-tag" @onclick="() => { ToggleTagFilter(tag); CloseModal(); }" 
+                                              title="Click to filter by this tag">
+                                            @tag
+                                        </span>
+                                        <button type="button" class="tag-remove-btn" 
+                                                @onclick="() => RequestRemoval(tag, GetCategoryFromTag(tag))"
+                                                @onclick:stopPropagation="true"
+                                                title="Request removal of this tag">
+                                            ×
+                                        </button>
+                                    </span>
+                                }
+                            </div>
+                        </div>
+                    }
+                    
+                    <!-- Community Tag Voting Section -->
+                    <div class="mt-4">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h6 class="text-primary mb-0">
+                                <i class="fas fa-users me-1"></i>Community Tags
+                            </h6>
+                            <button class="btn btn-sm btn-outline-primary" @onclick="() => showSuggestDialog = true">
+                                <i class="fas fa-plus me-1"></i>Suggest Tag
+                            </button>
+                        </div>
+                        
+                        @if (pendingSuggestions.Any() || pendingRemovals.Any())
+                        {
+                            <div class="community-tags-list">
+                                @foreach (var suggestion in pendingSuggestions)
+                                {
+                                    <div class="pending-tag-item mb-2 p-2 border rounded">
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <div>
+                                                <span class="badge bg-success me-2">+ @suggestion.TagName</span>
+                                                <small class="text-muted">(@suggestion.TagCategory)</small>
+                                            </div>
+                                            <div class="vote-controls">
+                                                <button class="btn btn-sm @(userVotes.ContainsKey(suggestion.Id) && userVotes[suggestion.Id] ? "btn-success" : "btn-outline-success")" 
+                                                        @onclick="() => VoteOnSuggestion(suggestion.Id, true)">
+                                                    👍 @suggestion.FavorVotes
+                                                </button>
+                                                <button class="btn btn-sm @(userVotes.ContainsKey(suggestion.Id) && !userVotes[suggestion.Id] ? "btn-danger" : "btn-outline-danger") ms-1" 
+                                                        @onclick="() => VoteOnSuggestion(suggestion.Id, false)">
+                                                    👎 @suggestion.AgainstVotes
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <div class="progress mt-2" style="height: 5px;">
+                                            <div class="progress-bar @(suggestion.AgreementPercentage >= 70 ? "bg-success" : "bg-warning")" 
+                                                 style="width: @(suggestion.AgreementPercentage)%"></div>
+                                        </div>
+                                        <small class="text-muted">@suggestion.AgreementPercentage.ToString("F0")% agreement (@suggestion.TotalVotes votes)</small>
+                                    </div>
+                                }
+                                
+                                @foreach (var removal in pendingRemovals)
+                                {
+                                    <div class="pending-tag-item mb-2 p-2 border rounded">
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <div>
+                                                <span class="badge bg-danger me-2">- @removal.TagName</span>
+                                                <small class="text-muted">(@removal.TagCategory)</small>
+                                            </div>
+                                            <div class="vote-controls">
+                                                <button class="btn btn-sm @(userVotes.ContainsKey(-removal.Id) && userVotes[-removal.Id] ? "btn-success" : "btn-outline-success")" 
+                                                        @onclick="() => VoteOnRemoval(removal.Id, true)">
+                                                    👍 @removal.FavorVotes
+                                                </button>
+                                                <button class="btn btn-sm @(userVotes.ContainsKey(-removal.Id) && !userVotes[-removal.Id] ? "btn-danger" : "btn-outline-danger") ms-1" 
+                                                        @onclick="() => VoteOnRemoval(removal.Id, false)">
+                                                    👎 @removal.AgainstVotes
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <div class="progress mt-2" style="height: 5px;">
+                                            <div class="progress-bar @(removal.AgreementPercentage >= 70 ? "bg-success" : "bg-warning")" 
+                                                 style="width: @(removal.AgreementPercentage)%"></div>
+                                        </div>
+                                        <small class="text-muted">@removal.AgreementPercentage.ToString("F0")% agreement (@removal.TotalVotes votes)</small>
+                                    </div>
+                                }
+                            </div>
+                        }
+                        else
+                        {
+                            <p class="text-muted mb-0"><small>No pending tag suggestions or removals for this document.</small></p>
+                        }
+                    </div>
+                    
+                    <!-- Suggest Tag Dialog -->
+                    @if (showSuggestDialog)
+                    {
+                        <div class="modal-overlay" @onclick="CloseSuggestDialog">
+                            <div class="modal-dialog-centered" @onclick:stopPropagation="true">
+                                <div class="card p-3">
+                                    <h6 class="mb-3">
+                                        <i class="fas fa-tag me-2"></i>Suggest New Tag
+                                    </h6>
+                                    <div class="mb-2 position-relative">
+                                        <label class="form-label">
+                                            Tag Name
+                                            @if (!string.IsNullOrWhiteSpace(newTagName) && filteredTagSuggestions.Any())
+                                            {
+                                                <small class="text-muted">(matching @filteredTagSuggestions.Count existing tags)</small>
+                                            }
+                                        </label>
+                                        <input type="text" 
+                                               class="form-control" 
+                                               value="@newTagName"
+                                               @oninput="OnTagNameInput"
+                                               @onfocus="() => showTagSuggestions = true"
+                                               placeholder="Start typing to see suggestions..." 
+                                               autocomplete="off" />
+                                        
+                                        @if (showTagSuggestions && filteredTagSuggestions.Any())
+                                        {
+                                            <div class="tag-suggestions-dropdown">
+                                                <div class="suggestions-header">
+                                                    <small class="text-muted">
+                                                        <i class="fas fa-lightbulb me-1"></i>
+                                                        Select existing tag or continue typing to create new
+                                                    </small>
+                                                </div>
+                                                @foreach (var suggestion in filteredTagSuggestions.Take(10))
+                                                {
+                                                    <div class="suggestion-item" @onclick="() => SelectTagSuggestion(suggestion)">
+                                                        <div class="d-flex justify-content-between align-items-center">
+                                                            <div>
+                                                                <span class="fw-bold">@suggestion.Name</span>
+                                                                <span class="badge bg-light text-dark ms-2">@suggestion.Category</span>
+                                                            </div>
+                                                            <small class="text-muted">@suggestion.Count docs</small>
+                                                        </div>
+                                                    </div>
+                                                }
+                                            </div>
+                                        }
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">
+                                            Category
+                                            @if (categoryAutoSelected)
+                                            {
+                                                <small class="text-success"><i class="fas fa-check me-1"></i>Auto-selected</small>
+                                            }
+                                        </label>
+                                        <select class="form-select" @bind="newTagCategory">
+                                            <option value="Genre">Genre (e.g., Fantasy, Sci-Fi, Horror)</option>
+                                            <option value="Series">Series (e.g., Marvel, DC, Worm)</option>
+                                            <option value="ContentType">Content Type (e.g., Supplement, Gauntlet)</option>
+                                            <option value="Quality">Quality (e.g., Complete, WIP, Popular)</option>
+                                            <option value="Format">Format (e.g., PDF, Google Doc)</option>
+                                            <option value="Size">Size (e.g., Small, Medium, Large)</option>
+                                            <option value="Version">Version (e.g., v1.0, v2.0)</option>
+                                            <option value="Other">Other</option>
+                                        </select>
+                                    </div>
+                                    @if (!string.IsNullOrWhiteSpace(newTagName))
+                                    {
+                                        <div class="alert alert-info py-2 mb-3">
+                                            <small>
+                                                <i class="fas fa-info-circle me-1"></i>
+                                                @if (IsExistingTag(newTagName))
+                                                {
+                                                    <span>This tag exists on <strong>@GetTagCount(newTagName)</strong> documents. Suggesting it for this document will require community votes.</span>
+                                                }
+                                                else
+                                                {
+                                                    <span>This will create a <strong>new tag</strong> "@newTagName" and suggest it for this document.</span>
+                                                }
+                                            </small>
+                                        </div>
+                                    }
+                                    <div class="d-flex justify-content-end gap-2">
+                                        <button class="btn btn-sm btn-secondary" @onclick="CloseSuggestDialog">
+                                            <i class="fas fa-times me-1"></i>Cancel
+                                        </button>
+                                        <button class="btn btn-sm btn-primary" 
+                                                @onclick="SuggestTag" 
+                                                disabled="@string.IsNullOrWhiteSpace(newTagName)">
+                                            <i class="fas fa-check me-1"></i>Submit Suggestion
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="CloseModal">Close</button>
+                    @if (selectedDocument.Tags != null && selectedDocument.Tags.Contains("Has Text"))
+                    {
+                        <a href="/api/browser/ui?docId=@selectedDocument.Id" target="_blank" class="btn btn-outline-primary">
+                            <i class="fas fa-file-alt me-1"></i> View Extracted Text
+                        </a>
+                    }
+                    else
+                    {
+                        <a href="/api/browser/ui?docId=@selectedDocument.Id" target="_blank" class="btn btn-outline-secondary" title="No extracted text available for this document">
+                            <i class="fas fa-file-alt me-1"></i> View Extracted Text
+                            <span class="badge bg-warning text-dark ms-1">No Text</span>
+                        </a>
+                    }
+                    <a href="@selectedDocument.WebViewLink" target="_blank" class="btn btn-primary">
+                        <i class="fas fa-external-link-alt me-1"></i> Open Document
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private string searchQuery = "";
+    private bool isSearching = false;
+    private List<SearchResult> searchResults = new List<SearchResult>();
+    private System.Threading.Timer? searchTimer;
+    
+    // Pagination variables
+    private int currentPage = 1;
+    private int pageSize = 50;
+    private int totalResults = 0;
+    private List<int> pageSizeOptions = new List<int> { 10, 25, 50, 100, 200 };
+    
+    // Tag filtering with inclusion/exclusion support
+    private List<TagInfo> availableTags = new List<TagInfo>();
+    private HashSet<string> includedTags = new HashSet<string>(); // Tags to include (green)
+    private HashSet<string> excludedTags = new HashSet<string>(); // Tags to exclude (red)
+    private HashSet<string> expandedCategories = new HashSet<string>();
+    #pragma warning disable CS0414 // Field is assigned but its value is never used
+    private bool isLoadingTags = false;
+    #pragma warning restore CS0414
+    
+    // Computed property for backwards compatibility
+    private HashSet<string> selectedTags => includedTags;
+    
+    // Modal-related variables
+    private SearchResult? selectedDocument = null;
+    private bool showModal = false;
+    
+    // Model for API response
+    public class SearchResult
+    {
+        public int Id { get; set; }
+        public string Name { get; set; } = "";
+        public string FolderPath { get; set; } = "";
+        public string SourceDrive { get; set; } = "";
+        public string MimeType { get; set; } = "";
+        public long Size { get; set; }
+        public string WebViewLink { get; set; } = "";
+        public DateTime ModifiedTime { get; set; }
+        public string Description { get; set; } = "";
+        public List<string> Tags { get; set; } = new List<string>();
+        public List<DocumentUrl> Urls { get; set; } = new List<DocumentUrl>();
+        public bool HasMultipleUrls { get; set; }
+        public string ThumbnailLink { get; set; } = "";
+        public bool HasThumbnail { get; set; }
+        public bool HasExtractedText { get; set; }
+    }
+
+    public class DocumentUrl
+    {
+        public string SourceDrive { get; set; } = "";
+        public string FolderPath { get; set; } = "";
+        public string WebViewLink { get; set; } = "";
+        public string DownloadLink { get; set; } = "";
+    }
+    
+    public class SearchResponse
+    {
+        public bool Success { get; set; }
+        public string Query { get; set; } = "";
+        public int ResultCount { get; set; }
+        public int TotalCount { get; set; }
+        public List<SearchResult> Results { get; set; } = new List<SearchResult>();
+    }
+
+    public class TagInfo
+    {
+        public string Name { get; set; } = "";
+        public string Category { get; set; } = "";
+        public int Count { get; set; }
+    }
+
+    public class TagsResponse
+    {
+        public bool Success { get; set; }
+        public int TotalTags { get; set; }
+        public List<TagApiResponse> AllTags { get; set; } = new List<TagApiResponse>();
+    }
+
+    public class TagApiResponse
+    {
+        public string TagName { get; set; } = "";
+        public string TagCategory { get; set; } = "";
+        public int Count { get; set; }
+    }
+    
+    // Tag voting models
+    public class PendingSuggestion
+    {
+        public int Id { get; set; }
+        public int JumpDocumentId { get; set; }
+        public string DocumentName { get; set; } = "";
+        public string TagName { get; set; } = "";
+        public string TagCategory { get; set; } = "";
+        public string SuggestedByUserId { get; set; } = "";
+        public DateTime CreatedAt { get; set; }
+        public int FavorVotes { get; set; }
+        public int AgainstVotes { get; set; }
+        public int TotalVotes { get; set; }
+        public double AgreementPercentage { get; set; }
+    }
+    
+    public class PendingRemoval
+    {
+        public int Id { get; set; }
+        public int JumpDocumentId { get; set; }
+        public string DocumentName { get; set; } = "";
+        public string TagName { get; set; } = "";
+        public string TagCategory { get; set; } = "";
+        public string RequestedByUserId { get; set; } = "";
+        public DateTime CreatedAt { get; set; }
+        public int FavorVotes { get; set; }
+        public int AgainstVotes { get; set; }
+        public int TotalVotes { get; set; }
+        public double AgreementPercentage { get; set; }
+    }
+    
+    public class PendingItemsResponse
+    {
+        public bool Success { get; set; }
+        public List<PendingSuggestion> PendingSuggestions { get; set; } = new List<PendingSuggestion>();
+        public List<PendingRemoval> PendingRemovalRequests { get; set; } = new List<PendingRemoval>();
+    }
+
+    public class VoteResponse
+    {
+        public bool Success { get; set; }
+        public string? Message { get; set; }
+        public VoteStats? VoteStats { get; set; }
+    }
+
+    public class VoteStats
+    {
+        public int FavorVotes { get; set; }
+        public int AgainstVotes { get; set; }
+        public int TotalVotes { get; set; }
+        public double AgreementPercentage { get; set; }
+    }
+
+    private void OnSearchInput()
+    {
+        currentPage = 1; // Reset to first page on new search
+        TriggerDebouncedSearch();
+    }
+    
+    private async Task PerformSearch()
+    {
+        // If no query and no tags, clear results
+        if (string.IsNullOrWhiteSpace(searchQuery) && !HasAnyTagFilters())
+        {
+            searchResults.Clear();
+            StateHasChanged();
+            return;
+        }
+            
+        isSearching = true;
+        StateHasChanged();
+        
+        try
+        {
+            // Build URL with query and tag filters
+            var url = "/api/search?";
+            var queryParams = new List<string>();
+            
+            if (!string.IsNullOrWhiteSpace(searchQuery))
+            {
+                queryParams.Add($"q={Uri.EscapeDataString(searchQuery)}");
+            }
+            
+            if (includedTags.Any())
+            {
+                queryParams.Add($"includeTags={Uri.EscapeDataString(string.Join(",", includedTags))}");
+            }
+            
+            if (excludedTags.Any())
+            {
+                queryParams.Add($"excludeTags={Uri.EscapeDataString(string.Join(",", excludedTags))}");
+            }
+            
+            queryParams.Add($"limit={pageSize}");
+            queryParams.Add($"offset={(currentPage - 1) * pageSize}");
+            url += string.Join("&", queryParams);
+            
+            // Configure JSON options for case-insensitive deserialization
+            var jsonOptions = new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true
+            };
+            
+            var httpResponse = await Http.GetAsync(url);
+            var jsonContent = await httpResponse.Content.ReadAsStringAsync();
+            var response = JsonSerializer.Deserialize<SearchResponse>(jsonContent, jsonOptions);
+            
+            if (response?.Success == true)
+            {
+                searchResults = response.Results;
+                totalResults = response.TotalCount > 0 ? response.TotalCount : response.ResultCount;
+            }
+            else
+            {
+                searchResults.Clear();
+                totalResults = 0;
+            }
+        }
+        catch (Exception)
+        {
+            searchResults.Clear();
+        }
+        finally
+        {
+            isSearching = false;
+            StateHasChanged();
+        }
+    }
+
+    // Tag voting related variables
+    private string userId = "";
+    private List<PendingSuggestion> pendingSuggestions = new List<PendingSuggestion>();
+    private List<PendingRemoval> pendingRemovals = new List<PendingRemoval>();
+    private Dictionary<int, bool> userVotes = new Dictionary<int, bool>(); // suggestionId/removalId → isInFavor
+    private bool showSuggestDialog = false;
+    private bool showRemovalConfirm = false;
+    private string newTagName = "";
+    private string newTagCategory = "Genre";
+    private string tagToRemove = "";
+    private string tagToRemoveCategory = "";
+    
+    // Tag autocomplete variables
+    private List<TagInfo> filteredTagSuggestions = new List<TagInfo>();
+    private bool showTagSuggestions = false;
+    private bool categoryAutoSelected = false;
+    
+    // Load available tags on component initialization
+    protected override async Task OnInitializedAsync()
+    {
+        userId = await GetOrCreateUserId();
+        await LoadAvailableTagsAsync();
+    }
+
+    private async Task LoadAvailableTagsAsync()
+    {
+        try
+        {
+            isLoadingTags = true;
+            
+            // Configure JSON options for case-insensitive deserialization
+            var jsonOptions = new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true
+            };
+            
+            var httpResponse = await Http.GetAsync("/api/search/tags");
+            var jsonContent = await httpResponse.Content.ReadAsStringAsync();
+            var response = JsonSerializer.Deserialize<TagsResponse>(jsonContent, jsonOptions);
+            
+            if (response?.Success == true && response.AllTags != null)
+            {
+                availableTags = response.AllTags.Select(t => new TagInfo
+                {
+                    Name = t.TagName,
+                    Category = t.TagCategory,
+                    Count = t.Count
+                }).ToList();
+            }
+        }
+        catch (Exception)
+        {
+            // Handle error silently
+        }
+        finally
+        {
+            isLoadingTags = false;
+            StateHasChanged();
+        }
+    }
+
+    private void ToggleTagFilter(string tagName)
+    {
+        // Cycle through states: unselected → included → excluded → unselected
+        if (includedTags.Contains(tagName))
+        {
+            // Currently included, move to excluded
+            includedTags.Remove(tagName);
+            excludedTags.Add(tagName);
+        }
+        else if (excludedTags.Contains(tagName))
+        {
+            // Currently excluded, move to unselected
+            excludedTags.Remove(tagName);
+        }
+        else
+        {
+            // Currently unselected, move to included
+            includedTags.Add(tagName);
+        }
+        
+        // Reset to first page when changing filters
+        currentPage = 1;
+        
+        // Trigger a new search with the updated filters
+        TriggerDebouncedSearch();
+        StateHasChanged();
+    }
+
+    private void ClearAllTags()
+    {
+        includedTags.Clear();
+        excludedTags.Clear();
+        TriggerDebouncedSearch();
+        StateHasChanged();
+    }
+
+    private void ToggleCategoryExpansion(string category)
+    {
+        if (expandedCategories.Contains(category))
+        {
+            expandedCategories.Remove(category);
+        }
+        else
+        {
+            expandedCategories.Add(category);
+        }
+        StateHasChanged();
+    }
+
+    private string GetTagFilterClass(string tagName)
+    {
+        if (includedTags.Contains(tagName))
+            return "bg-success"; // Green for included tags
+        else if (excludedTags.Contains(tagName))
+            return "bg-danger"; // Red for excluded tags
+        else
+            return "bg-secondary"; // Gray for unselected tags
+    }
+
+    private string GetTagFilterTitle(string tagName, int count)
+    {
+        if (includedTags.Contains(tagName))
+            return $"{count} documents - Click again to exclude this tag";
+        else if (excludedTags.Contains(tagName))
+            return $"Excluding {tagName} - Click again to remove filter";
+        else
+            return $"{count} documents - Click to include only this tag";
+    }
+
+    private bool HasAnyTagFilters()
+    {
+        return includedTags.Any() || excludedTags.Any();
+    }
+
+    private void TriggerDebouncedSearch()
+    {
+        // Cancel previous timer
+        searchTimer?.Dispose();
+        
+        // If empty query and no tags, clear results immediately
+        if (string.IsNullOrWhiteSpace(searchQuery) && !selectedTags.Any())
+        {
+            searchResults.Clear();
+            StateHasChanged();
+            return;
+        }
+
+        // Set up a new timer for debounced search
+        searchTimer = new System.Threading.Timer(async _ =>
+        {
+            await InvokeAsync(async () => await PerformSearch());
+        }, null, 300, Timeout.Infinite);
+    }
+    
+    private string GetShortPath(string fullPath)
+    {
+        if (string.IsNullOrEmpty(fullPath)) return "";
+        
+        var parts = fullPath.Split('/', StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length <= 2) return fullPath;
+        
+        return $".../{parts[^2]}/{parts[^1]}";
+    }
+    
+    private string FormatFileSize(long bytes)
+    {
+        if (bytes == 0) return "0 B";
+        
+        string[] suffixes = { "B", "KB", "MB", "GB" };
+        int suffixIndex = 0;
+        double size = bytes;
+        
+        while (size >= 1024 && suffixIndex < suffixes.Length - 1)
+        {
+            size /= 1024;
+            suffixIndex++;
+        }
+        
+        return $"{size:N1} {suffixes[suffixIndex]}";
+    }
+
+    private string GetFileIcon(string mimeType)
+    {
+        return mimeType switch
+        {
+            "application/pdf" => "fa-file-pdf",
+            "application/vnd.google-apps.document" => "fa-file-word",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document" => "fa-file-word",
+            "text/plain" => "fa-file-alt",
+            "image/jpeg" or "image/png" or "image/gif" or "image/webp" => "fa-file-image",
+            "application/vnd.ms-excel" or "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" => "fa-file-excel",
+            "application/vnd.ms-powerpoint" or "application/vnd.openxmlformats-officedocument.presentationml.presentation" => "fa-file-powerpoint",
+            "application/zip" or "application/x-zip-compressed" or "application/x-rar-compressed" => "fa-file-archive",
+            _ => "fa-file"
+        };
+    }
+
+    private string GetFileTypeLabel(string mimeType)
+    {
+        return mimeType switch
+        {
+            "application/pdf" => "PDF Document",
+            "application/vnd.google-apps.document" => "Google Doc",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document" => "Word Document",
+            "text/plain" => "Text File",
+            "image/jpeg" => "JPEG Image",
+            "image/png" => "PNG Image", 
+            "image/gif" => "GIF Image",
+            "image/webp" => "WebP Image",
+            "application/vnd.ms-excel" => "Excel File",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" => "Excel File",
+            "application/vnd.ms-powerpoint" => "PowerPoint",
+            "application/vnd.openxmlformats-officedocument.presentationml.presentation" => "PowerPoint",
+            "application/zip" => "ZIP Archive",
+            "application/x-zip-compressed" => "ZIP Archive",
+            "application/x-rar-compressed" => "RAR Archive",
+            _ => "Document"
+        };
+    }
+
+    private string GenerateGoogleDriveThumbnail(string webViewLink, string mimeType)
+    {
+        if (string.IsNullOrEmpty(webViewLink))
+            return "";
+
+        try
+        {
+            // Extract file ID from Google Drive URLs
+            var fileId = ExtractGoogleDriveFileId(webViewLink);
+            if (string.IsNullOrEmpty(fileId))
+                return "";
+
+            // Generate thumbnail URL - use the same pattern for all file types
+            // This URL pattern works better for public files and returns actual images
+            return $"https://drive.google.com/thumbnail?id={fileId}&sz=w300-h200";
+        }
+        catch
+        {
+            return "";
+        }
+    }
+
+    private string ExtractGoogleDriveFileId(string url)
+    {
+        if (string.IsNullOrEmpty(url))
+            return "";
+
+        // Handle different Google Drive URL patterns
+        // Pattern 1: /file/d/{fileId}/view
+        var match = System.Text.RegularExpressions.Regex.Match(url, @"/file/d/([a-zA-Z0-9-_]+)");
+        if (match.Success)
+            return match.Groups[1].Value;
+
+        // Pattern 2: /document/d/{fileId}/edit
+        match = System.Text.RegularExpressions.Regex.Match(url, @"/document/d/([a-zA-Z0-9-_]+)");
+        if (match.Success)
+            return match.Groups[1].Value;
+
+        // Pattern 3: id={fileId} parameter
+        match = System.Text.RegularExpressions.Regex.Match(url, @"[?&]id=([a-zA-Z0-9-_]+)");
+        if (match.Success)
+            return match.Groups[1].Value;
+
+        // Pattern 4: /d/{fileId}/ in various contexts
+        match = System.Text.RegularExpressions.Regex.Match(url, @"/d/([a-zA-Z0-9-_]+)/");
+        if (match.Success)
+            return match.Groups[1].Value;
+
+        return "";
+    }
+
+    private string GetTagColor(string tag)
+    {
+        // Simple tag coloring based on tag content for now
+        return tag.ToLowerInvariant() switch
+        {
+            // Text Extraction
+            "has text" => "bg-success text-white",
+            
+            // Content Types
+            "gauntlet" => "bg-danger text-white",
+            "supplement" => "bg-warning text-dark",
+            "jumpdoc" or "jumpDoc" => "bg-primary text-white",
+            
+            // Formats
+            "pdf" => "bg-secondary text-white",
+            "google doc" => "bg-primary text-white", 
+            "word doc" => "bg-info text-white",
+            
+            // Size Categories  
+            "tiny" => "bg-light text-dark",
+            "small" => "bg-light text-dark",
+            "medium" => "bg-secondary text-white",
+            "large" => "bg-warning text-dark",
+            "huge" => "bg-danger text-white",
+            
+            // Quality
+            "complete" => "bg-success text-white",
+            "wip" or "work in progress" => "bg-warning text-dark",
+            "popular" => "bg-info text-white",
+            "official" => "bg-success text-white",
+            
+            // Series/Franchises
+            "generic" => "bg-secondary text-white",
+            "worm" => "bg-warning text-dark",
+            "marvel" => "bg-danger text-white",
+            "dc" => "bg-primary text-white",
+            
+            // Drives
+            _ when tag.Contains("drive") || tag.Contains("Drive") => "bg-dark text-white",
+            
+            // Default
+            _ => "bg-light text-dark"
+        };
+    }
+
+    private string GetTagFilterColor(string tag)
+    {
+        // Determine tag category by checking available tags
+        var tagInfo = availableTags.FirstOrDefault(t => t.Name == tag);
+        var category = tagInfo?.Category ?? "";
+        
+        return category switch
+        {
+            "ContentType" => "bg-primary bg-opacity-25 text-dark border border-primary",
+            "Format" => "bg-secondary bg-opacity-25 text-dark border border-secondary", 
+            "Extraction" => "bg-success bg-opacity-25 text-dark border border-success",
+            "Size" => "bg-info bg-opacity-25 text-dark border border-info",
+            "Quality" => "bg-success bg-opacity-25 text-dark border border-success",
+            "Series" => "bg-warning bg-opacity-25 text-dark border border-warning",
+            "Drive" => "bg-dark bg-opacity-25 text-dark border border-dark",
+            "Folder" => "bg-light border border-secondary text-dark",
+            _ => "bg-light border border-secondary text-dark"
+        };
+    }
+
+    private int GetCategoryOrder(string category)
+    {
+        return category switch
+        {
+            "ContentType" => 1,
+            "Format" => 2,
+            "Extraction" => 3,
+            "Size" => 4,
+            "Quality" => 5,
+            "Series" => 6,
+            "Drive" => 7,
+            "Folder" => 8,
+            _ => 9
+        };
+    }
+
+    // Pagination methods
+    private int TotalPages => (int)Math.Ceiling((double)totalResults / pageSize);
+
+    private RenderFragment RenderPaginationControls() => builder =>
+    {
+        builder.OpenElement(0, "nav");
+        builder.OpenElement(1, "ul");
+        builder.AddAttribute(2, "class", "pagination pagination-sm mb-0");
+
+        // Previous button
+        builder.OpenElement(3, "li");
+        builder.AddAttribute(4, "class", $"page-item {(currentPage == 1 ? "disabled" : "")}");
+        builder.OpenElement(5, "button");
+        builder.AddAttribute(6, "class", "page-link");
+        builder.AddAttribute(7, "onclick", EventCallback.Factory.Create(this, () => ChangePage(currentPage - 1)));
+        builder.AddAttribute(8, "disabled", currentPage == 1);
+        builder.AddContent(9, "Previous");
+        builder.CloseElement(); // button
+        builder.CloseElement(); // li
+
+        // Page numbers
+        var startPage = Math.Max(1, currentPage - 2);
+        var endPage = Math.Min(TotalPages, currentPage + 2);
+
+        if (startPage > 1)
+        {
+            // First page
+            builder.OpenElement(10, "li");
+            builder.AddAttribute(11, "class", "page-item");
+            builder.OpenElement(12, "button");
+            builder.AddAttribute(13, "class", "page-link");
+            builder.AddAttribute(14, "onclick", EventCallback.Factory.Create(this, () => ChangePage(1)));
+            builder.AddContent(15, "1");
+            builder.CloseElement(); // button
+            builder.CloseElement(); // li
+
+            if (startPage > 2)
+            {
+                builder.OpenElement(16, "li");
+                builder.AddAttribute(17, "class", "page-item disabled");
+                builder.OpenElement(18, "span");
+                builder.AddAttribute(19, "class", "page-link");
+                builder.AddContent(20, "...");
+                builder.CloseElement(); // span
+                builder.CloseElement(); // li
+            }
+        }
+
+        for (int i = startPage; i <= endPage; i++)
+        {
+            var page = i; // Capture for closure
+            builder.OpenElement(21, "li");
+            builder.AddAttribute(22, "class", $"page-item {(page == currentPage ? "active" : "")}");
+            builder.OpenElement(23, "button");
+            builder.AddAttribute(24, "class", "page-link");
+            builder.AddAttribute(25, "onclick", EventCallback.Factory.Create(this, () => ChangePage(page)));
+            builder.AddContent(26, page.ToString());
+            builder.CloseElement(); // button
+            builder.CloseElement(); // li
+        }
+
+        if (endPage < TotalPages)
+        {
+            if (endPage < TotalPages - 1)
+            {
+                builder.OpenElement(27, "li");
+                builder.AddAttribute(28, "class", "page-item disabled");
+                builder.OpenElement(29, "span");
+                builder.AddAttribute(30, "class", "page-link");
+                builder.AddContent(31, "...");
+                builder.CloseElement(); // span
+                builder.CloseElement(); // li
+            }
+
+            // Last page
+            builder.OpenElement(32, "li");
+            builder.AddAttribute(33, "class", "page-item");
+            builder.OpenElement(34, "button");
+            builder.AddAttribute(35, "class", "page-link");
+            builder.AddAttribute(36, "onclick", EventCallback.Factory.Create(this, () => ChangePage(TotalPages)));
+            builder.AddContent(37, TotalPages.ToString());
+            builder.CloseElement(); // button
+            builder.CloseElement(); // li
+        }
+
+        // Next button
+        builder.OpenElement(38, "li");
+        builder.AddAttribute(39, "class", $"page-item {(currentPage >= TotalPages ? "disabled" : "")}");
+        builder.OpenElement(40, "button");
+        builder.AddAttribute(41, "class", "page-link");
+        builder.AddAttribute(42, "onclick", EventCallback.Factory.Create(this, () => ChangePage(currentPage + 1)));
+        builder.AddAttribute(43, "disabled", currentPage >= TotalPages);
+        builder.AddContent(44, "Next");
+        builder.CloseElement(); // button
+        builder.CloseElement(); // li
+
+        builder.CloseElement(); // ul
+        builder.CloseElement(); // nav
+    };
+
+    private async Task ChangePage(int newPage)
+    {
+        if (newPage >= 1 && newPage <= TotalPages && newPage != currentPage)
+        {
+            currentPage = newPage;
+            await PerformSearch();
+        }
+    }
+
+    private async Task OnPageSizeChanged(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out int newSize))
+        {
+            pageSize = newSize;
+            currentPage = 1; // Reset to first page
+            await PerformSearch();
+        }
+    }
+
+    // Modal-related methods
+    private async Task ShowDocumentDetails(SearchResult document)
+    {
+        selectedDocument = document;
+        showModal = true;
+        await LoadPendingItemsForDocument(document.Id);
+        StateHasChanged();
+    }
+
+    private void CloseModal()
+    {
+        showModal = false;
+        selectedDocument = null;
+        StateHasChanged();
+    }
+
+    private string GetFileTypeDescription(string mimeType)
+    {
+        return mimeType switch
+        {
+            "application/pdf" => "PDF Document",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document" => "Word Document",
+            "application/vnd.google-apps.document" => "Google Document",
+            "application/vnd.google-apps.spreadsheet" => "Google Spreadsheet",
+            "application/vnd.google-apps.presentation" => "Google Presentation",
+            "application/msword" => "Word Document",
+            "application/vnd.ms-excel" => "Excel Spreadsheet",
+            "application/vnd.ms-powerpoint" => "PowerPoint Presentation",
+            "text/plain" => "Text File",
+            "image/jpeg" => "JPEG Image",
+            "image/png" => "PNG Image",
+            "image/gif" => "GIF Image",
+            _ => "Unknown File Type"
+        };
+    }
+
+    // Tag voting methods
+    private async Task<string> GetOrCreateUserId()
+    {
+        try
+        {
+            var storedUserId = await JSRuntime.InvokeAsync<string?>("localStorage.getItem", "jumpchain-user-id");
+            if (string.IsNullOrEmpty(storedUserId))
+            {
+                storedUserId = Guid.NewGuid().ToString();
+                await JSRuntime.InvokeVoidAsync("localStorage.setItem", "jumpchain-user-id", storedUserId);
+            }
+            return storedUserId;
+        }
+        catch
+        {
+            return Guid.NewGuid().ToString();
+        }
+    }
+
+    private async Task LoadPendingItemsForDocument(int documentId)
+    {
+        try
+        {
+            var jsonOptions = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+            var response = await Http.GetFromJsonAsync<PendingItemsResponse>($"/api/voting/document/{documentId}/pending", jsonOptions);
+            
+            if (response?.Success == true)
+            {
+                pendingSuggestions = response.PendingSuggestions;
+                pendingRemovals = response.PendingRemovalRequests;
+            }
+        }
+        catch
+        {
+            pendingSuggestions.Clear();
+            pendingRemovals.Clear();
+        }
+    }
+
+    // Tag autocomplete methods
+    private void OnTagNameInput(ChangeEventArgs e)
+    {
+        newTagName = e.Value?.ToString() ?? "";
+        categoryAutoSelected = false;
+        
+        if (string.IsNullOrWhiteSpace(newTagName))
+        {
+            filteredTagSuggestions.Clear();
+            showTagSuggestions = false;
+        }
+        else
+        {
+            // Filter tags that match the input (case-insensitive, partial match)
+            filteredTagSuggestions = availableTags
+                .Where(t => t.Name.Contains(newTagName, StringComparison.OrdinalIgnoreCase))
+                .OrderByDescending(t => t.Name.StartsWith(newTagName, StringComparison.OrdinalIgnoreCase)) // Exact prefix matches first
+                .ThenByDescending(t => t.Count) // Then by popularity
+                .ThenBy(t => t.Name) // Then alphabetically
+                .ToList();
+            
+            showTagSuggestions = filteredTagSuggestions.Any();
+        }
+        
+        StateHasChanged();
+    }
+    
+    private void SelectTagSuggestion(TagInfo suggestion)
+    {
+        newTagName = suggestion.Name;
+        newTagCategory = suggestion.Category;
+        categoryAutoSelected = true;
+        showTagSuggestions = false;
+        filteredTagSuggestions.Clear();
+        StateHasChanged();
+    }
+    
+    private void CloseSuggestDialog()
+    {
+        showSuggestDialog = false;
+        newTagName = "";
+        newTagCategory = "Genre";
+        categoryAutoSelected = false;
+        filteredTagSuggestions.Clear();
+        showTagSuggestions = false;
+        StateHasChanged();
+    }
+    
+    private bool IsExistingTag(string tagName)
+    {
+        return availableTags.Any(t => t.Name.Equals(tagName, StringComparison.OrdinalIgnoreCase));
+    }
+    
+    private int GetTagCount(string tagName)
+    {
+        return availableTags.FirstOrDefault(t => t.Name.Equals(tagName, StringComparison.OrdinalIgnoreCase))?.Count ?? 0;
+    }
+
+    private async Task SuggestTag()
+    {
+        if (selectedDocument == null || string.IsNullOrWhiteSpace(newTagName)) return;
+
+        try
+        {
+            var request = new
+            {
+                DocumentId = selectedDocument.Id,
+                TagName = newTagName.Trim(),
+                TagCategory = newTagCategory,
+                UserId = userId
+            };
+
+            var response = await Http.PostAsJsonAsync("/api/voting/suggest-tag", request);
+            if (response.IsSuccessStatusCode)
+            {
+                // Reload pending items
+                await LoadPendingItemsForDocument(selectedDocument.Id);
+                
+                // Close dialog and reset form
+                CloseSuggestDialog();
+                
+                StateHasChanged();
+            }
+        }
+        catch
+        {
+            // Handle error silently for now
+        }
+    }
+
+    private async Task RequestRemoval(string tagName, string tagCategory)
+    {
+        if (selectedDocument == null) return;
+
+        try
+        {
+            var request = new
+            {
+                DocumentId = selectedDocument.Id,
+                TagName = tagName,
+                TagCategory = tagCategory,
+                UserId = userId
+            };
+
+            var response = await Http.PostAsJsonAsync("/api/voting/request-removal", request);
+            if (response.IsSuccessStatusCode)
+            {
+                await LoadPendingItemsForDocument(selectedDocument.Id);
+                StateHasChanged();
+            }
+        }
+        catch
+        {
+            // Handle error silently
+        }
+    }
+
+    private async Task VoteOnSuggestion(int suggestionId, bool isInFavor)
+    {
+        try
+        {
+            var request = new
+            {
+                UserId = userId,
+                SuggestionId = (int?)suggestionId,
+                RemovalRequestId = (int?)null,
+                IsInFavor = isInFavor
+            };
+
+            var response = await Http.PostAsJsonAsync("/api/voting/vote", request);
+            if (response.IsSuccessStatusCode)
+            {
+                var result = await response.Content.ReadFromJsonAsync<VoteResponse>();
+                if (result?.Success == true)
+                {
+                    // Update the local suggestion with new vote stats
+                    var suggestion = pendingSuggestions.FirstOrDefault(s => s.Id == suggestionId);
+                    if (suggestion != null && result.VoteStats != null)
+                    {
+                        suggestion.FavorVotes = result.VoteStats.FavorVotes;
+                        suggestion.AgainstVotes = result.VoteStats.AgainstVotes;
+                        suggestion.TotalVotes = result.VoteStats.TotalVotes;
+                        suggestion.AgreementPercentage = result.VoteStats.AgreementPercentage;
+                    }
+                    
+                    userVotes[suggestionId] = isInFavor;
+                    StateHasChanged();
+                }
+            }
+        }
+        catch
+        {
+            // Handle error silently
+        }
+    }
+
+    private async Task VoteOnRemoval(int removalId, bool isInFavor)
+    {
+        try
+        {
+            var request = new
+            {
+                UserId = userId,
+                SuggestionId = (int?)null,
+                RemovalRequestId = (int?)removalId,
+                IsInFavor = isInFavor
+            };
+
+            var response = await Http.PostAsJsonAsync("/api/voting/vote", request);
+            if (response.IsSuccessStatusCode)
+            {
+                var result = await response.Content.ReadFromJsonAsync<VoteResponse>();
+                if (result?.Success == true)
+                {
+                    // Update the local removal with new vote stats
+                    var removal = pendingRemovals.FirstOrDefault(r => r.Id == removalId);
+                    if (removal != null && result.VoteStats != null)
+                    {
+                        removal.FavorVotes = result.VoteStats.FavorVotes;
+                        removal.AgainstVotes = result.VoteStats.AgainstVotes;
+                        removal.TotalVotes = result.VoteStats.TotalVotes;
+                        removal.AgreementPercentage = result.VoteStats.AgreementPercentage;
+                    }
+                    
+                    userVotes[-removalId] = isInFavor; // Negative ID for removals
+                    StateHasChanged();
+                }
+            }
+        }
+        catch
+        {
+            // Handle error silently
+        }
+    }
+
+    private string GetCategoryFromTag(string tag)
+    {
+        // Try to find the tag in available tags first
+        var tagInfo = availableTags.FirstOrDefault(t => t.Name == tag);
+        if (tagInfo != null)
+        {
+            return tagInfo.Category;
+        }
+
+        // Otherwise try to infer from common patterns
+        if (tag == "PDF" || tag == "Word" || tag == "Image" || tag == "Text")
+            return "Format";
+        if (tag == "Has Text")
+            return "Content";
+        if (tag.StartsWith("Size:"))
+            return "Meta";
+        if (tag.Contains("Drive"))
+            return "Source";
+
+        return "Other"; // Default fallback
+    }
+
+    public void Dispose()
+    {
+        searchTimer?.Dispose();
+    }
+}
+
+<style>
+    .clickable-tag {
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+    
+    .clickable-tag:hover {
+        transform: scale(1.05);
+        box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    }
+    
+    /* Tag removal button styling */
+    .tag-with-remove {
+        padding-right: 1.5rem !important;
+        position: relative !important;
+    }
+    
+    .tag-remove-btn {
+        position: absolute !important;
+        right: 2px !important;
+        top: 50% !important;
+        transform: translateY(-50%) !important;
+        opacity: 0 !important;
+        transition: all 0.2s ease !important;
+        cursor: pointer !important;
+        border: none !important;
+        background: transparent !important;
+        color: rgba(0,0,0,0.7) !important;
+        font-size: 18px !important;
+        line-height: 1 !important;
+        padding: 0 2px !important;
+        margin: 0 !important;
+        font-weight: bold !important;
+        text-shadow: 0 0 2px rgba(255,255,255,0.8) !important;
+    }
+    
+    .tag-with-remove:hover .tag-remove-btn {
+        opacity: 1 !important;
+    }
+    
+    .tag-remove-btn:hover {
+        transform: translateY(-50%) scale(1.2) !important;
+        color: rgba(0,0,0,0.9) !important;
+        text-shadow: 0 0 4px rgba(255,255,255,1) !important;
+    }
+    
+    .tag-remove-btn:focus {
+        outline: none;
+        box-shadow: none;
+    }
+    
+    .tag-filter-wrapper {
+        /* Wrapper styling if needed */
+    }
+    
+    .selected {
+        box-shadow: 0 0 0 2px #007bff !important;
+        font-weight: bold;
+    }
+    
+    .tag-category {
+        border-bottom: 1px solid #dee2e6;
+        padding-bottom: 0.5rem;
+    }
+    
+    .tag-category:last-child {
+        border-bottom: none;
+    }
+
+    .tag-filter-compact {
+        border: 1px solid #dee2e6;
+        border-radius: 0.375rem;
+        padding: 0.75rem;
+        background: #f8f9fa;
+    }
+
+    .tag-category-inline {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.25rem;
+        border-bottom: 1px solid #e9ecef;
+        padding-bottom: 0.5rem;
+    }
+
+    .tag-category-inline:last-child {
+        border-bottom: none;
+        margin-bottom: 0 !important;
+    }
+
+    .category-label {
+        font-weight: 600;
+        color: #495057;
+        min-width: 80px;
+        font-size: 0.875rem;
+        margin-right: 0.5rem;
+    }
+
+    .show-more-btn {
+        font-size: 0.75rem;
+        padding: 0.125rem 0.375rem;
+        line-height: 1;
+    }
+
+    .expanded-tags {
+        width: 100%;
+        padding-left: 80px;
+    }
+    
+    .document-meta {
+        font-size: 0.875rem;
+    }
+    
+    .tags-container .badge {
+        font-size: 0.75rem;
+    }
+    
+    /* Modal and card enhancements */
+    .clickable-card {
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+    
+    .clickable-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.15) !important;
+    }
+    
+    .modal.show {
+        display: block;
+    }
+    
+    .modal-backdrop {
+        background-color: rgba(0,0,0,0.5);
+    }
+    
+    .thumbnail-container {
+        text-align: center;
+        position: relative;
+    }
+
+    .file-icon-container {
+        transition: all 0.3s ease;
+    }
+
+    .file-icon-container:hover {
+        background: var(--bs-light-rgb, 248, 249, 250) !important;
+        transform: translateY(-2px);
+        border-color: var(--bs-primary) !important;
+    }
+
+    .file-icon-fallback {
+        background: var(--bs-light);
+        border-radius: 8px;
+        border: 2px dashed var(--bs-border-color);
+        min-height: 200px;
+        align-items: center;
+        justify-content: center;
+        flex-direction: column;
+    }
+
+    .thumbnail-image {
+        border: 1px solid var(--bs-border-color);
+        transition: all 0.3s ease;
+    }
+
+    .thumbnail-image:hover {
+        transform: scale(1.02);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15) !important;
+    }
+    
+    .info-grid .row {
+        border-bottom: 1px solid #f8f9fa;
+        padding: 0.25rem 0;
+    }
+    
+    .info-grid .row:last-child {
+        border-bottom: none;
+    }
+    
+    .links-container .card {
+        transition: all 0.2s ease;
+    }
+    
+    .links-container .card:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+    }
+    
+    .tags-container-modal .badge {
+        font-size: 0.8rem;
+    }
+    
+    /* Community tag voting styles */
+    .pending-tag-item {
+        background: #f8f9fa;
+        transition: all 0.2s ease;
+    }
+    
+    .pending-tag-item:hover {
+        background: #e9ecef;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    .vote-controls .btn {
+        font-size: 0.75rem;
+        padding: 0.25rem 0.5rem;
+    }
+    
+    .modal-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0,0,0,0.5);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 2000;
+    }
+    
+    .modal-dialog-centered {
+        max-width: 400px;
+        width: 90%;
+    }
+    
+    .community-tags-list {
+        max-height: 300px;
+        overflow-y: auto;
+    }
+    
+    /* Tag autocomplete dropdown styles */
+    .tag-suggestions-dropdown {
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        background: white;
+        border: 1px solid #dee2e6;
+        border-radius: 0.375rem;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        max-height: 300px;
+        overflow-y: auto;
+        z-index: 1050;
+        margin-top: 2px;
+    }
+    
+    .suggestions-header {
+        padding: 0.5rem 0.75rem;
+        background: #f8f9fa;
+        border-bottom: 1px solid #dee2e6;
+        position: sticky;
+        top: 0;
+        z-index: 1;
+    }
+    
+    .suggestion-item {
+        padding: 0.75rem;
+        border-bottom: 1px solid #f8f9fa;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+    
+    .suggestion-item:last-child {
+        border-bottom: none;
+    }
+    
+    .suggestion-item:hover {
+        background: #e7f3ff;
+        border-left: 3px solid #0d6efd;
+    }
+    
+    .suggestion-item:active {
+        background: #cfe2ff;
+    }
+    
+    /* Modal dialog sizing for tag suggestion */
+    .modal-dialog-centered {
+        max-width: 500px;
+        width: 90%;
+    }
+</style>
+
