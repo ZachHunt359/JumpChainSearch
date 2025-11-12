@@ -30,6 +30,163 @@
         <a class="dismiss">🗙</a>
     </div>
 
+    <div id="components-reconnect-modal" class="components-reconnect-hide">
+        <div class="reconnect-overlay"></div>
+        <div class="reconnect-dialog">
+            <div class="reconnect-icon">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M23 4v6h-6M1 20v-6h6"/>
+                    <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+                </svg>
+            </div>
+            <div class="reconnect-content">
+                <h3 id="reconnect-title">Connecting...</h3>
+                <p id="reconnect-message">Attempting to reconnect to the server</p>
+                <div class="reconnect-progress">
+                    <div class="reconnect-progress-bar"></div>
+                </div>
+                <!-- Reload button removed: page will auto-reload when reconnection is possible -->
+            </div>
+        </div>
+    </div>
+
     <script src="_framework/blazor.server.js"></script>
+    <script>
+        // Blazor reconnection UI using default mechanism with custom display
+        (function() {
+            const reconnectModal = document.getElementById('components-reconnect-modal');
+            const reconnectTitle = document.getElementById('reconnect-title');
+            const reconnectMessage = document.getElementById('reconnect-message');
+            // Reload button removed
+            const progressBar = reconnectModal.querySelector('.reconnect-progress-bar');
+            
+            let reconnectTimerId = null;
+            let attemptCount = 0;
+            let checkInterval = null;
+            let pollInterval = null;
+            let pollAbort = null;
+            
+            function showReconnectUI(show) {
+                console.log(`${show ? 'Showing' : 'Hiding'} reconnect UI`);
+                if (show) {
+                    reconnectModal.classList.remove('components-reconnect-hide');
+                    reconnectModal.classList.add('components-reconnect-show');
+                } else {
+                    reconnectModal.classList.remove('components-reconnect-show');
+                    reconnectModal.classList.add('components-reconnect-hide');
+                }
+            }
+            
+            function updateProgress(attempt) {
+                const maxAttempts = 8;
+                const progress = (attempt / maxAttempts) * 100;
+                progressBar.style.width = progress + '%';
+                console.log(`Progress: ${progress}% (${attempt}/${maxAttempts})`);
+            }
+            
+            function startMonitoring() {
+                console.log('Starting reconnection monitoring');
+                if (checkInterval) {
+                    clearInterval(checkInterval);
+                }
+                if (pollInterval) {
+                    clearInterval(pollInterval);
+                }
+                if (pollAbort) {
+                    pollAbort.abort();
+                }
+                attemptCount = 0;
+                showReconnectUI(true);
+                reconnectTitle.textContent = 'Connection Lost';
+                reconnectMessage.textContent = 'Attempting to reconnect...';
+                updateProgress(0);
+                // Start polling the server for availability
+                pollAbort = new AbortController();
+                pollInterval = setInterval(() => {
+                    attemptCount++;
+                    reconnectTitle.textContent = 'Reconnecting...';
+                    reconnectMessage.textContent = `Attempt ${attemptCount} of 8`;
+                    updateProgress(attemptCount);
+                    fetch('/health', { method: 'GET', cache: 'no-store', signal: pollAbort.signal })
+                        .then(resp => {
+                            if (resp.ok) {
+                                console.log('Server available, reloading now');
+                                stopMonitoring();
+                                window.location.reload();
+                            }
+                        })
+                        .catch(() => {});
+                    if (attemptCount >= 8) {
+                        clearInterval(pollInterval);
+                        pollInterval = null;
+                        reconnectTitle.textContent = 'Reconnection Failed';
+                        reconnectMessage.textContent = 'Unable to reconnect. Reloading in 3 seconds...';
+                        updateProgress(8);
+                        reconnectTimerId = setTimeout(() => {
+                            console.log('Auto-reloading page');
+                            window.location.reload();
+                        }, 3000);
+                    }
+                }, 3000);
+            }
+            
+            function stopMonitoring() {
+                console.log('Stopping reconnection monitoring');
+                if (checkInterval) {
+                    clearInterval(checkInterval);
+                    checkInterval = null;
+                }
+                if (pollInterval) {
+                    clearInterval(pollInterval);
+                    pollInterval = null;
+                }
+                if (pollAbort) {
+                    pollAbort.abort();
+                    pollAbort = null;
+                }
+                if (reconnectTimerId) {
+                    clearTimeout(reconnectTimerId);
+                    reconnectTimerId = null;
+                }
+                attemptCount = 0;
+                showReconnectUI(false);
+            }
+            
+            // On disconnect, start monitoring. On reconnect, stop monitoring.
+            // Use Blazor's circuit error UI as the trigger for starting monitoring.
+            window.addEventListener('blazor:connection-lost', startMonitoring);
+            window.addEventListener('blazor:connection-restored', stopMonitoring);
+            // Fallback: also start monitoring on WebSocket disconnect error
+            const originalLog = console.error;
+            console.error = function(...args) {
+                const message = args.join(' ');
+                if (message.includes('Connection disconnected') || message.includes('WebSocket closed')) {
+                    startMonitoring();
+                }
+                originalLog.apply(console, args);
+            };
+            
+            // Also monitor Info logs for reconnection
+            window.addEventListener('load', () => {
+                setTimeout(() => {
+                    // Check if we can access Blazor's connection
+                    if (window.Blazor && window.Blazor._internal) {
+                        console.log('Blazor internal API available');
+                    }
+                }, 1000);
+            });
+            
+            // Reload button removed
+            
+            // Page visibility monitoring
+            document.addEventListener('visibilitychange', () => {
+                if (document.hidden) {
+                    console.log('Page hidden');
+                } else {
+                    console.log('Page visible - checking connection');
+                }
+            });
+        })();
+    </script>
 </body>
 </html>

@@ -48,6 +48,13 @@ namespace JumpChainSearch.Models
         // Method used to extract text (e.g., "google_drive_export", "basic_pdfpig", "improved_pdfpig")
         public string? ExtractionMethod { get; set; }
         
+        // Text review/editing fields
+        public bool TextNeedsReview { get; set; }
+        public DateTime? TextReviewFlaggedAt { get; set; }
+        public string? TextReviewFlaggedBy { get; set; }
+        public DateTime? TextLastEditedAt { get; set; }
+        public string? TextLastEditedBy { get; set; }
+        
         // Navigation properties
         public virtual ICollection<DocumentTag> Tags { get; set; } = new List<DocumentTag>();
         public virtual ICollection<DocumentUrl> Urls { get; set; } = new List<DocumentUrl>();

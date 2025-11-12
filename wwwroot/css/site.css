@@ -457,3 +457,162 @@ html, body {
 ::-webkit-scrollbar-thumb:hover {
     background: var(--text-muted);
 }
+
+/* ========================================
+   Blazor Reconnection UI
+   ======================================== */
+
+/* Hide the default reconnection UI elements */
+#components-reconnect-modal.components-reconnect-hide {
+    display: none !important;
+}
+
+#components-reconnect-modal.components-reconnect-show {
+    display: flex !important;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 9999;
+    align-items: center;
+    justify-content: center;
+    animation: fadeIn 0.2s ease-in;
+}
+
+.reconnect-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(4px);
+}
+
+.reconnect-dialog {
+    position: relative;
+    background: var(--bg-primary, #1a1a1a);
+    border: 1px solid var(--border-color, #333);
+    border-radius: 12px;
+    padding: 2rem;
+    max-width: 400px;
+    width: 90%;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+    animation: slideUp 0.3s ease-out;
+    text-align: center;
+    color: var(--text-primary, #e0e0e0);
+}
+
+@keyframes slideUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.reconnect-icon {
+    width: 48px;
+    height: 48px;
+    margin: 0 auto 1rem;
+    color: var(--accent-primary, #0d6efd);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.reconnect-icon svg {
+    animation: rotate 2s linear infinite;
+    transform-origin: center center;
+}
+
+@keyframes rotate {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+.reconnect-content h3 {
+    margin: 0 0 0.5rem;
+    font-size: 1.5rem;
+    color: var(--text-primary, #e0e0e0);
+}
+
+.reconnect-content p {
+    margin: 0 0 1.5rem;
+    color: var(--text-secondary, #999);
+    font-size: 0.95rem;
+}
+
+.reconnect-progress {
+    width: 100%;
+    height: 4px;
+    background: var(--bg-tertiary, #2a2a2a);
+    border-radius: 2px;
+    overflow: hidden;
+    margin-bottom: 1.5rem;
+}
+
+.reconnect-progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg, 
+        var(--accent-primary, #0d6efd) 0%, 
+        var(--accent-secondary, #20c997) 100%);
+    width: 0;
+    transition: width 0.3s ease;
+    border-radius: 2px;
+}
+
+.reconnect-btn {
+    background: var(--accent-primary, #0d6efd);
+    color: white;
+    border: none;
+    padding: 0.75rem 2rem;
+    border-radius: 8px;
+    font-size: 1rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.reconnect-btn:hover {
+    background: var(--accent-primary-hover, #0b5ed7);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(13, 110, 253, 0.4);
+}
+
+.reconnect-btn:active {
+    transform: translateY(0);
+}
+
+/* Mobile optimizations */
+@media (max-width: 576px) {
+    .reconnect-dialog {
+        padding: 1.5rem;
+        width: 95%;
+    }
+    
+    .reconnect-content h3 {
+        font-size: 1.25rem;
+    }
+    
+    .reconnect-content p {
+        font-size: 0.9rem;
+    }
+    
+    .reconnect-icon {
+        width: 40px;
+        height: 40px;
+    }
+}
+
+/* Ensure the old reconnect UI is hidden */
+#components-reconnect-show,
+#components-reconnect-hide,
+#components-reconnect-failed,
+#components-reconnect-rejected {
+    display: none !important;
+}

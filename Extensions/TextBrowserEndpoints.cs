@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using JumpChainSearch.Data;
+using JumpChainSearch.Services;
 
 namespace JumpChainSearch.Extensions;
 
@@ -17,6 +18,10 @@ public static class TextBrowserEndpoints
         group.MapGet("/browse/{documentId:int}", GetDocumentText);
         group.MapGet("/ui", TextBrowserUI);
         group.MapGet("/parser-test", ParserTestUI);
+        group.MapPost("/flag-review/{documentId:int}", FlagForReview);
+        group.MapPost("/unflag-review/{documentId:int}", UnflagReview);
+        group.MapPost("/save-text/{documentId:int}", SaveEditedText);
+        group.MapGet("/check-admin", CheckAdminStatus);
         #pragma warning restore ASP0016
         return group;
     }
@@ -146,6 +151,11 @@ public static class TextBrowserEndpoints
                 rawDocument.ExtractionMethod,
                 rawDocument.ExtractedText,
                 rawDocument.GoogleDriveFileId,
+                rawDocument.TextNeedsReview,
+                rawDocument.TextReviewFlaggedAt,
+                rawDocument.TextReviewFlaggedBy,
+                rawDocument.TextLastEditedAt,
+                rawDocument.TextLastEditedBy,
                 HasExtractedText = !string.IsNullOrEmpty(rawDocument.ExtractedText),
                 ExtractedTextLength = rawDocument.ExtractedText?.Length ?? 0,
                 WordCount = rawDocument.ExtractedText?.Split(' ', StringSplitOptions.RemoveEmptyEntries).Length ?? 0,
@@ -164,6 +174,152 @@ public static class TextBrowserEndpoints
                 error = ex.Message 
             });
         }
+    }
+
+    private static async Task<IResult> FlagForReview(
+        JumpChainDbContext context, 
+        int documentId, 
+        HttpContext httpContext)
+    {
+        try
+        {
+            var document = await context.JumpDocuments.FindAsync(documentId);
+            if (document == null)
+                return Results.NotFound(new { success = false, message = "Document not found" });
+
+            // Get user identifier (IP address if not logged in, username if admin)
+            var userIdentifier = httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+            var sessionToken = httpContext.Request.Cookies["admin_session"];
+            if (!string.IsNullOrEmpty(sessionToken))
+            {
+                // Try to get admin username
+                var adminSession = await context.AdminSessions
+                    .Include(s => s.AdminUser)
+                    .FirstOrDefaultAsync(s => s.SessionToken == sessionToken && s.ExpiresAt > DateTime.UtcNow);
+                if (adminSession != null)
+                    userIdentifier = adminSession.AdminUser.Username;
+            }
+
+            document.TextNeedsReview = true;
+            document.TextReviewFlaggedAt = DateTime.UtcNow;
+            document.TextReviewFlaggedBy = userIdentifier;
+
+            await context.SaveChangesAsync();
+
+            return Results.Ok(new { 
+                success = true, 
+                message = "Document flagged for review",
+                flaggedBy = userIdentifier
+            });
+        }
+        catch (Exception ex)
+        {
+            return Results.BadRequest(new { 
+                success = false, 
+                error = ex.Message 
+            });
+        }
+    }
+
+    private static async Task<IResult> UnflagReview(
+        JumpChainDbContext context, 
+        int documentId)
+    {
+        try
+        {
+            var document = await context.JumpDocuments.FindAsync(documentId);
+            if (document == null)
+                return Results.NotFound(new { success = false, message = "Document not found" });
+
+            document.TextNeedsReview = false;
+
+            await context.SaveChangesAsync();
+
+            return Results.Ok(new { 
+                success = true, 
+                message = "Review flag removed"
+            });
+        }
+        catch (Exception ex)
+        {
+            return Results.BadRequest(new { 
+                success = false, 
+                error = ex.Message 
+            });
+        }
+    }
+
+    private static async Task<IResult> SaveEditedText(
+        HttpContext httpContext,
+        JumpChainDbContext context,
+        AdminAuthService authService,
+        int documentId,
+        [FromBody] EditTextRequest request)
+    {
+        try
+        {
+            // Validate admin session
+            var sessionToken = httpContext.Request.Cookies["admin_session"];
+            if (string.IsNullOrEmpty(sessionToken))
+                return Results.Unauthorized();
+
+            var (valid, user) = await authService.ValidateSessionAsync(sessionToken);
+            if (!valid || user == null)
+                return Results.Unauthorized();
+
+            var document = await context.JumpDocuments.FindAsync(documentId);
+            if (document == null)
+                return Results.NotFound(new { success = false, message = "Document not found" });
+
+            document.ExtractedText = request.Text;
+            document.TextLastEditedAt = DateTime.UtcNow;
+            document.TextLastEditedBy = user.Username;
+            document.TextNeedsReview = false; // Clear review flag when edited
+
+            await context.SaveChangesAsync();
+
+            return Results.Ok(new { 
+                success = true, 
+                message = "Text saved successfully",
+                editedBy = user.Username,
+                editedAt = document.TextLastEditedAt
+            });
+        }
+        catch (Exception ex)
+        {
+            return Results.BadRequest(new { 
+                success = false, 
+                error = ex.Message 
+            });
+        }
+    }
+
+    private static async Task<IResult> CheckAdminStatus(
+        HttpContext httpContext,
+        AdminAuthService authService)
+    {
+        try
+        {
+            var sessionToken = httpContext.Request.Cookies["admin_session"];
+            if (string.IsNullOrEmpty(sessionToken))
+                return Results.Ok(new { isAdmin = false });
+
+            var (valid, user) = await authService.ValidateSessionAsync(sessionToken);
+            
+            return Results.Ok(new { 
+                isAdmin = valid && user != null,
+                username = user?.Username
+            });
+        }
+        catch
+        {
+            return Results.Ok(new { isAdmin = false });
+        }
+    }
+
+    public class EditTextRequest
+    {
+        public string Text { get; set; } = string.Empty;
     }
 
     private static async Task<IResult> TextBrowserUI(HttpContext context)
@@ -224,11 +380,20 @@ public static class TextBrowserEndpoints
         .badge { display: inline-block; padding: 2px 6px; border-radius: 3px; font-size: 0.8em; margin-left: 5px; }
         .badge.success { background: #d4edda; color: #155724; }
         .badge.danger { background: #f8d7da; color: #721c24; }
-        .text-controls { margin-bottom: 15px; display: flex; gap: 10px; align-items: center; }
+        .text-controls { margin-bottom: 15px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
         .text-controls button { background: #28a745; color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer; font-size: 14px; transition: background-color 0.2s; }
         .text-controls button:hover { background: #218838; }
         .text-controls button.secondary { background: #6c757d; }
         .text-controls button.secondary:hover { background: #5a6268; }
+        .text-controls button.warning { background: #ffc107; color: #000; }
+        .text-controls button.warning:hover { background: #e0a800; }
+        .text-controls button.danger { background: #dc3545; }
+        .text-controls button.danger:hover { background: #c82333; }
+        .text-controls button.primary { background: #007bff; }
+        .text-controls button.primary:hover { background: #0056b3; }
+        .text-controls .review-flag { padding: 5px 10px; background: #fff3cd; color: #856404; border: 1px solid #ffeaa7; border-radius: 4px; font-size: 0.9em; }
+        .edit-textarea { width: 100%; min-height: 500px; font-family: 'Georgia', 'Times New Roman', serif; font-size: 1em; line-height: 1.6; padding: 15px; border: 2px solid #007bff; border-radius: 5px; resize: vertical; }
+        .save-info { color: #666; font-size: 0.85em; margin-top: 10px; font-style: italic; }
     </style>
 </head>
 <body>
@@ -276,7 +441,23 @@ public static class TextBrowserEndpoints
     <script>
         let currentPage = 1;
         const limit = 10;
+        let isAdmin = false;
+        let isEditMode = false;
+        let currentDocumentId = null;
+        
+        async function checkAdminStatus() {
+            try {
+                const response = await fetch('/api/browser/check-admin');
+                const data = await response.json();
+                isAdmin = data.isAdmin;
+                return isAdmin;
+            } catch {
+                return false;
+            }
+        }
+        
         async function loadDocuments(page = 1) {
+            console.log('loadDocuments called with page:', page);
             currentPage = page;
             const search = document.getElementById('searchBox').value;
             const sortBy = document.getElementById('sortBy').value;
@@ -287,19 +468,32 @@ public static class TextBrowserEndpoints
             if (hasTextValue && hasTextValue !== '') { params.append('hasText', hasTextValue); }
             document.getElementById('documentsArea').innerHTML = '<div class=""loading"">Loading documents...</div>';
             try {
-                const response = await fetch(`/api/browser/browse?${params}`);
+                const url = `/api/browser/browse?${params}`;
+                console.log('Fetching:', url);
+                const response = await fetch(url);
                 const data = await response.json();
+                console.log('Received data:', data);
                 if (data.success) { displayStats(data); displayDocuments(data.documents); displayPagination(data); }
                 else { document.getElementById('documentsArea').innerHTML = `<div class=""error"">Error: ${data.error || 'Unknown error occurred'}</div>`; }
-            } catch (error) { document.getElementById('documentsArea').innerHTML = `<div class=""error"">Network error: ${error.message}</div>`; }
+            } catch (error) { 
+                console.error('Error loading documents:', error);
+                document.getElementById('documentsArea').innerHTML = `<div class=""error"">Network error: ${error.message}</div>`; 
+            }
         }
         function displayStats(data) {
             document.getElementById('statsArea').innerHTML = `<div class=""stats"">📊 <strong>${data.totalCount.toLocaleString()}</strong> documents found | Page <strong>${data.page}</strong> of <strong>${data.totalPages}</strong> | Showing <strong>${data.documents.length}</strong> documents</div>`;
         }
         function displayDocuments(documents) {
+            console.log('displayDocuments called with', documents.length, 'documents');
             if (documents.length === 0) { document.getElementById('documentsArea').innerHTML = '<div class=""no-text"">No documents found matching your criteria.</div>'; return; }
-            const html = documents.map(doc => `<div class=""document-card""><div class=""document-header"" onclick=""viewFullText(${doc.id})"">📄 ${escapeHtml(doc.name || 'Untitled')} (ID: ${doc.id}) ${doc.hasExtractedText ? '<span class=""badge success"">✅ Has Text</span>' : '<span class=""badge danger"">❌ No Text</span>'}</div><div class=""document-meta"">📁 <strong>Folder:</strong> ${escapeHtml(doc.folderPath || 'Root')} | 💾 <strong>Size:</strong> ${formatFileSize(doc.size)} | 📝 <strong>Text:</strong> ${doc.extractedTextLength.toLocaleString()} chars | 📖 <strong>Words:</strong> ${doc.wordCount.toLocaleString()} | 🔧 <strong>Method:</strong> ${escapeHtml(doc.extractionMethod || 'None')}</div>${doc.extractedTextPreview ? `<div class=""document-preview"">${escapeHtml(doc.extractedTextPreview)}</div>` : '<div class=""no-text"">No extracted text available - click to try viewing anyway</div>'}</div>`).join('');
-            document.getElementById('documentsArea').innerHTML = html;
+            try {
+                const html = documents.map(doc => `<div class=""document-card""><div class=""document-header"" onclick=""viewFullText(${doc.id})"">📄 ${escapeHtml(doc.name || 'Untitled')} (ID: ${doc.id}) ${doc.hasExtractedText ? '<span class=""badge success"">✅ Has Text</span>' : '<span class=""badge danger"">❌ No Text</span>'}</div><div class=""document-meta"">📁 <strong>Folder:</strong> ${escapeHtml(doc.folderPath || 'Root')} | 💾 <strong>Size:</strong> ${formatFileSize(doc.size)} | 📝 <strong>Text:</strong> ${doc.extractedTextLength.toLocaleString()} chars | 📖 <strong>Words:</strong> ${doc.wordCount.toLocaleString()} | 🔧 <strong>Method:</strong> ${escapeHtml(doc.extractionMethod || 'None')}</div>${doc.extractedTextPreview ? `<div class=""document-preview"">${escapeHtml(doc.extractedTextPreview)}</div>` : '<div class=""no-text"">No extracted text available - click to try viewing anyway</div>'}</div>`).join('');
+                document.getElementById('documentsArea').innerHTML = html;
+                console.log('Documents displayed successfully');
+            } catch (error) {
+                console.error('Error in displayDocuments:', error);
+                document.getElementById('documentsArea').innerHTML = '<div class=""error"">Error displaying documents</div>';
+            }
         }
         function displayPagination(data) {
             if (data.totalPages <= 1) { document.getElementById('paginationArea').innerHTML = ''; return; }
@@ -311,17 +505,110 @@ public static class TextBrowserEndpoints
             html += '</div>'; document.getElementById('paginationArea').innerHTML = html;
         }
         async function viewFullText(documentId) {
+            console.log('viewFullText called with documentId:', documentId);
+            currentDocumentId = documentId;
+            isEditMode = false;
             document.getElementById('modalContent').innerHTML = '<div class=""loading"">Loading document...</div>';
             document.getElementById('textModal').style.display = 'block';
+            await checkAdminStatus();
             try {
-                const response = await fetch(`/api/browser/browse/${documentId}`);
+                const url = `/api/browser/browse/${documentId}`;
+                console.log('Fetching document:', url);
+                const response = await fetch(url);
                 const data = await response.json();
+                console.log('Document data:', data);
                 if (data.success) {
                     const doc = data.document;
                     window.originalText = doc.extractedText;
-                    document.getElementById('modalContent').innerHTML = `<h2>📄 ${escapeHtml(doc.name || 'Untitled')}</h2><div class=""document-meta"" style=""margin-bottom: 15px; padding: 10px; background: #f8f9fa; border-radius: 5px;""><strong>ID:</strong> ${doc.id} | <strong>Size:</strong> ${formatFileSize(doc.size)} | <strong>Text Length:</strong> ${doc.extractedTextLength.toLocaleString()} chars | <strong>Words:</strong> ${doc.wordCount.toLocaleString()} | <strong>Lines:</strong> ${doc.lineCount.toLocaleString()}<br><strong>Folder:</strong> ${escapeHtml(doc.folderPath || 'Root')}<br><strong>Drive:</strong> ${escapeHtml(doc.sourceDrive || 'Unknown')} | <strong>Type:</strong> ${escapeHtml(doc.mimeType || 'Unknown')} | <strong>Method:</strong> ${escapeHtml(doc.extractionMethod || 'None')}</div>${doc.extractedText ? `<div class=""text-controls""><button id=""cleanTextBtn"" onclick=""toggleCleanText(${doc.id})"" title=""Remove unnecessary line breaks and clean up formatting"">🧹 Clean Text</button><button id=""fontToggleBtn"" onclick=""toggleFont()"" class=""secondary"" title=""Switch between serif and monospace font"">🔤 Toggle Font</button><span style=""color: #666; font-size: 0.9em;"">Tip: Cleaned text removes mid-paragraph line breaks</span></div><div class=""full-text"">${escapeHtml(doc.extractedText)}</div>` : '<div class=""no-text"">No extracted text available for this document.</div>'}`;
-                } else { document.getElementById('modalContent').innerHTML = `<div class=""error"">Error loading document: ${data.message || 'Unknown error'}</div>`; }
-            } catch (error) { document.getElementById('modalContent').innerHTML = `<div class=""error"">Network error: ${error.message}</div>`; }
+                    
+                    let reviewFlagHtml = '';
+                    if (doc.textNeedsReview) {
+                        reviewFlagHtml = `<span class=""review-flag"">⚠️ Flagged for review by ${escapeHtml(doc.textReviewFlaggedBy || 'user')} on ${new Date(doc.textReviewFlaggedAt).toLocaleString()}</span>`;
+                    }
+                    
+                    let editInfoHtml = '';
+                    if (doc.textLastEditedAt) {
+                        editInfoHtml = `<div class=""save-info"">✏️ Last edited by ${escapeHtml(doc.textLastEditedBy || 'admin')} on ${new Date(doc.textLastEditedAt).toLocaleString()}</div>`;
+                    }
+                    
+                    document.getElementById('modalContent').innerHTML = `<h2>📄 ${escapeHtml(doc.name || 'Untitled')}</h2><div class=""document-meta"" style=""margin-bottom: 15px; padding: 10px; background: #f8f9fa; border-radius: 5px;""><strong>ID:</strong> ${doc.id} | <strong>Size:</strong> ${formatFileSize(doc.size)} | <strong>Text Length:</strong> ${doc.extractedTextLength.toLocaleString()} chars | <strong>Words:</strong> ${doc.wordCount.toLocaleString()} | <strong>Lines:</strong> ${doc.lineCount.toLocaleString()}<br><strong>Folder:</strong> ${escapeHtml(doc.folderPath || 'Root')}<br><strong>Drive:</strong> ${escapeHtml(doc.sourceDrive || 'Unknown')} | <strong>Type:</strong> ${escapeHtml(doc.mimeType || 'Unknown')} | <strong>Method:</strong> ${escapeHtml(doc.extractionMethod || 'None')}</div>${doc.extractedText ? `<div class=""text-controls""><button id=""cleanTextBtn"" onclick=""toggleCleanText(${doc.id})"" title=""Remove unnecessary line breaks and clean up formatting"">🧹 Clean Text</button><button id=""fontToggleBtn"" onclick=""toggleFont()"" class=""secondary"" title=""Switch between serif and monospace font"">🔤 Toggle Font</button>${isAdmin ? `<button id=""editBtn"" onclick=""toggleEditMode()"" class=""primary"" title=""Edit the extracted text"">✏️ Edit</button>` : ''}<button id=""flagBtn"" onclick=""toggleReviewFlag(${doc.id}, ${doc.textNeedsReview})"" class=""${doc.textNeedsReview ? 'danger' : 'warning'}"" title=""${doc.textNeedsReview ? 'Remove review flag' : 'Flag this text for admin review'}"">${doc.textNeedsReview ? '✓ Unflag' : '⚠️ Needs Review'}</button>${reviewFlagHtml}</div><div id=""textContainer"" class=""full-text"">${escapeHtml(doc.extractedText)}</div>${editInfoHtml}` : '<div class=""no-text"">No extracted text available for this document.</div>'}`;
+                    console.log('Modal content updated successfully');
+                } else { 
+                    console.error('API returned error:', data.message);
+                    document.getElementById('modalContent').innerHTML = `<div class=""error"">Error loading document: ${data.message || 'Unknown error'}</div>`; 
+                }
+            } catch (error) { 
+                console.error('Error in viewFullText:', error);
+                document.getElementById('modalContent').innerHTML = `<div class=""error"">Network error: ${error.message}</div>`; 
+            }
+        }
+        
+        async function toggleReviewFlag(documentId, currentlyFlagged) {
+            const endpoint = currentlyFlagged ? 'unflag-review' : 'flag-review';
+            try {
+                const response = await fetch(`/api/browser/${endpoint}/${documentId}`, { method: 'POST' });
+                const data = await response.json();
+                if (data.success) {
+                    await viewFullText(documentId);
+                } else {
+                    alert('Error: ' + data.message);
+                }
+            } catch (error) {
+                alert('Network error: ' + error.message);
+            }
+        }
+        
+        function toggleEditMode() {
+            if (!isAdmin) {
+                alert('Admin access required to edit text');
+                return;
+            }
+            
+            const textContainer = document.getElementById('textContainer');
+            const editBtn = document.getElementById('editBtn');
+            
+            if (!isEditMode) {
+                const currentText = window.originalText || textContainer.textContent;
+                textContainer.innerHTML = `<textarea id=""editTextArea"" class=""edit-textarea"">${escapeHtml(currentText)}</textarea><div style=""margin-top: 10px;""><button onclick=""saveEditedText()"" style=""background: #007bff; color: white; border: none; padding: 10px 20px; font-size: 16px; border-radius: 4px; cursor: pointer;"">💾 Save Changes</button><button onclick=""cancelEdit()"" style=""background: #6c757d; color: white; border: none; padding: 10px 20px; font-size: 16px; border-radius: 4px; cursor: pointer; margin-left: 10px;"">❌ Cancel</button></div>`;
+                editBtn.textContent = '👁️ View Mode';
+                editBtn.style.background = '#6c757d';
+                isEditMode = true;
+            } else {
+                viewFullText(currentDocumentId);
+            }
+        }
+        
+        function cancelEdit() {
+            viewFullText(currentDocumentId);
+        }
+        
+        async function saveEditedText() {
+            const textarea = document.getElementById('editTextArea');
+            if (!textarea) return;
+            
+            const newText = textarea.value;
+            
+            if (!confirm(""Save changes to this document's extracted text?"")) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/browser/save-text/${currentDocumentId}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ text: newText })
+                });
+                
+                const data = await response.json();
+                if (data.success) {
+                    alert('Text saved successfully!');
+                    await viewFullText(currentDocumentId);
+                } else {
+                    alert('Error saving text: ' + (data.error || 'Unknown error'));
+                }
+            } catch (error) {
+                alert('Network error: ' + error.message);
+            }
         }
         function closeModal() { document.getElementById('textModal').style.display = 'none'; }
         function resetFilters() { document.getElementById('searchBox').value = ''; document.getElementById('sortBy').value = 'id'; document.getElementById('sortOrder').value = 'asc'; document.getElementById('hasText').value = ''; document.getElementById('extractionMethod').value = ''; loadDocuments(1); }

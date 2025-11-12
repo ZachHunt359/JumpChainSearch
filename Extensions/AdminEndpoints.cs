@@ -31,6 +31,9 @@ public static class AdminEndpoints
         
         // Genre tagging endpoints
         group.MapPost("/tags/apply-community-genres", ApplyCommunityGenreTags);
+        
+        // Text review queue endpoint
+        group.MapGet("/text-review/queue", GetTextReviewQueue);
 
         return group;
     }
@@ -82,42 +85,43 @@ public static class AdminEndpoints
             background: var(--bg-primary);
             color: var(--text-primary);
             line-height: 1.6;
+            min-height: 100vh;
         }}
         
-        .header {{
+        header {{
             background: var(--bg-secondary);
             border-bottom: 2px solid var(--accent);
-            padding: 1.5rem 2rem;
+            padding: 1rem 2rem;
             display: flex;
             justify-content: space-between;
             align-items: center;
             box-shadow: 0 2px 10px rgba(0,0,0,0.3);
         }}
         
-        .header h1 {{
-            font-size: 1.8rem;
+        header h1 {{
+            font-size: 1.6rem;
             color: var(--text-primary);
         }}
         
         .header-info {{
             display: flex;
             align-items: center;
-            gap: 1.5rem;
+            gap: 1rem;
         }}
         
         .user-info {{
             color: var(--text-secondary);
-            font-size: 0.9rem;
+            font-size: 0.85rem;
         }}
         
         .btn {{
-            padding: 0.5rem 1.5rem;
+            padding: 0.4rem 1rem;
             background: var(--accent);
             color: white;
             border: none;
-            border-radius: 5px;
+            border-radius: 4px;
             cursor: pointer;
-            font-size: 0.9rem;
+            font-size: 0.85rem;
             transition: background 0.3s, transform 0.1s;
             text-decoration: none;
             display: inline-block;
@@ -125,7 +129,7 @@ public static class AdminEndpoints
         
         .btn:hover {{
             background: var(--accent-hover);
-            transform: translateY(-2px);
+            transform: translateY(-1px);
         }}
         
         .btn:active {{
@@ -156,81 +160,157 @@ public static class AdminEndpoints
             background: #c0392b;
         }}
         
-        .container {{
-            max-width: 1400px;
-            margin: 0 auto;
-            padding: 2rem;
+        .btn-primary {{
+            background: #3498db;
         }}
         
+        .btn-primary:hover {{
+            background: #2980b9;
+        }}
+        
+        main {{
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 1rem;
+        }}
+        
+        /* Tab Navigation */
+        nav {{
+            background: var(--bg-secondary);
+            border-radius: 8px;
+            padding: 0.5rem;
+            margin-bottom: 1rem;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+        }}
+        
+        .tab-nav {{
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }}
+        
+        .tab-button {{
+            position: relative;
+            padding: 0.6rem 1.2rem;
+            background: transparent;
+            border: none;
+            color: var(--text-secondary);
+            cursor: pointer;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }}
+        
+        .tab-button:hover {{
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+        }}
+        
+        .tab-button.active {{
+            background: var(--accent);
+            color: white;
+        }}
+        
+        .badge {{
+            display: inline-block;
+            min-width: 18px;
+            height: 18px;
+            padding: 0 5px;
+            background: var(--danger);
+            color: white;
+            border-radius: 9px;
+            font-size: 0.7rem;
+            font-weight: bold;
+            line-height: 18px;
+            text-align: center;
+        }}
+        
+        .badge.success {{
+            background: var(--success);
+        }}
+        
+        /* Stats Dashboard */
         .stats-grid {{
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 1.5rem;
-            margin-bottom: 2rem;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-bottom: 1rem;
         }}
         
         .stat-card {{
             background: var(--bg-secondary);
             border: 1px solid var(--border);
-            border-radius: 10px;
-            padding: 1.5rem;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+            border-radius: 8px;
+            padding: 1rem;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.2);
         }}
         
         .stat-card h3 {{
             color: var(--text-secondary);
-            font-size: 0.9rem;
-            margin-bottom: 0.5rem;
+            font-size: 0.8rem;
+            margin-bottom: 0.3rem;
             text-transform: uppercase;
             letter-spacing: 0.5px;
         }}
         
         .stat-value {{
-            font-size: 2.5rem;
+            font-size: 2rem;
             font-weight: bold;
             color: var(--accent);
         }}
         
-        .section {{
-            background: var(--bg-secondary);
-            border: 1px solid var(--border);
-            border-radius: 10px;
-            padding: 2rem;
-            margin-bottom: 2rem;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+        /* Tab Content Sections */
+        .tab-content {{
+            display: none;
         }}
         
-        .section h2 {{
+        .tab-content.active {{
+            display: block;
+        }}
+        
+        section {{
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+        }}
+        
+        section h2 {{
             color: var(--text-primary);
-            margin-bottom: 1.5rem;
-            font-size: 1.5rem;
+            margin-bottom: 1rem;
+            font-size: 1.3rem;
             border-bottom: 2px solid var(--accent);
             padding-bottom: 0.5rem;
         }}
         
         .action-grid {{
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 1.5rem;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1rem;
         }}
         
         .action-card {{
             background: var(--bg-tertiary);
             border: 1px solid var(--border);
-            border-radius: 8px;
-            padding: 1.5rem;
+            border-radius: 6px;
+            padding: 1rem;
         }}
         
         .action-card h3 {{
             color: var(--text-primary);
-            margin-bottom: 1rem;
-            font-size: 1.2rem;
+            margin-bottom: 0.5rem;
+            font-size: 1.1rem;
         }}
         
         .action-card p {{
             color: var(--text-secondary);
-            font-size: 0.9rem;
-            margin-bottom: 1rem;
+            font-size: 0.85rem;
+            margin-bottom: 0.8rem;
         }}
         
         .status {{
@@ -293,41 +373,88 @@ public static class AdminEndpoints
     </style>
 </head>
 <body>
-    <div class=""header"">
+    <header>
         <h1>🚀 JumpChain Admin Portal</h1>
         <div class=""header-info"">
             <span class=""user-info"">Logged in as: <strong>{username}</strong></span>
             <a href=""/Admin/Logout"" class=""btn btn-secondary"">Logout</a>
         </div>
-    </div>
+    </header>
     
-    <div class=""container"">
-        <!-- Stats Dashboard -->
-        <div class=""stats-grid"">
-            <div class=""stat-card"">
-                <h3>Total Documents</h3>
-                <div class=""stat-value"" id=""total-docs"">{totalDocuments}</div>
+    <main>
+        <!-- Tab Navigation -->
+        <nav>
+            <div class=""tab-nav"">
+                <button class=""tab-button active"" onclick=""switchTab('dashboard')"">📊 Dashboard</button>
+                <button class=""tab-button"" onclick=""switchTab('processing')"">📦 Processing</button>
+                <button class=""tab-button"" onclick=""switchTab('drives')"">💾 Drives</button>
+                <button class=""tab-button"" onclick=""switchTab('tags')"">🏷️ Tags</button>
+                <button class=""tab-button"" id=""tag-voting-tab"" onclick=""switchTab('voting')"">
+                    🗳️ Tag Voting
+                    <span class=""badge"" id=""voting-badge"" style=""display: none;"">0</span>
+                </button>
+                <button class=""tab-button"" id=""text-review-tab"" onclick=""switchTab('review')"">
+                    📝 Text Review
+                    <span class=""badge"" id=""review-badge"" style=""display: none;"">0</span>
+                </button>
+                <button class=""tab-button"" onclick=""switchTab('system')"">⚙️ System</button>
             </div>
-            <div class=""stat-card"">
-                <h3>Processed Documents</h3>
-                <div class=""stat-value"" id=""processed-docs"">{processedDocuments}</div>
+        </nav>
+        
+        <!-- Dashboard Tab -->
+        <div id=""dashboard"" class=""tab-content active"">
+            <div class=""stats-grid"">
+                <div class=""stat-card"">
+                    <h3>Total Documents</h3>
+                    <div class=""stat-value"" id=""total-docs"">{totalDocuments}</div>
+                </div>
+                <div class=""stat-card"">
+                    <h3>Processed Documents</h3>
+                    <div class=""stat-value"" id=""processed-docs"">{processedDocuments}</div>
+                </div>
+                <div class=""stat-card"">
+                    <h3>Configured Drives</h3>
+                    <div class=""stat-value"" id=""total-drives"">{totalDrives}</div>
+                </div>
+                <div class=""stat-card"">
+                    <h3>Server Status</h3>
+                    <div class=""stat-value"" style=""color: var(--success);"">●</div>
+                </div>
             </div>
-            <div class=""stat-card"">
-                <h3>Configured Drives</h3>
-                <div class=""stat-value"" id=""total-drives"">{totalDrives}</div>
-            </div>
-            <div class=""stat-card"">
-                <h3>Server Status</h3>
-                <div class=""stat-value"" style=""color: var(--success);"">●</div>
-            </div>
+            
+            <section>
+                <h2>Quick Actions</h2>
+                <div class=""action-grid"">
+                    <div class=""action-card"">
+                        <h3>Start Drive Scan</h3>
+                        <p>Scan all configured drives for new documents.</p>
+                        <button class=""btn btn-success"" onclick=""switchTab('drives'); startDriveScan();"">Start Scan</button>
+                    </div>
+                    <div class=""action-card"">
+                        <h3>Process Text</h3>
+                        <p>Extract text from unprocessed documents.</p>
+                        <button class=""btn btn-success"" onclick=""switchTab('processing'); startBatch();"">Start Processing</button>
+                    </div>
+                    <div class=""action-card"">
+                        <h3>Review Queue</h3>
+                        <p id=""review-queue-summary"">Checking for flagged documents...</p>
+                        <button class=""btn btn-primary"" onclick=""switchTab('review')"">View Queue</button>
+                    </div>
+                    <div class=""action-card"">
+                        <h3>Tag Voting</h3>
+                        <p id=""voting-summary"">Checking for pending tags...</p>
+                        <button class=""btn btn-primary"" onclick=""switchTab('voting')"">View Pending</button>
+                    </div>
+                </div>
+            </section>
         </div>
         
-        <!-- Batch Processing Section -->
-        <div class=""section"">
-            <h2>📦 Batch Processing</h2>
-            <div class=""action-grid"">
+        <!-- Batch Processing Tab -->
+        <div id=""processing"" class=""tab-content"">
+            <section>
+                <h2>📦 Batch Text Extraction</h2>
                 <div class=""action-card"">
-                    <h3>Text Extraction</h3>
+                    <h3>Text Extraction Status</h3>
                     <p>Process documents to extract text content for search indexing.</p>
                     <span class=""status status-idle"" id=""batch-status"">Checking...</span>
                     <div class=""btn-group"" style=""margin-top: 1rem;"">
@@ -336,15 +463,15 @@ public static class AdminEndpoints
                     </div>
                     <div id=""batch-info"" style=""margin-top: 1rem; color: var(--text-secondary); font-size: 0.85rem;""></div>
                 </div>
-            </div>
+            </section>
         </div>
         
-        <!-- Drive Scanning Section -->
-        <div class=""section"">
-            <h2>💾 Google Drive Scanning</h2>
-            <div class=""action-grid"">
+        <!-- Drive Scanning Tab -->
+        <div id=""drives"" class=""tab-content"">
+            <section>
+                <h2>💾 Google Drive Scanning</h2>
                 <div class=""action-card"">
-                    <h3>Drive Sync</h3>
+                    <h3>Drive Sync Status</h3>
                     <p>Scan configured Google Drives for new JumpChain documents.</p>
                     <span class=""status status-idle"" id=""drive-status"">Checking...</span>
                     <div class=""btn-group"" style=""margin-top: 1rem;"">
@@ -353,46 +480,175 @@ public static class AdminEndpoints
                     </div>
                     <div id=""drive-info"" style=""margin-top: 1rem; color: var(--text-secondary); font-size: 0.85rem;""></div>
                 </div>
-            </div>
+            </section>
         </div>
         
-        <!-- Genre Tagging Section -->
-        <div class=""section"">
-            <h2>🏷️ Genre Tagging</h2>
-            <div class=""action-grid"">
+        <!-- Genre Tagging Tab -->
+        <div id=""tags"" class=""tab-content"">
+            <section>
+                <h2>🏷️ Genre Tagging</h2>
                 <div class=""action-card"">
                     <h3>Community Genre Tags</h3>
                     <p>Apply genre tags from the community tag list to matching documents.</p>
                     <button class=""btn btn-success"" onclick=""applyGenreTags()"">Apply Genre Tags</button>
                     <div id=""genre-info"" style=""margin-top: 1rem; color: var(--text-secondary); font-size: 0.85rem;""></div>
                 </div>
-            </div>
+            </section>
         </div>
         
-        <!-- System Management Section -->
-        <div class=""section"">
-            <h2>⚙️ System Management</h2>
-            <div class=""action-grid"">
-                <div class=""action-card"">
-                    <h3>Server Control</h3>
-                    <p>Restart the application server.</p>
-                    <button class=""btn btn-danger"" onclick=""restartServer()"">Restart Server</button>
+        <!-- Tag Voting Tab -->
+        <div id=""voting"" class=""tab-content"">
+            <section>
+                <h2>🗳️ Tag Recommendations</h2>
+                <div class=""action-grid"">
+                    <div class=""action-card"">
+                        <h3>Pending Tag Suggestions</h3>
+                        <p>Review and approve/reject community tag suggestions.</p>
+                        <button class=""btn btn-primary"" onclick=""loadPendingTags()"">Load Pending Tags</button>
+                    </div>
+                    <div class=""action-card"">
+                        <h3>Voting Configuration</h3>
+                        <p>Configure automatic approval thresholds.</p>
+                        <button class=""btn btn-secondary"" onclick=""showVotingConfig()"">Configure</button>
+                    </div>
                 </div>
-                
-                <div class=""action-card"">
-                    <h3>Batch Logs</h3>
-                    <p>View recent batch processing logs.</p>
-                    <button class=""btn btn-secondary"" onclick=""viewLogs()"">View Logs</button>
-                    <div id=""logs"" class=""log-container"" style=""display: none;""></div>
-                </div>
-            </div>
+                <div id=""pending-tags-info"" style=""margin-top: 1rem;""></div>
+            </section>
         </div>
-    </div>
+        
+        <!-- Text Review Tab -->
+        <div id=""review"" class=""tab-content"">
+            <section>
+                <h2>📝 Text Review Queue</h2>
+                <div class=""action-card"">
+                    <h3>Documents Needing Review</h3>
+                    <p>Documents flagged by users for text extraction errors.</p>
+                    <button class=""btn btn-primary"" onclick=""loadReviewQueue()"">Load Review Queue</button>
+                    <div id=""review-queue"" style=""margin-top: 1rem;""></div>
+                </div>
+            </section>
+        </div>
+        
+        <!-- System Management Tab -->
+        <div id=""system"" class=""tab-content"">
+            <section>
+                <h2>⚙️ System Management</h2>
+                <div class=""action-grid"">
+                    <div class=""action-card"">
+                        <h3>Server Control</h3>
+                        <p>Restart the application server.</p>
+                        <button class=""btn btn-danger"" onclick=""restartServer()"">Restart Server</button>
+                    </div>
+                    <div class=""action-card"">
+                        <h3>Batch Logs</h3>
+                        <p>View recent batch processing logs.</p>
+                        <button class=""btn btn-secondary"" onclick=""viewLogs()"">View Logs</button>
+                    </div>
+                </div>
+                <div id=""logs"" class=""log-container"" style=""display: none;""></div>
+            </section>
+        </div>
+    </main>
     
     <script>
-        // Auto-refresh status every 5 seconds
-        setInterval(updateStatus, 5000);
-        updateStatus();
+        // Tab Switching
+        function switchTab(tabName) {{
+            // Hide all tabs
+            document.querySelectorAll('.tab-content').forEach(tab => {{
+                tab.classList.remove('active');
+            }});
+            
+            // Remove active from all buttons
+            document.querySelectorAll('.tab-button').forEach(btn => {{
+                btn.classList.remove('active');
+            }});
+            
+            // Show selected tab
+            document.getElementById(tabName).classList.add('active');
+            
+            // Activate button
+            event.target.closest('.tab-button').classList.add('active');
+            
+            // Auto-load data for certain tabs
+            if (tabName === 'review') {{
+                loadReviewQueue();
+            }} else if (tabName === 'voting') {{
+                loadPendingTags();
+            }}
+        }}
+        
+        // Initialize on page load
+        window.addEventListener('DOMContentLoaded', () => {{
+            updateStatus();
+            checkReviewQueue();
+            checkVotingQueue();
+            // Poll every 30 seconds
+            setInterval(() => {{
+                updateStatus();
+                checkReviewQueue();
+                checkVotingQueue();
+            }}, 30000);
+        }});
+        
+        // Check review queue and update badge
+        async function checkReviewQueue() {{
+            try {{
+                const response = await fetch('/admin/text-review/queue');
+                const data = await response.json();
+                const count = data.documents ? data.documents.length : 0;
+                
+                const badge = document.getElementById('review-badge');
+                const summary = document.getElementById('review-queue-summary');
+                
+                if (count > 0) {{
+                    badge.textContent = count;
+                    badge.style.display = 'inline-block';
+                    if (summary) {{
+                        summary.textContent = `${{count}} document${{count !== 1 ? 's' : ''}} need${{count === 1 ? 's' : ''}} review`;
+                        summary.style.color = 'var(--warning)';
+                    }}
+                }} else {{
+                    badge.style.display = 'none';
+                    if (summary) {{
+                        summary.textContent = 'No documents need review ✓';
+                        summary.style.color = 'var(--success)';
+                    }}
+                }}
+            }} catch (e) {{
+                console.error('Error checking review queue:', e);
+            }}
+        }}
+        
+        // Check voting queue and update badge
+        async function checkVotingQueue() {{
+            try {{
+                const response = await fetch('/api/voting/pending');
+                const data = await response.json();
+                const suggestions = data.pendingSuggestions || [];
+                const removals = data.pendingRemovalRequests || [];
+                const count = suggestions.length + removals.length;
+                
+                const badge = document.getElementById('voting-badge');
+                const summary = document.getElementById('voting-summary');
+                
+                if (count > 0) {{
+                    badge.textContent = count;
+                    badge.style.display = 'inline-block';
+                    if (summary) {{
+                        summary.textContent = `${{count}} pending tag action${{count !== 1 ? 's' : ''}}`;
+                        summary.style.color = 'var(--warning)';
+                    }}
+                }} else {{
+                    badge.style.display = 'none';
+                    if (summary) {{
+                        summary.textContent = 'No pending tag actions ✓';
+                        summary.style.color = 'var(--success)';
+                    }}
+                }}
+            }} catch (e) {{
+                console.error('Error checking voting queue:', e);
+            }}
+        }}
         
         async function updateStatus() {{
             // Update batch status
@@ -525,6 +781,287 @@ public static class AdminEndpoints
             }} catch (e) {{
                 logsDiv.innerHTML = 'Error loading logs: ' + e.message;
             }}
+        }}
+        
+        // Text Review Queue Functions
+        async function loadReviewQueue() {{
+            const container = document.getElementById('review-queue');
+            container.innerHTML = '<div style=""color: var(--text-secondary);"">Loading review queue...</div>';
+            
+            try {{
+                const response = await fetch('/admin/text-review/queue');
+                const data = await response.json();
+                
+                if (data.success && data.documents && data.documents.length > 0) {{
+                    const html = `
+                        <table style=""width: 100%; border-collapse: collapse; margin-top: 1rem;"">
+                            <thead>
+                                <tr style=""border-bottom: 2px solid var(--border); text-align: left;"">
+                                    <th style=""padding: 0.5rem;"">Document</th>
+                                    <th style=""padding: 0.5rem;"">Flagged By</th>
+                                    <th style=""padding: 0.5rem;"">When</th>
+                                    <th style=""padding: 0.5rem;"">Text Length</th>
+                                    <th style=""padding: 0.5rem;"">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${{data.documents.map(doc => `
+                                    <tr style=""border-bottom: 1px solid var(--border);"">
+                                        <td style=""padding: 0.5rem;"">${{escapeHtml(doc.name)}}</td>
+                                        <td style=""padding: 0.5rem;"">${{escapeHtml(doc.textReviewFlaggedBy || 'Unknown')}}</td>
+                                        <td style=""padding: 0.5rem;"">${{doc.textReviewFlaggedAt ? new Date(doc.textReviewFlaggedAt).toLocaleDateString() : 'N/A'}}</td>
+                                        <td style=""padding: 0.5rem;"">${{doc.extractedTextLength ? doc.extractedTextLength.toLocaleString() : '0'}} chars</td>
+                                        <td style=""padding: 0.5rem;"">
+                                            <a href=""/api/browser/ui?docId=${{doc.id}}"" target=""_blank"" style=""display: inline-block; background: #007bff; color: white; text-decoration: none; padding: 0.4rem 0.8rem; border-radius: 4px; font-size: 0.85rem;"">✏️ Edit Text</a>
+                                        </td>
+                                    </tr>
+                                `).join('')}}
+                            </tbody>
+                        </table>
+                    `;
+                    container.innerHTML = html;
+                }} else {{
+                    container.innerHTML = '<div style=""color: var(--success); padding: 1rem;"">✅ No documents need review!</div>';
+                }}
+            }} catch (error) {{
+                container.innerHTML = `<div style=""color: var(--danger);"">Error loading queue: ${{error.message}}</div>`;
+            }}
+        }}
+        
+        // Tag Voting Functions
+        async function loadPendingTags() {{
+            const container = document.getElementById('pending-tags-info');
+            container.innerHTML = '<div style=""color: var(--text-secondary);"">Loading pending tags...</div>';
+            
+            try {{
+                const response = await fetch('/api/voting/pending');
+                const data = await response.json();
+                
+                if (!data.success) {{
+                    container.innerHTML = `<div style=""color: var(--danger);"">Error: ${{data.message || 'Failed to load'}}</div>`;
+                    return;
+                }}
+                
+                const suggestions = data.pendingSuggestions || [];
+                const removals = data.pendingRemovalRequests || [];
+                
+                if (suggestions.length === 0 && removals.length === 0) {{
+                    container.innerHTML = '<div style=""color: var(--success); padding: 1rem;"">✅ No pending tag actions!</div>';
+                    return;
+                }}
+                
+                let html = '';
+                
+                if (suggestions.length > 0) {{
+                    html += `
+                        <h4 style=""margin-top: 1rem; color: var(--accent);"">Tag Suggestions (${{suggestions.length}})</h4>
+                        <table style=""width: 100%; border-collapse: collapse; margin-top: 0.5rem;"">
+                            <thead>
+                                <tr style=""border-bottom: 2px solid var(--border); text-align: left;"">
+                                    <th style=""padding: 0.5rem;"">Document</th>
+                                    <th style=""padding: 0.5rem;"">Tag</th>
+                                    <th style=""padding: 0.5rem;"">Votes</th>
+                                    <th style=""padding: 0.5rem;"">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${{suggestions.map(s => `
+                                    <tr style=""border-bottom: 1px solid var(--border);"">
+                                        <td style=""padding: 0.5rem;"">${{escapeHtml(s.documentName || 'Doc #' + s.jumpDocumentId)}}</td>
+                                        <td style=""padding: 0.5rem;""><strong>${{escapeHtml(s.tagName)}}</strong></td>
+                                        <td style=""padding: 0.5rem;"">👍 ${{Math.round(s.favorVotes)}} / 👎 ${{Math.round(s.againstVotes)}}</td>
+                                        <td style=""padding: 0.5rem;"">
+                                            <button onclick=""approveSuggestion(${{s.id}})"" style=""background: var(--success); color: white; border: none; padding: 0.3rem 0.6rem; border-radius: 4px; cursor: pointer; margin-right: 0.5rem;"">✓ Approve</button>
+                                            <button onclick=""rejectSuggestion(${{s.id}})"" style=""background: var(--danger); color: white; border: none; padding: 0.3rem 0.6rem; border-radius: 4px; cursor: pointer;"">✗ Reject</button>
+                                        </td>
+                                    </tr>
+                                `).join('')}}
+                            </tbody>
+                        </table>
+                    `;
+                }}
+                
+                if (removals.length > 0) {{
+                    html += `
+                        <h4 style=""margin-top: 1.5rem; color: var(--accent);"">Tag Removal Requests (${{removals.length}})</h4>
+                        <table style=""width: 100%; border-collapse: collapse; margin-top: 0.5rem;"">
+                            <thead>
+                                <tr style=""border-bottom: 2px solid var(--border); text-align: left;"">
+                                    <th style=""padding: 0.5rem;"">Document</th>
+                                    <th style=""padding: 0.5rem;"">Tag</th>
+                                    <th style=""padding: 0.5rem;"">Votes</th>
+                                    <th style=""padding: 0.5rem;"">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${{removals.map(r => `
+                                    <tr style=""border-bottom: 1px solid var(--border);"">
+                                        <td style=""padding: 0.5rem;"">${{escapeHtml(r.documentName || 'Doc #' + r.jumpDocumentId)}}</td>
+                                        <td style=""padding: 0.5rem;""><strong>${{escapeHtml(r.tagName)}}</strong></td>
+                                        <td style=""padding: 0.5rem;"">👍 ${{Math.round(r.favorVotes)}} / 👎 ${{Math.round(r.againstVotes)}}</td>
+                                        <td style=""padding: 0.5rem;"">
+                                            <button onclick=""approveRemoval(${{r.id}})"" style=""background: var(--success); color: white; border: none; padding: 0.3rem 0.6rem; border-radius: 4px; cursor: pointer; margin-right: 0.5rem;"">✓ Approve Removal</button>
+                                            <button onclick=""rejectRemoval(${{r.id}})"" style=""background: var(--danger); color: white; border: none; padding: 0.3rem 0.6rem; border-radius: 4px; cursor: pointer;"">✗ Keep Tag</button>
+                                        </td>
+                                    </tr>
+                                `).join('')}}
+                            </tbody>
+                        </table>
+                    `;
+                }}
+                
+                container.innerHTML = html;
+            }} catch (error) {{
+                container.innerHTML = `<div style=""color: var(--danger);"">Error: ${{error.message}}</div>`;
+            }}
+        }}
+        
+        async function approveSuggestion(id) {{
+            try {{
+                const response = await fetch(`/api/voting/admin/approve-suggestion/${{id}}`, {{ method: 'POST' }});
+                const data = await response.json();
+                if (data.success) {{
+                    alert('✓ Tag suggestion approved!');
+                    loadPendingTags(); // Reload the list
+                }} else {{
+                    alert('Error: ' + (data.message || 'Failed to approve'));
+                }}
+            }} catch (error) {{
+                alert('Error: ' + error.message);
+            }}
+        }}
+        
+        async function rejectSuggestion(id) {{
+            try {{
+                const response = await fetch(`/api/voting/admin/reject-suggestion/${{id}}`, {{ method: 'POST' }});
+                const data = await response.json();
+                if (data.success) {{
+                    alert('✓ Tag suggestion rejected');
+                    loadPendingTags(); // Reload the list
+                }} else {{
+                    alert('Error: ' + (data.message || 'Failed to reject'));
+                }}
+            }} catch (error) {{
+                alert('Error: ' + error.message);
+            }}
+        }}
+        
+        async function approveRemoval(id) {{
+            try {{
+                const response = await fetch(`/api/voting/admin/approve-removal/${{id}}`, {{ method: 'POST' }});
+                const data = await response.json();
+                if (data.success) {{
+                    alert('✓ Tag removal approved');
+                    loadPendingTags(); // Reload the list
+                }} else {{
+                    alert('Error: ' + (data.message || 'Failed to approve'));
+                }}
+            }} catch (error) {{
+                alert('Error: ' + error.message);
+            }}
+        }}
+        
+        async function rejectRemoval(id) {{
+            try {{
+                const response = await fetch(`/api/voting/admin/reject-removal/${{id}}`, {{ method: 'POST' }});
+                const data = await response.json();
+                if (data.success) {{
+                    alert('✓ Tag kept (removal rejected)');
+                    loadPendingTags(); // Reload the list
+                }} else {{
+                    alert('Error: ' + (data.message || 'Failed to reject'));
+                }}
+            }} catch (error) {{
+                alert('Error: ' + error.message);
+            }}
+        }}
+        
+        async function showVotingConfig() {{
+            const modal = document.createElement('div');
+            modal.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); display: flex; align-items: center; justify-content: center; z-index: 10000;';
+            
+            const content = document.createElement('div');
+            content.style.cssText = 'background: var(--bg-primary); padding: 2rem; border-radius: 8px; max-width: 500px; width: 90%;';
+            content.innerHTML = '<div style=""color: var(--text-secondary);"">Loading configuration...</div>';
+            
+            modal.appendChild(content);
+            document.body.appendChild(modal);
+            
+            try {{
+                const response = await fetch('/api/voting/config');
+                const data = await response.json();
+                
+                if (!data.success) {{
+                    content.innerHTML = `<div style=""color: var(--danger);"">Error loading config</div>`;
+                    return;
+                }}
+                
+                const config = data.config || {{}};
+                
+                content.innerHTML = `
+                    <h2 style=""margin-top: 0; color: var(--accent);"">Voting Configuration</h2>
+                    <form id=""voting-config-form"" style=""margin: 1rem 0;"">
+                        <div style=""margin-bottom: 1rem;"">
+                            <label style=""display: block; margin-bottom: 0.5rem;"">Auto-Approve Threshold (upvotes):</label>
+                            <input type=""number"" id=""approval-threshold"" value=""${{config.autoApproveThreshold || 5}}"" min=""1"" style=""width: 100%; padding: 0.5rem; border: 1px solid var(--border); border-radius: 4px; background: var(--bg-secondary); color: var(--text-primary);"">
+                        </div>
+                        <div style=""margin-bottom: 1rem;"">
+                            <label style=""display: block; margin-bottom: 0.5rem;"">Auto-Reject Threshold (downvotes):</label>
+                            <input type=""number"" id=""rejection-threshold"" value=""${{config.autoRejectThreshold || 5}}"" min=""1"" style=""width: 100%; padding: 0.5rem; border: 1px solid var(--border); border-radius: 4px; background: var(--bg-secondary); color: var(--text-primary);"">
+                        </div>
+                        <div style=""margin-bottom: 1rem;"">
+                            <label style=""display: flex; align-items: center;"">
+                                <input type=""checkbox"" id=""enable-auto-processing"" ${{config.enableAutoProcessing ? 'checked' : ''}} style=""margin-right: 0.5rem;"">
+                                Enable automatic processing
+                            </label>
+                        </div>
+                        <div style=""display: flex; gap: 0.5rem; margin-top: 1.5rem;"">
+                            <button type=""button"" onclick=""saveVotingConfig()"" style=""flex: 1; background: var(--success); color: white; border: none; padding: 0.75rem; border-radius: 4px; cursor: pointer; font-weight: bold;"">💾 Save</button>
+                            <button type=""button"" onclick=""closeVotingConfig()"" style=""flex: 1; background: var(--danger); color: white; border: none; padding: 0.75rem; border-radius: 4px; cursor: pointer;"">✗ Cancel</button>
+                        </div>
+                    </form>
+                `;
+            }} catch (error) {{
+                content.innerHTML = `<div style=""color: var(--danger);"">Error: ${{error.message}}</div>`;
+            }}
+        }}
+        
+        async function saveVotingConfig() {{
+            try {{
+                const config = {{
+                    autoApproveThreshold: parseInt(document.getElementById('approval-threshold').value),
+                    autoRejectThreshold: parseInt(document.getElementById('rejection-threshold').value),
+                    enableAutoProcessing: document.getElementById('enable-auto-processing').checked
+                }};
+                
+                const response = await fetch('/api/voting/config', {{
+                    method: 'POST',
+                    headers: {{ 'Content-Type': 'application/json' }},
+                    body: JSON.stringify(config)
+                }});
+                
+                const data = await response.json();
+                if (data.success) {{
+                    alert('✓ Configuration saved!');
+                    closeVotingConfig();
+                }} else {{
+                    alert('Error: ' + (data.message || 'Failed to save'));
+                }}
+            }} catch (error) {{
+                alert('Error: ' + error.message);
+            }}
+        }}
+        
+        function closeVotingConfig() {{
+            const modal = document.querySelector('div[style*=""position: fixed""]');
+            if (modal) modal.remove();
+        }}
+        
+        function escapeHtml(text) {{
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
         }}
     </script>
 </body>
@@ -939,6 +1476,40 @@ try {
         catch (Exception ex)
         {
             Console.WriteLine($"Error applying genre tags: {ex.Message}");
+            return Results.BadRequest(new { success = false, error = ex.Message });
+        }
+    }
+
+    private static async Task<IResult> GetTextReviewQueue(HttpContext context, JumpChainDbContext dbContext, AdminAuthService authService)
+    {
+        var (valid, user) = await ValidateSession(context, authService);
+        if (!valid)
+            return Results.Unauthorized();
+
+        try
+        {
+            var flaggedDocuments = await dbContext.JumpDocuments
+                .Where(d => d.TextNeedsReview)
+                .OrderByDescending(d => d.TextReviewFlaggedAt)
+                .Select(d => new
+                {
+                    d.Id,
+                    d.Name,
+                    d.TextReviewFlaggedBy,
+                    d.TextReviewFlaggedAt,
+                    ExtractedTextLength = d.ExtractedText != null ? d.ExtractedText.Length : 0
+                })
+                .ToListAsync();
+
+            return Results.Ok(new
+            {
+                success = true,
+                documents = flaggedDocuments
+            });
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error fetching text review queue: {ex.Message}");
             return Results.BadRequest(new { success = false, error = ex.Message });
         }
     }

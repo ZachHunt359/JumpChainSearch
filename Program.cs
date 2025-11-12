@@ -37,191 +37,44 @@ catch (Exception ex)
     Console.WriteLine($"Warning: Could not load .env file: {ex.Message}");
 }
 
-// Handle CLI commands for admin user creation
-if (args.Length > 0 && args[0] == "create-admin")
-{
-    if (args.Length < 3)
-    {
-        Console.WriteLine("Usage: dotnet run -- create-admin <username> <password>");
-        Console.WriteLine("Password must be at least 8 characters.");
-        return 1;
-    }
 
-    var username = args[1];
-    var password = args[2];
-
-    // Build minimal services for CLI command
-    var tempBuilder = WebApplication.CreateBuilder();
-    tempBuilder.Services.AddDbContext<JumpChainDbContext>(options =>
-        options.UseSqlite(tempBuilder.Configuration.GetConnectionString("DefaultConnection") ?? "Data Source=jumpchain.db"));
-    tempBuilder.Services.AddScoped<AdminAuthService>();
-    
-    var tempApp = tempBuilder.Build();
-    
-    using (var scope = tempApp.Services.CreateScope())
-    {
-        var authService = scope.ServiceProvider.GetRequiredService<AdminAuthService>();
-        try
-        {
-            var user = await authService.CreateAdminUserAsync(username, password);
-            Console.WriteLine($"✓ Admin user '{username}' created successfully!");
-            Console.WriteLine($"  User ID: {user.Id}");
-            Console.WriteLine($"  Created: {user.CreatedAt}");
-            Console.WriteLine("\nYou can now login at: http://localhost:5248/admin/");
-            return 0;
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"✗ Error creating admin user: {ex.Message}");
-            return 1;
-        }
-    }
-}
+// Handle CLI commands (admin user creation, etc.)
+var cliResult = await CliAdminCommands.Handle(args);
+if (cliResult >= 0) return cliResult;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddRazorPages();
-builder.Services.AddServerSideBlazor();
+builder.Services.AddServerSideBlazor(options =>
+{
+    // Improve reconnection experience
+    options.DisconnectedCircuitRetentionPeriod = TimeSpan.FromMinutes(3);
+    options.DisconnectedCircuitMaxRetained = 100;
+    options.JSInteropDefaultCallTimeout = TimeSpan.FromMinutes(2);
+    
+    // For mobile: Be more patient with reconnections
+    options.MaxBufferedUnacknowledgedRenderBatches = 10;
+})
+.AddHubOptions(options =>
+{
+builder.Services.AddMemoryCache();
+builder.Services.AddJumpChainServices(connectionString);
+
+    // SignalR configuration for better mobile experience
+    options.ClientTimeoutInterval = TimeSpan.FromSeconds(60); // Default is 30s
+    options.HandshakeTimeout = TimeSpan.FromSeconds(30); // Default is 15s
+    options.KeepAliveInterval = TimeSpan.FromSeconds(15); // Default is 15s
+    options.MaximumReceiveMessageSize = 64 * 1024; // 64KB
+});
+
+// Add memory caching for search response caching
+builder.Services.AddMemoryCache();
 
 // Configure JSON options for case-insensitive property matching
-builder.Services.ConfigureHttpJsonOptions(options =>
-{
-    options.SerializerOptions.PropertyNameCaseInsensitive = true;
-});
 
-// Add Entity Framework
-var connectionString = Environment.GetEnvironmentVariable("CONNECTION_STRING") 
-                       ?? builder.Configuration.GetConnectionString("DefaultConnection") 
-                       ?? "Data Source=jumpchain.db";
-
-builder.Services.AddDbContext<JumpChainDbContext>(options =>
-    options.UseSqlite(connectionString));
-
-// Add custom services
-builder.Services.AddScoped<IGoogleDriveService, GoogleDriveService>();
-builder.Services.AddScoped<ISearchService, SearchService>();
-builder.Services.AddScoped<IPurchasableParsingService, PurchasableParsingService>();
-builder.Services.AddScoped<GenreTagService>();
-builder.Services.AddScoped<AdminAuthService>();
-
-// Configure HttpClient for Blazor Server
-builder.Services.AddScoped(sp => new HttpClient 
-{ 
-    BaseAddress = new Uri(sp.GetRequiredService<NavigationManager>().BaseUri) 
-});
-
-// Configure JSON serialization options globally
-builder.Services.Configure<JsonSerializerOptions>(options =>
-{
-    options.PropertyNameCaseInsensitive = true;
-});
-
-
-
-var app = builder.Build();
-
-// Create database if it doesn't exist and generate tags for existing documents
-using (var scope = app.Services.CreateScope())
-{
-    var context = scope.ServiceProvider.GetRequiredService<JumpChainDbContext>();
-    context.Database.EnsureCreated();
-    
-    // Initialize drive configurations from .env if table is empty
-    if (!context.DriveConfigurations.Any())
-    {
-        Console.WriteLine("Initializing drive configurations from .env...");
-        var drivesConfig = Environment.GetEnvironmentVariable("JUMPCHAIN_DRIVES_CONFIG");
-        if (!string.IsNullOrEmpty(drivesConfig))
-        {
-            try
-            {
-                var drives = JsonSerializer.Deserialize<List<JumpChainDriveConfig>>(drivesConfig);
-                if (drives != null)
-                {
-                    foreach (var drive in drives)
-                    {
-                        context.DriveConfigurations.Add(new DriveConfiguration
-                        {
-                            DriveId = drive.folderId,
-                            DriveName = drive.name,
-                            Description = $"JumpChain community drive",
-                            IsActive = true,
-                            LastScanTime = DateTime.MinValue,
-                            DocumentCount = 0
-                        });
-                    }
-                    context.SaveChanges();
-                    Console.WriteLine($"Initialized {drives.Count} drive configurations.");
-                }
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Warning: Could not initialize drive configurations: {ex.Message}");
-            }
-        }
-    }
-    
-    // Skip automatic tag generation for now to avoid startup errors
-    Console.WriteLine("Skipping automatic tag generation on startup.");
-}
-
-// Configure the HTTP request pipeline.
-if (!app.Environment.IsDevelopment())
-{
-    app.UseExceptionHandler("/Error");
-    // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
-    app.UseHsts();
-}
-
-app.UseHttpsRedirection();
-
-app.UseStaticFiles();
-
-app.UseRouting();
-
-app.MapBlazorHub();
-
-// ===== ORGANIZED API ENDPOINTS =====
-
-// Admin Portal endpoints (secure with key-based authentication)
-app.MapGroup("/admin").MapAdminEndpoints();
-
-// Google Drive API endpoints
-app.MapGroup("/api/drive").MapGoogleDriveEndpoints();
-
-// Batch processing endpoints for text extraction
-app.MapGroup("/api/batch").MapBatchProcessingEndpoints();
-
-// Search and document browsing endpoints
-app.MapGroup("/api/search").MapSearchEndpoints();
-
-// Tag voting and community moderation endpoints
-app.MapTagVotingEndpoints();
-
-// Database management endpoints
-app.MapGroup("/api/database").MapDatabaseManagementEndpoints();
-
-// Session management endpoints (legacy batch processing)
-app.MapGroup("/api/sessions").MapSessionManagementEndpoints();
-
-// Text browser UI endpoints
-app.MapGroup("/api/browser").MapTextBrowserEndpoints();
-
-// Purchasable parsing endpoints
-app.MapGroup("/api/purchasables").MapPurchasableEndpoints();
-
-// Text extraction endpoints
-app.MapGroup("/api/text").MapTextExtractionEndpoints();
-
-// Tag management endpoints
-app.MapGroup("/api/tags").MapTagManagementEndpoints();
-
-// ===== LEGACY TEST ENDPOINTS (DEPRECATED) =====
-app.MapLegacyTestEndpoints();
-
-// ===== BACKWARD COMPATIBILITY REDIRECTS =====
-// These redirects maintain compatibility with the old flat URL structure
+// ===== REDIRECT AND AD-HOC ENDPOINTS =====
+app.MapRedirectEndpoints();
 // All new code should use the organized /api/* endpoints
 
 // Tag management redirects
@@ -378,6 +231,10 @@ app.MapRazorPages();
 
 // Setup Blazor fallback AFTER all API endpoints
 app.MapFallbackToPage("/_Host");
+
+
+// Run all startup tasks (db, FTS5, drive config, doc count)
+await StartupTasks.RunAllAsync(app.Services);
 
 app.Run();
 

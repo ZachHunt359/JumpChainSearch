@@ -1,0 +1,16 @@
+11/11/2025 6:20:07 PM
+SqliteException: SQLite Error 1: 'no such column: fts'.
+
+Stack Trace:
+   at Microsoft.Data.Sqlite.SqliteException.ThrowExceptionForRC(Int32 rc, sqlite3 db)
+   at Microsoft.Data.Sqlite.SqliteCommand.PrepareAndEnumerateStatements()+MoveNext()
+   at Microsoft.Data.Sqlite.SqliteCommand.GetStatements()+MoveNext()
+   at Microsoft.Data.Sqlite.SqliteDataReader.NextResult()
+   at Microsoft.Data.Sqlite.SqliteCommand.ExecuteReader(CommandBehavior behavior)
+   at Microsoft.Data.Sqlite.SqliteCommand.ExecuteReaderAsync(CommandBehavior behavior, CancellationToken cancellationToken)
+   at Microsoft.Data.Sqlite.SqliteCommand.ExecuteDbDataReaderAsync(CommandBehavior behavior, CancellationToken cancellationToken)
+   at JumpChainSearch.Services.Fts5SearchService.SearchFts5Async(String fts5Query, Int32 limit, Int32 offset) in C:\Users\khayy\source\repos\JumpChainSearch\Services\Fts5SearchService.cs:line 108
+   at JumpChainSearch.Services.Fts5SearchService.SearchFts5Async(String fts5Query, Int32 limit, Int32 offset) in C:\Users\khayy\source\repos\JumpChainSearch\Services\Fts5SearchService.cs:line 123
+   at JumpChainSearch.Extensions.SearchEndpointsOptimized.OptimizedSearch(JumpChainDbContext context, IMemoryCache cache, Fts5SearchService fts5Service, String q, Int32 limit, Int32 offset, String includeTags, String excludeTags) in C:\Users\khayy\source\repos\JumpChainSearch\Extensions\SearchEndpointsOptimized.cs:line 63
+
+Inner Exception:

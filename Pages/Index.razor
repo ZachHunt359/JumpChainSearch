@@ -8,22 +8,22 @@
 <PageTitle>JumpChain Search</PageTitle>
 
 <div class="container-fluid">
-    <div class="row mb-4">
+    <header class="row mb-4">
         <div class="col-12 text-center">
             <h1 class="display-4 mb-3">🚀 JumpChain Search</h1>
-            <p class="lead text-muted">Real-time search across 7,283+ JumpChain documents</p>
+            <p class="lead text-muted">Real-time search across @totalDocumentCount.ToString("N0") JumpChain documents</p>
         </div>
-    </div>
+    </header>
 
-    <div class="row mb-4">
+    <section class="row mb-4" aria-label="Search">
         <div class="col-md-10 offset-md-1">
-            <div class="search-container">
+            <form class="search-container" @onsubmit:preventDefault>
                 <div class="input-group input-group-lg">
                     <span class="input-group-text bg-primary text-white">
                         <i class="fas fa-search"></i>
                     </span>
-                    <input type="text" class="form-control" placeholder="Search for jumps, supplements, gauntlets... (type to search instantly)" 
-                           @bind="searchQuery" @bind:event="oninput" @onkeyup="OnSearchInput">
+                    <input type="search" class="form-control" placeholder="Search for jumps, supplements, gauntlets... (type to search instantly)" 
+                           @bind="searchQuery" @bind:event="oninput" @onkeyup="OnSearchInput" aria-label="Search documents">
                 </div>
                 
                 @if (isSearching)
@@ -35,16 +35,16 @@
                         </small>
                     </div>
                 }
-                else if (!string.IsNullOrEmpty(searchQuery) && searchResults.Any())
+                else if (searchResults.Any())
                 {
                     <div class="search-status mt-2">
                         <small class="text-success">
                             <i class="fas fa-check-circle me-1"></i>
-                            Found <strong>@searchResults.Count()</strong> documents matching "@searchQuery"
+                            Found <strong>@totalResults</strong> documents matching "@searchQuery"
                         </small>
                     </div>
                 }
-                else if (!string.IsNullOrEmpty(searchQuery) && !searchResults.Any() && !isSearching)
+                else if (showNoResultsMessage)
                 {
                     <div class="search-status mt-2">
                         <small class="text-warning">
@@ -53,85 +53,97 @@
                         </small>
                     </div>
                 }
-            </div>
+            </form>
         </div>
-    </div>
+    </section>
 
     <!-- Tag Filter Panel -->
-    @if (availableTags.Any() || selectedTags.Any())
-    {
-        <div class="row mb-3">
-            <div class="col-12">
-                <div class="tag-filter-wrapper">
-                    <h6 class="mb-3">
-                        <i class="fas fa-filter me-2"></i>Filter by Tags
-                        @if (HasAnyTagFilters())
-                        {
-                            <button class="btn btn-outline-secondary btn-sm ms-2" @onclick="ClearAllTags">
-                                <i class="fas fa-times me-1"></i>Clear All
-                            </button>
-                        }
-                    </h6>
-                    
+    <aside class="row mb-3" aria-label="Tag filters">
+        <div class="col-12">
+            <div class="tag-filter-wrapper">
+                <h6 class="mb-3">
+                    <i class="fas fa-filter me-2"></i>Filter by Tags
                     @if (HasAnyTagFilters())
                     {
-                        <div class="selected-tags mb-3">
-                            <small class="text-muted d-block mb-2">Active Filters:</small>
-                            @if (includedTags.Any())
-                            {
-                                <div class="mb-1">
-                                    <small class="text-success fw-bold">Include:</small>
-                                    @foreach (var tag in includedTags)
-                                    {
-                                        <span class="badge bg-success me-1 mb-1 clickable-tag" @onclick="() => ToggleTagFilter(tag)" title="Click to exclude this tag instead">
-                                            @tag <i class="fas fa-check ms-1"></i>
-                                        </span>
-                                    }
-                                </div>
-                            }
-                            @if (excludedTags.Any())
-                            {
-                                <div class="mb-1">
-                                    <small class="text-danger fw-bold">Exclude:</small>
-                                    @foreach (var tag in excludedTags)
-                                    {
-                                        <span class="badge bg-danger me-1 mb-1 clickable-tag" @onclick="() => ToggleTagFilter(tag)" title="Click to remove this filter">
-                                            @tag <i class="fas fa-times ms-1"></i>
-                                        </span>
-                                    }
-                                </div>
-                            }
-                        </div>
+                        <button class="btn btn-outline-secondary btn-sm ms-2" @onclick="ClearAllTags">
+                            <i class="fas fa-times me-1"></i>Clear All
+                        </button>
                     }
+                </h6>
                     
-                    @if (availableTags.Any())
-                    {
-                        <div class="tag-filter-compact">
-                            @foreach (var category in availableTags.GroupBy(t => t.Category).OrderBy(g => GetCategoryOrder(g.Key)))
-                            {
-                                <div class="tag-category-inline mb-2">
-                                    <span class="category-label">@category.Key:</span>
-                                    @foreach (var tag in category.OrderByDescending(t => t.Count))
-                                    {
-                                        <span class="badge @GetTagFilterClass(tag.Name) me-1 mb-1 clickable-tag" 
-                                              @onclick="() => ToggleTagFilter(tag.Name)"
-                                              title="@GetTagFilterTitle(tag.Name, tag.Count)">
-                                            @tag.Name (@tag.Count)
-                                        </span>
-                                    }
-                                </div>
-                            }
-                        </div>
-                    }
-                </div>
+                @if (HasAnyTagFilters())
+                {
+                    <div class="selected-tags mb-3">
+                        <small class="text-muted d-block mb-2">Active Filters:</small>
+                        @if (includedTags.Any())
+                        {
+                            <div class="mb-1">
+                                <small class="text-success fw-bold">Include:</small>
+                                @foreach (var tag in includedTags)
+                                {
+                                    <span class="badge bg-success me-1 mb-1 clickable-tag" @onclick="() => ToggleTagFilter(tag)" title="Click to exclude this tag instead">
+                                        @tag <i class="fas fa-check ms-1"></i>
+                                    </span>
+                                }
+                            </div>
+                        }
+                        @if (excludedTags.Any())
+                        {
+                            <div class="mb-1">
+                                <small class="text-danger fw-bold">Exclude:</small>
+                                @foreach (var tag in excludedTags)
+                                {
+                                    <span class="badge bg-danger me-1 mb-1 clickable-tag" @onclick="() => ToggleTagFilter(tag)" title="Click to remove this filter">
+                                        @tag <i class="fas fa-times ms-1"></i>
+                                    </span>
+                                }
+                            </div>
+                        }
+                    </div>
+                }
+                
+                @if (availableTags.Any())
+                {
+                    <div class="tag-filter-compact">
+                        @foreach (var category in availableTags.GroupBy(t => t.Category).OrderBy(g => GetCategoryOrder(g.Key)))
+                        {
+                            <div class="tag-category-inline mb-2">
+                                <span class="category-label">@category.Key:</span>
+                                @foreach (var tag in category.OrderByDescending(t => t.Count))
+                                {
+                                    <span class="badge @GetTagFilterClass(tag.Name) me-1 mb-1 clickable-tag" 
+                                          @onclick="() => ToggleTagFilter(tag.Name)"
+                                          title="@GetTagFilterTitle(tag.Name, tag.Count)">
+                                        @tag.Name (@tag.Count)
+                                    </span>
+                                }
+                            </div>
+                        }
+                    </div>
+                }
+                else if (isLoadingTags)
+                {
+                    <div class="text-center text-muted py-2">
+                        <small>
+                            <span class="spinner-border spinner-border-sm me-1"></span>
+                            Loading tags...
+                        </small>
+                    </div>
+                }
+                else
+                {
+                    <div class="text-center text-muted py-2">
+                        <small>No tags available</small>
+                    </div>
+                }
             </div>
         </div>
-    }
+    </aside>
 
     @if (searchResults.Any())
     {
         <!-- Pagination controls - Top -->
-        <div class="row mb-3">
+        <nav class="row mb-3" aria-label="Pagination">
             <div class="col-12">
                 <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
                     <div class="pagination-info">
@@ -140,8 +152,8 @@
                         </span>
                     </div>
                     <div class="d-flex align-items-center gap-2">
-                        <label class="mb-0 me-2 text-muted">Results per page:</label>
-                        <select class="form-select form-select-sm" style="width: auto;" @onchange="OnPageSizeChanged">
+                        <label class="mb-0 me-2 text-muted" for="pageSizeSelect">Results per page:</label>
+                        <select id="pageSizeSelect" class="form-select form-select-sm" style="width: auto;" @onchange="OnPageSizeChanged" aria-label="Results per page">
                             @foreach (var size in pageSizeOptions)
                             {
                                 <option value="@size" selected="@(size == pageSize)">@size</option>
@@ -151,14 +163,14 @@
                     @RenderPaginationControls()
                 </div>
             </div>
-        </div>
+        </nav>
         
-        <div class="row">
+        <section class="row" aria-label="Search results">
             <div class="col-12">
                 <div class="results-container">
                     @foreach (var document in searchResults)
                     {
-                        <div class="result-item mb-3">
+                        <article class="result-item mb-3">
                             <div class="card shadow-sm clickable-card" @onclick="() => ShowDocumentDetails(document)">
                                 <div class="card-body">
                                     <div class="row">
@@ -220,14 +232,14 @@
                                     </div>
                                 </div>
                             </div>
-                        </div>
+                        </article>
                     }
                 </div>
             </div>
-        </div>
+        </section>
         
         <!-- Pagination controls - Bottom -->
-        <div class="row mt-3">
+        <nav class="row mt-3" aria-label="Pagination">
             <div class="col-12">
                 <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
                     <div class="pagination-info">
@@ -238,22 +250,22 @@
                     @RenderPaginationControls()
                 </div>
             </div>
-        </div>
+        </nav>
     }
-    else if (!string.IsNullOrEmpty(searchQuery) && !isSearching)
+    else if (showNoResultsMessage && !isSearching)
     {
-        <div class="row">
+        <section class="row" aria-label="No results">
             <div class="col-12 text-center">
                 <div class="alert alert-warning">
                     <h5><i class="fas fa-search"></i> No results found</h5>
                     <p>No documents match "<strong>@searchQuery</strong>". Try different search terms.</p>
                 </div>
             </div>
-        </div>
+        </section>
     }
     else if (string.IsNullOrEmpty(searchQuery))
     {
-        <div class="row">
+        <section class="row" aria-label="Welcome">
             <div class="col-12 text-center">
                 <div class="welcome-section">
                     <div class="mb-4">
@@ -274,7 +286,7 @@
                             <div class="card border-0 shadow-sm">
                                 <div class="card-body text-center">
                                     <i class="fas fa-database fa-2x text-success mb-2"></i>
-                                    <h6>7,283+ Documents</h6>
+                                    <h6>@totalDocumentCount.ToString("N0") Documents</h6>
                                     <small class="text-muted">Across multiple Google Drives</small>
                                 </div>
                             </div>
@@ -291,7 +303,7 @@
                     </div>
                 </div>
             </div>
-        </div>
+        </section>
     }
 </div>
 
@@ -687,6 +699,7 @@
 @code {
     private string searchQuery = "";
     private bool isSearching = false;
+    private bool showNoResultsMessage = false;
     private List<SearchResult> searchResults = new List<SearchResult>();
     private System.Threading.Timer? searchTimer;
     
@@ -695,6 +708,9 @@
     private int pageSize = 50;
     private int totalResults = 0;
     private List<int> pageSizeOptions = new List<int> { 10, 25, 50, 100, 200 };
+    
+    // Total document count in database
+    private int totalDocumentCount = 0;
     
     // Tag filtering with inclusion/exclusion support
     private List<TagInfo> availableTags = new List<TagInfo>();
@@ -769,6 +785,12 @@
         public string TagCategory { get; set; } = "";
         public int Count { get; set; }
     }
+
+    public class DocumentCountResponse
+    {
+        public bool Success { get; set; }
+        public int TotalDocuments { get; set; }
+    }
     
     // Tag voting models
     public class PendingSuggestion
@@ -835,11 +857,13 @@
         if (string.IsNullOrWhiteSpace(searchQuery) && !HasAnyTagFilters())
         {
             searchResults.Clear();
+            showNoResultsMessage = false;
             StateHasChanged();
             return;
         }
             
         isSearching = true;
+        showNoResultsMessage = false;
         StateHasChanged();
         
         try
@@ -881,16 +905,19 @@
             {
                 searchResults = response.Results;
                 totalResults = response.TotalCount > 0 ? response.TotalCount : response.ResultCount;
+                showNoResultsMessage = !searchResults.Any();
             }
             else
             {
                 searchResults.Clear();
                 totalResults = 0;
+                showNoResultsMessage = true;
             }
         }
         catch (Exception)
         {
             searchResults.Clear();
+            showNoResultsMessage = true;
         }
         finally
         {
@@ -921,6 +948,9 @@
     {
         userId = await GetOrCreateUserId();
         await LoadAvailableTagsAsync();
+        
+        // Load document count from API (which returns cached singleton value)
+        await LoadTotalDocumentCountAsync();
     }
 
     private async Task LoadAvailableTagsAsync()
@@ -957,6 +987,31 @@
         {
             isLoadingTags = false;
             StateHasChanged();
+        }
+    }
+
+    private async Task LoadTotalDocumentCountAsync()
+    {
+        try
+        {
+            var jsonOptions = new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true
+            };
+            
+            var httpResponse = await Http.GetAsync("/api/search/count");
+            var jsonContent = await httpResponse.Content.ReadAsStringAsync();
+            var response = JsonSerializer.Deserialize<DocumentCountResponse>(jsonContent, jsonOptions);
+            
+            if (response?.Success == true)
+            {
+                totalDocumentCount = response.TotalDocuments;
+            }
+        }
+        catch (Exception)
+        {
+            // Handle error silently - default to 0
+            totalDocumentCount = 0;
         }
     }
 
@@ -1043,9 +1098,13 @@
         if (string.IsNullOrWhiteSpace(searchQuery) && !selectedTags.Any())
         {
             searchResults.Clear();
+            showNoResultsMessage = false;
             StateHasChanged();
             return;
         }
+
+        // Reset message when starting a new search
+        showNoResultsMessage = false;
 
         // Set up a new timer for debounced search
         searchTimer = new System.Threading.Timer(async _ =>

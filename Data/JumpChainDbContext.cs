@@ -40,6 +40,7 @@ namespace JumpChainSearch.Data
                 entity.HasIndex(e => e.GoogleDriveFileId).IsUnique();
                 entity.HasIndex(e => e.Name);
                 entity.HasIndex(e => new { e.SourceDrive, e.Name });
+                entity.HasIndex(e => e.FolderPath); // NEW: Index for FolderPath searches
                 
                 entity.Property(e => e.Name).HasMaxLength(500);
                 entity.Property(e => e.SourceDrive).HasMaxLength(200);
