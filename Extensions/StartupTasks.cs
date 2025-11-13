@@ -16,11 +16,11 @@ public static class StartupTasks
         // Skip database creation - database should already exist in production
         // context.Database.EnsureCreated();
 
-        // Initialize FTS5 full-text search
-        Console.WriteLine("Initializing FTS5 full-text search...");
-        var fts5Setup = scope.ServiceProvider.GetRequiredService<Fts5SetupService>();
-        await fts5Setup.InitializeFts5Async();
-        Console.WriteLine("FTS5 initialization complete.");
+        // Skip FTS5 initialization - FTS5 tables already exist in production database
+        // Console.WriteLine("Initializing FTS5 full-text search...");
+        // var fts5Setup = scope.ServiceProvider.GetRequiredService<Fts5SetupService>();
+        // await fts5Setup.InitializeFts5Async();
+        // Console.WriteLine("FTS5 initialization complete.");
 
         // Initialize drive configurations from .env if table is empty
         if (!context.DriveConfigurations.Any())
