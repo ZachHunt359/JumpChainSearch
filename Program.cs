@@ -55,6 +55,15 @@ var connectionString = builder.Configuration.GetConnectionString("DefaultConnect
 builder.Services.AddMemoryCache();
 builder.Services.AddJumpChainServices(connectionString);
 
+// Register a scoped HttpClient for server-side Blazor components that inject it.
+// Use NavigationManager.BaseUri as the BaseAddress so relative URLs like "/api/..." work.
+builder.Services.AddScoped(sp =>
+{
+    var nav = sp.GetService<NavigationManager>();
+    var baseUri = nav?.BaseUri ?? new Uri("http://localhost").ToString();
+    return new System.Net.Http.HttpClient { BaseAddress = new Uri(baseUri) };
+});
+
 builder.Services.AddRazorPages();
 builder.Services.AddServerSideBlazor(options =>
 {
@@ -76,9 +85,33 @@ builder.Services.AddServerSideBlazor(options =>
 // Build the app
 var app = builder.Build();
 
+// Serve static files from wwwroot (CSS, JS, images)
+app.UseStaticFiles();
+
+// Ensure routing is enabled for endpoint mappings
+app.UseRouting();
+
+// Map the Blazor Server SignalR hub so the client script is available
+app.MapBlazorHub();
+
 // ===== REDIRECT AND AD-HOC ENDPOINTS =====
 app.MapRedirectEndpoints();
 // All new code should use the organized /api/* endpoints
+
+// Map the organized API route groups (search, tags, text, etc.)
+// This registers endpoints such as `/api/search`, `/api/search/tags`, and `/api/search/count`.
+app.MapGroup("/api/search").MapOptimizedSearchEndpoints();
+// Map text browser UI endpoints (e.g. /api/browser/ui)
+app.MapGroup("/api/browser").MapTextBrowserEndpoints();
+
+// Map admin portal endpoints (Admin UI and admin APIs)
+app.MapGroup("/admin").MapAdminEndpoints();
+
+// Map voting endpoints used by the admin UI (uses internal /api/voting group)
+app.MapTagVotingEndpoints();
+
+// Map batch processing API (extraction background jobs)
+app.MapGroup("/api/batch").MapBatchProcessingEndpoints();
 
 // Tag management redirects
 app.MapGet("/debug-tag-inconsistencies", () => Results.Redirect("/api/tags/debug-inconsistencies"));

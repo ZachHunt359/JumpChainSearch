@@ -26,7 +26,17 @@ public class Fts5SearchService
         // Add regular search terms with AND logic
         foreach (var term in searchTerms)
         {
-            queryParts.Add(EscapeFts5Term(term));
+            // Use prefix matching for partial terms to allow 'zom' -> matches 'zombie'
+            // but avoid applying to very short terms to reduce noise
+            var escaped = EscapeFts5Term(term);
+            if (!string.IsNullOrWhiteSpace(escaped) && escaped.Length >= 3)
+            {
+                queryParts.Add(escaped + "*");
+            }
+            else
+            {
+                queryParts.Add(escaped);
+            }
         }
 
         // Add quoted phrases
@@ -39,7 +49,12 @@ public class Fts5SearchService
         var positiveQuery = string.Join(" AND ", queryParts.Where(p => !string.IsNullOrEmpty(p)));
 
         // Add excluded terms with NOT
-        var excludeParts = excludedTerms.Select(term => $"NOT {EscapeFts5Term(term)}");
+        // Apply prefix exclusion too when sensible
+        var excludeParts = excludedTerms.Select(term =>
+        {
+            var e = EscapeFts5Term(term);
+            return (!string.IsNullOrWhiteSpace(e) && e.Length >= 3) ? $"NOT {e}*" : $"NOT {e}";
+        });
         var excludeQuery = string.Join(" ", excludeParts);
 
         // Combine positive and negative parts

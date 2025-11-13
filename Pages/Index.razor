@@ -17,7 +17,7 @@
 
     <section class="row mb-4" aria-label="Search">
         <div class="col-md-10 offset-md-1">
-            <form class="search-container" @onsubmit:preventDefault>
+            <form class="search-container" @onsubmit="OnSearchSubmit">
                 <div class="input-group input-group-lg">
                     <span class="input-group-text bg-primary text-white">
                         <i class="fas fa-search"></i>
@@ -1013,6 +1013,13 @@
             // Handle error silently - default to 0
             totalDocumentCount = 0;
         }
+    }
+
+    // No-op submit handler to prevent full-page refresh when Enter is pressed in the search box
+    private Task OnSearchSubmit()
+    {
+        // Intentionally do nothing; search is triggered by typing (debounced)
+        return Task.CompletedTask;
     }
 
     private void ToggleTagFilter(string tagName)
