@@ -2,6 +2,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.EntityFrameworkCore;
 using JumpChainSearch.Data;
 using JumpChainSearch.Services;
+using JumpChainSearch.Models;
 using System.Text.Json;
 
 namespace JumpChainSearch.Extensions;

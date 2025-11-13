@@ -44,7 +44,17 @@ if (cliResult >= 0) return cliResult;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
+// Determine connection string (fallback to SQLite file if not set)
+var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
+                       ?? builder.Configuration["ConnectionStrings:DefaultConnection"]
+                       ?? Environment.GetEnvironmentVariable("DefaultConnection")
+                       ?? Environment.GetEnvironmentVariable("CONNECTION_STRING")
+                       ?? "Data Source=jumpchain.db";
+
+// Register core services
+builder.Services.AddMemoryCache();
+builder.Services.AddJumpChainServices(connectionString);
+
 builder.Services.AddRazorPages();
 builder.Services.AddServerSideBlazor(options =>
 {
@@ -52,15 +62,10 @@ builder.Services.AddServerSideBlazor(options =>
     options.DisconnectedCircuitRetentionPeriod = TimeSpan.FromMinutes(3);
     options.DisconnectedCircuitMaxRetained = 100;
     options.JSInteropDefaultCallTimeout = TimeSpan.FromMinutes(2);
-    
-    // For mobile: Be more patient with reconnections
     options.MaxBufferedUnacknowledgedRenderBatches = 10;
 })
 .AddHubOptions(options =>
 {
-builder.Services.AddMemoryCache();
-builder.Services.AddJumpChainServices(connectionString);
-
     // SignalR configuration for better mobile experience
     options.ClientTimeoutInterval = TimeSpan.FromSeconds(60); // Default is 30s
     options.HandshakeTimeout = TimeSpan.FromSeconds(30); // Default is 15s
@@ -68,10 +73,8 @@ builder.Services.AddJumpChainServices(connectionString);
     options.MaximumReceiveMessageSize = 64 * 1024; // 64KB
 });
 
-// Add memory caching for search response caching
-builder.Services.AddMemoryCache();
-
-// Configure JSON options for case-insensitive property matching
+// Build the app
+var app = builder.Build();
 
 // ===== REDIRECT AND AD-HOC ENDPOINTS =====
 app.MapRedirectEndpoints();
