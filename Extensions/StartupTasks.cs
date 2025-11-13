@@ -13,11 +13,8 @@ public static class StartupTasks
     {
         using var scope = services.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<JumpChainDbContext>();
-        // Only create database if it doesn't exist
-        if (!await context.Database.CanConnectAsync())
-        {
-            context.Database.EnsureCreated();
-        }
+        // Skip database creation - database should already exist in production
+        // context.Database.EnsureCreated();
 
         // Initialize FTS5 full-text search
         Console.WriteLine("Initializing FTS5 full-text search...");
