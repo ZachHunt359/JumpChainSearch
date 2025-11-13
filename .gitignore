@@ -1,4 +1,7 @@
-﻿# Build results
+﻿## Root-level ignores
+.github/
+
+# Build results
 bin/
 obj/
 
