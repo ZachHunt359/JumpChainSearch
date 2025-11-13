@@ -78,13 +78,17 @@ public static class TagGenerationHelpers
             ["My Hero Academia"] = new[] { "my hero academia", "my hero academy", "boku no hero", "plus ultra" },
             ["Dragon Ball"] = new[] { "dragon ball", "goku", "vegeta", "frieza" },
             ["Harry Potter"] = new[] { "harry potter", "hogwarts", "wizarding world" },
-            ["Warhammer"] = new[] { "warhammer", "40k", "space marine" },
+            ["Warhammer 40K"] = new[] { "warhammer 40k", "40k", "space marine", "tyranid" },
+            ["Warhammer Fantasy"] = new[] { "warhammer fantasy", "grand cathay", "rise of sigmar", "bretonnia", "skaven"},
             ["Generic"] = new[] { "generic" },
             ["Out of Context"] = new[] { "out of context", "ooc" },
             ["Isekai"] = new[] { "isekai"},
             ["Jurassic World"] = new[] { "jurassic park", "jurassic world","dinosaurs", "isla nublar" },
             ["Men in Black"] = new[] { "men in black", "mib" },
-            ["Nasuverse"] = new[] { "fate/stay night", "fate zero", "nasuverse", "type-moon", "type moon", "fate/"}
+            ["Nasuverse"] = new[] { "fate/stay night", "fate zero", "nasuverse", "type-moon", "type moon", "fate/"},
+            ["Elder Scrolls"] = new[] { "elder scrolls", "skyrim", "morrowind", "oblivion" },
+            ["The Witcher"] = new[] { "witcher", "geralt", "yennefer", "cirilla" },
+            ["Lord of the Rings"] = new[] { "lord of the rings", "lotr", "middle-earth", "middle earth", "gondor", "shire", "sauron", "celebrimbor" }
         };
 
         foreach (var franchise in franchises)
