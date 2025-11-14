@@ -32,6 +32,9 @@ public static class AdminEndpoints
         // Genre tagging endpoints
         group.MapPost("/tags/apply-community-genres", ApplyCommunityGenreTags);
         
+        // Series tagging endpoints
+        group.MapPost("/tags/apply-community-series", ApplyCommunitySeriesTags);
+        
         // Text review queue endpoint
         group.MapGet("/text-review/queue", GetTextReviewQueue);
 
@@ -486,12 +489,20 @@ public static class AdminEndpoints
         <!-- Genre Tagging Tab -->
         <div id=""tags"" class=""tab-content"">
             <section>
-                <h2>🏷️ Genre Tagging</h2>
-                <div class=""action-card"">
-                    <h3>Community Genre Tags</h3>
-                    <p>Apply genre tags from the community tag list to matching documents.</p>
-                    <button class=""btn btn-success"" onclick=""applyGenreTags()"">Apply Genre Tags</button>
-                    <div id=""genre-info"" style=""margin-top: 1rem; color: var(--text-secondary); font-size: 0.85rem;""></div>
+                <h2>🏷️ Tag Management</h2>
+                <div class=""action-grid"">
+                    <div class=""action-card"">
+                        <h3>Community Genre Tags</h3>
+                        <p>Apply genre tags from the community tag list to matching documents.</p>
+                        <button class=""btn btn-success"" onclick=""applyGenreTags()"">Apply Genre Tags</button>
+                        <div id=""genre-info"" style=""margin-top: 1rem; color: var(--text-secondary); font-size: 0.85rem;""></div>
+                    </div>
+                    <div class=""action-card"">
+                        <h3>Community Series Tags</h3>
+                        <p>Apply series tags from the community series list to matching documents.</p>
+                        <button class=""btn btn-success"" onclick=""applySeriesTags()"">Apply Series Tags</button>
+                        <div id=""series-info"" style=""margin-top: 1rem; color: var(--text-secondary); font-size: 0.85rem;""></div>
+                    </div>
                 </div>
             </section>
         </div>
@@ -754,6 +765,21 @@ public static class AdminEndpoints
                 alert(data.message || 'Genre tags applied successfully!');
             }} catch (e) {{
                 document.getElementById('genre-info').innerHTML = '✗ Error applying tags';
+                alert('Error: ' + e.message);
+            }}
+        }}
+        
+        async function applySeriesTags() {{
+            if (!confirm('Apply community series tags to documents? This may take a few minutes.')) return;
+            document.getElementById('series-info').innerHTML = '<span class=""spinner""></span> Processing...';
+            try {{
+                const resp = await fetch('/admin/tags/apply-community-series', {{ method: 'POST' }});
+                const data = await resp.json();
+                document.getElementById('series-info').innerHTML = data.message || 
+                    `✓ Applied ${{data.newTagsApplied}} tags to ${{data.matchedDocuments}} documents`;
+                alert(data.message || 'Series tags applied successfully!');
+            }} catch (e) {{
+                document.getElementById('series-info').innerHTML = '✗ Error applying tags';
                 alert('Error: ' + e.message);
             }}
         }}
@@ -1476,6 +1502,33 @@ try {
         catch (Exception ex)
         {
             Console.WriteLine($"Error applying genre tags: {ex.Message}");
+            return Results.BadRequest(new { success = false, error = ex.Message });
+        }
+    }
+
+    private static async Task<IResult> ApplyCommunitySeriesTags(HttpContext context, SeriesTagService seriesService, AdminAuthService authService)
+    {
+        var (valid, user) = await ValidateSession(context, authService);
+        if (!valid)
+            return Results.Unauthorized();
+
+        try
+        {
+            Console.WriteLine("Starting community series tag application...");
+            var (matched, tagged) = await seriesService.ApplySeriesTagsFromCommunityList();
+            Console.WriteLine($"Completed: {matched} documents matched, {tagged} new tags applied");
+            
+            return Results.Ok(new
+            {
+                success = true,
+                matchedDocuments = matched,
+                newTagsApplied = tagged,
+                message = $"Applied {tagged} new series tags to {matched} documents"
+            });
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error applying series tags: {ex.Message}");
             return Results.BadRequest(new { success = false, error = ex.Message });
         }
     }

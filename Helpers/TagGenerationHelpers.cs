@@ -67,39 +67,51 @@ public static class TagGenerationHelpers
     {
         string fullPath = $"{folderPath}/{fileName}".ToLowerInvariant();
 
-        var franchises = new Dictionary<string, string[]>
-        {
-            ["Marvel"] = new[] { "marvel", "x-men", "avengers", "spider-man", "iron man", "captain america" },
-            ["DC Comics"] = new[] { "batman", "superman", "wonder woman", "justice league", "flash", "green lantern" },
-            ["Star Wars"] = new[] { "star wars", "jedi", "sith", "clone wars" },
-            ["Star Trek"] = new[] { "star trek", "enterprise", "voyager", "ds9", "picard" },
-            ["Pokemon"] = new[] { "pokemon", "pokémon" },
-            ["Naruto"] = new[] { "naruto", "konoha" },
-            ["My Hero Academia"] = new[] { "my hero academia", "my hero academy", "boku no hero", "plus ultra" },
-            ["Dragon Ball"] = new[] { "dragon ball", "goku", "vegeta", "frieza" },
-            ["Harry Potter"] = new[] { "harry potter", "hogwarts", "wizarding world" },
-            ["Warhammer 40K"] = new[] { "warhammer 40k", "40k", "space marine", "tyranid" },
-            ["Warhammer Fantasy"] = new[] { "warhammer fantasy", "grand cathay", "rise of sigmar", "bretonnia", "skaven"},
-            ["Generic"] = new[] { "generic" },
-            ["Out of Context"] = new[] { "out of context", "ooc" },
-            ["Isekai"] = new[] { "isekai"},
-            ["Jurassic World"] = new[] { "jurassic park", "jurassic world","dinosaurs", "isla nublar" },
-            ["Men in Black"] = new[] { "men in black", "mib" },
-            ["Nasuverse"] = new[] { "fate/stay night", "fate zero", "nasuverse", "type-moon", "type moon", "fate/"},
-            ["Elder Scrolls"] = new[] { "elder scrolls", "skyrim", "morrowind", "oblivion" },
-            ["The Witcher"] = new[] { "witcher", "geralt", "yennefer", "cirilla" },
-            ["Lord of the Rings"] = new[] { "lord of the rings", "lotr", "middle-earth", "middle earth", "gondor", "shire", "sauron", "celebrimbor" }
-        };
+        // Load series mappings from JSON file (single source of truth)
+        var franchises = LoadSeriesMappingsFromJson();
 
         foreach (var franchise in franchises)
         {
-            if (franchise.Value.Any(keyword => fullPath.Contains(keyword)))
+            // Use negative lookahead (?!anon) to prevent "skyrim" from matching "skyrimanon"
+            if (franchise.Value.Any(keyword => System.Text.RegularExpressions.Regex.IsMatch(fullPath, $@"\b{System.Text.RegularExpressions.Regex.Escape(keyword)}(?!anon)\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase)))
             {
                 tags.Add(new DocumentTag { TagName = franchise.Key, TagCategory = "Series", JumpDocumentId = documentId });
                 //break; 
                 // Can add more than one series tag
             }
         }
+    }
+
+    private static Dictionary<string, List<string>> LoadSeriesMappingsFromJson()
+    {
+        var jsonPath = Path.Combine(Directory.GetCurrentDirectory(), "series-mappings.json");
+        
+        if (!File.Exists(jsonPath))
+        {
+            // Return empty dictionary if file doesn't exist
+            Console.WriteLine($"Warning: series-mappings.json not found at {jsonPath}");
+            return new Dictionary<string, List<string>>();
+        }
+        
+        var json = File.ReadAllText(jsonPath);
+        var doc = System.Text.Json.JsonDocument.Parse(json);
+        
+        var mappings = new Dictionary<string, List<string>>();
+        
+        if (doc.RootElement.TryGetProperty("seriesMappings", out var seriesMappingsElement))
+        {
+            foreach (var series in seriesMappingsElement.EnumerateObject())
+            {
+                var patterns = new List<string>();
+                foreach (var pattern in series.Value.EnumerateArray())
+                {
+                    patterns.Add(pattern.GetString() ?? "");
+                }
+                mappings[series.Name] = patterns;
+            }
+        }
+        
+        return mappings;
     }
 
     public static void AddGenreTags(List<DocumentTag> tags, string fileName, string folderPath, int documentId)

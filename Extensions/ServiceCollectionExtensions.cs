@@ -18,6 +18,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<ISearchService, SearchService>();
         services.AddScoped<IPurchasableParsingService, PurchasableParsingService>();
         services.AddScoped<GenreTagService>();
+        services.AddScoped<SeriesTagService>();
         services.AddScoped<AdminAuthService>();
         services.AddSingleton<SearchCacheInvalidationService>();
         services.AddScoped<Fts5SetupService>();
