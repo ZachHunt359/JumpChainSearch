@@ -103,6 +103,23 @@ dotnet build
 dotnet run
 ```
 
+### Deployment Script
+
+For production servers, use the included `deploy.sh` script to pull updates and restart the service:
+
+```bash
+# On your Ubuntu VPS, in the project directory:
+chmod +x deploy.sh
+./deploy.sh
+```
+
+The script will:
+1. Pull latest changes from Git
+2. Stop the systemd service
+3. Build and publish the application
+4. Restart the service
+5. Verify it's running correctly
+
 ### Google Drive API Setup
 
 1. Go to [Google Cloud Console](https://console.cloud.google.com/)
@@ -248,6 +265,18 @@ sudo systemctl reload nginx
 sudo apt install certbot python3-certbot-nginx
 sudo certbot --nginx -d yourdomain.com
 ```
+
+**Deploying Updates:**
+
+After initial setup, use the deployment script to update:
+
+```bash
+cd /home/deploy/JumpChainSearch
+chmod +x deploy.sh  # Only needed once
+./deploy.sh
+```
+
+The script automatically pulls changes, rebuilds, and restarts the service.
 
 See `.github/reference/DEPLOYMENT_GUIDE.md` for troubleshooting and advanced configuration.
 
