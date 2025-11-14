@@ -1,9 +1,3 @@
-  --name jumpchain-search \
-  -p 80:8080 \
-  -e GoogleDrive__ServiceAccountKey="$(cat service-account.json)" \
-  -v jumpchain-data:/app/data \
-  jumpchain-search
-
 # JumpChain Search
 
 JumpChain Search is a modern web application for searching, reviewing, and managing JumpChain documents across multiple Google Drives. It is designed for both the JumpChain community (searchers, reviewers) and as a showcase of best-practice, modular ASP.NET Core Blazor Server architecture.
