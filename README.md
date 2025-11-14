@@ -133,9 +133,129 @@ docker build -t jumpchain-search .
 docker run -d -p 80:8080 jumpchain-search
 ```
 
-### Linux VPS (Ubuntu 24.04)
+### Linux VPS (Ubuntu 24.04) - Production Deployment
 
-See `.github/reference/DEPLOYMENT_GUIDE.md` for full instructions.
+**Prerequisites:**
+- Ubuntu 24.04 LTS VPS
+- .NET 8.0 SDK and runtime installed
+- Nginx installed
+- Domain name (optional, but recommended for SSL)
+
+**Quick Deployment:**
+
+1. **Clone and build:**
+```bash
+cd /home/deploy
+git clone <repository-url> JumpChainSearch
+cd JumpChainSearch
+dotnet publish -c Release -o ./publish
+```
+
+2. **Setup directories and permissions:**
+```bash
+sudo mkdir -p /var/lib/jumpchain /etc/jumpchain
+sudo chown deploy:www-data /var/lib/jumpchain
+sudo chmod 775 /var/lib/jumpchain
+```
+
+3. **Copy service account key:**
+```bash
+sudo cp service-account.json /etc/jumpchain/
+sudo chown root:www-data /etc/jumpchain/service-account.json
+sudo chmod 640 /etc/jumpchain/service-account.json
+```
+
+4. **Transfer database (if migrating):**
+```bash
+# From local Windows machine:
+pscp -i path\to\private-key.ppk jumpchain.db deploy@YOUR_VPS_IP:/tmp/
+# On VPS:
+sudo mv /tmp/jumpchain.db /var/lib/jumpchain/jumpsearch.db
+sudo chown deploy:www-data /var/lib/jumpchain/jumpsearch.db
+sudo chmod 664 /var/lib/jumpchain/jumpsearch.db
+```
+
+5. **Create systemd service:**
+```bash
+sudo nano /etc/systemd/system/jumpchain.service
+```
+
+Paste this configuration (update environment variables as needed):
+```ini
+[Unit]
+Description=JumpChain Search Application
+After=network.target
+
+[Service]
+Type=simple
+User=deploy
+Group=www-data
+WorkingDirectory=/home/deploy/JumpChainSearch/publish
+ExecStart=/usr/bin/dotnet JumpChainSearch.dll
+Restart=on-failure
+RestartSec=10
+Environment="CONNECTION_STRING=Data Source=/var/lib/jumpchain/jumpsearch.db;Mode=ReadWrite"
+Environment="GOOGLE_API_KEY=YOUR_API_KEY_HERE"
+Environment="GOOGLE_APPLICATION_CREDENTIALS=/etc/jumpchain/service-account.json"
+Environment="ASPNETCORE_ENVIRONMENT=Production"
+Environment="ASPNETCORE_URLS=http://0.0.0.0:5248"
+Environment="JUMPCHAIN_DRIVES_CONFIG=[{\"name\":\"Drive1\",\"folderId\":\"ID1\"},{\"name\":\"Drive2\",\"folderId\":\"ID2\"}]"
+LimitNOFILE=10000
+
+[Install]
+WantedBy=multi-user.target
+```
+
+**Important:** The directory `/var/lib/jumpchain/` must be owned by the `deploy` user so SQLite can create WAL/SHM lock files. If you get "readonly database" errors, check directory ownership with `ls -la /var/lib/jumpchain/`.
+
+6. **Start the service:**
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable jumpchain
+sudo systemctl start jumpchain
+sudo systemctl status jumpchain
+```
+
+7. **Configure Nginx reverse proxy:**
+```bash
+sudo nano /etc/nginx/sites-available/jumpchain
+```
+
+Paste:
+```nginx
+server {
+    listen 80;
+    server_name YOUR_DOMAIN_OR_IP;
+
+    location / {
+        proxy_pass http://localhost:5248;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection keep-alive;
+        proxy_set_header Host $host;
+        proxy_cache_bypass $http_upgrade;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_buffering off;
+    }
+}
+```
+
+Enable and reload:
+```bash
+sudo ln -s /etc/nginx/sites-available/jumpchain /etc/nginx/sites-enabled/
+sudo rm /etc/nginx/sites-enabled/default
+sudo nginx -t
+sudo systemctl reload nginx
+```
+
+8. **Optional - SSL with Let's Encrypt:**
+```bash
+sudo apt install certbot python3-certbot-nginx
+sudo certbot --nginx -d yourdomain.com
+```
+
+See `.github/reference/DEPLOYMENT_GUIDE.md` for troubleshooting and advanced configuration.
 
 ---
 
