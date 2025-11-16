@@ -42,32 +42,87 @@ namespace JumpChainSearch.Services
             _context = context;
             _logger = logger;
 
-            // Initialize authenticated Google Drive service (for private/owned content)
-            var serviceAccountKey = configuration["GOOGLE_DRIVE_SERVICE_ACCOUNT_KEY"] 
-                                   ?? Environment.GetEnvironmentVariable("GOOGLE_DRIVE_SERVICE_ACCOUNT_KEY")
-                                   ?? "{}";
-            var credential = GoogleCredential.FromJson(serviceAccountKey)
-                .CreateScoped(new[] { 
-                    DriveService.Scope.DriveReadonly,
-                    DriveService.Scope.Drive
+            try
+            {
+                // Initialize authenticated Google Drive service (for private/owned content)
+                // Try to get credentials from file first, then from environment variable
+                GoogleCredential credential;
+                var credentialsPath = configuration["GOOGLE_APPLICATION_CREDENTIALS"] 
+                                     ?? Environment.GetEnvironmentVariable("GOOGLE_APPLICATION_CREDENTIALS");
+                
+                _logger.LogInformation($"Credentials path: {credentialsPath ?? "null"}");
+                
+                if (!string.IsNullOrEmpty(credentialsPath))
+                {
+                    // Resolve relative paths to absolute
+                    if (!Path.IsPathRooted(credentialsPath))
+                    {
+                        credentialsPath = Path.Combine(Directory.GetCurrentDirectory(), credentialsPath);
+                        _logger.LogInformation($"Resolved to absolute path: {credentialsPath}");
+                    }
+                    
+                    if (System.IO.File.Exists(credentialsPath))
+                    {
+                        // Read from file
+                        _logger.LogInformation($"Reading credentials from file: {credentialsPath}");
+                        var serviceAccountJson = System.IO.File.ReadAllText(credentialsPath);
+                        credential = GoogleCredential.FromJson(serviceAccountJson)
+                            .CreateScoped(new[] { 
+                                DriveService.Scope.DriveReadonly,
+                                DriveService.Scope.Drive
+                            });
+                        _logger.LogInformation("Successfully loaded credentials from file");
+                    }
+                    else
+                    {
+                        _logger.LogWarning($"Credentials file not found at: {credentialsPath}");
+                        throw new FileNotFoundException($"Service account credentials file not found at: {credentialsPath}");
+                    }
+                }
+                else
+                {
+                    // Fall back to JSON string from environment
+                    _logger.LogInformation("Credentials file not configured, trying environment variable");
+                    var serviceAccountKey = configuration["GOOGLE_DRIVE_SERVICE_ACCOUNT_KEY"] 
+                                           ?? Environment.GetEnvironmentVariable("GOOGLE_DRIVE_SERVICE_ACCOUNT_KEY");
+                    
+                    if (string.IsNullOrEmpty(serviceAccountKey))
+                    {
+                        throw new InvalidOperationException("No Google Drive credentials configured. Please set GOOGLE_APPLICATION_CREDENTIALS or GOOGLE_DRIVE_SERVICE_ACCOUNT_KEY.");
+                    }
+                    
+                    credential = GoogleCredential.FromJson(serviceAccountKey)
+                        .CreateScoped(new[] { 
+                            DriveService.Scope.DriveReadonly,
+                            DriveService.Scope.Drive
+                        });
+                    _logger.LogInformation("Successfully loaded credentials from environment");
+                }
+                
+                _driveService = new DriveService(new BaseClientService.Initializer()
+                {
+                    HttpClientInitializer = credential,
+                    ApplicationName = "JumpChain Search",
                 });
-            
-            _driveService = new DriveService(new BaseClientService.Initializer()
-            {
-                HttpClientInitializer = credential,
-                ApplicationName = "JumpChain Search",
-            });
+                _logger.LogInformation("Drive service initialized successfully");
 
-            // Initialize public Google Drive service (for public content using API key)
-            var apiKey = configuration["GOOGLE_API_KEY"] 
-                        ?? Environment.GetEnvironmentVariable("GOOGLE_API_KEY")
-                        ?? "";
-            
-            _publicDriveService = new DriveService(new BaseClientService.Initializer()
+                // Initialize public Google Drive service (for public content using API key)
+                var apiKey = configuration["GOOGLE_API_KEY"] 
+                            ?? Environment.GetEnvironmentVariable("GOOGLE_API_KEY")
+                            ?? "";
+                
+                _publicDriveService = new DriveService(new BaseClientService.Initializer()
+                {
+                    ApiKey = apiKey,
+                    ApplicationName = "JumpChain Search - Public",
+                });
+                _logger.LogInformation("Public drive service initialized successfully");
+            }
+            catch (Exception ex)
             {
-                ApiKey = apiKey,
-                ApplicationName = "JumpChain Search - Public",
-            });
+                _logger.LogError(ex, "Failed to initialize GoogleDriveService");
+                throw;
+            }
         }
 
         public async Task<IEnumerable<DriveData>> GetAvailableDrivesAsync()

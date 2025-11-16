@@ -23,6 +23,35 @@ public static class GoogleDriveEndpoints
         
         // Drive scanning endpoint for admin portal
         group.MapPost("/scan-all", ScanAllDrives);
+        
+        // Test endpoint without any dependencies
+        group.MapGet("/test-ping", () => {
+            Console.WriteLine("TEST PING endpoint hit!");
+            return Results.Ok(new { message = "pong", timestamp = DateTime.Now });
+        });
+        
+        // Test endpoint to diagnose GoogleDriveService issues
+        group.MapGet("/test-service-creation", (IServiceProvider serviceProvider) => {
+            try {
+                Console.WriteLine("Attempting to resolve IGoogleDriveService...");
+                var service = serviceProvider.GetRequiredService<IGoogleDriveService>();
+                Console.WriteLine("✅ Service resolved successfully!");
+                return Results.Ok(new { success = true, message = "GoogleDriveService created successfully" });
+            }
+            catch (Exception ex) {
+                Console.WriteLine($"❌ Service resolution failed: {ex.Message}");
+                Console.WriteLine($"Stack trace: {ex.StackTrace}");
+                if (ex.InnerException != null) {
+                    Console.WriteLine($"Inner exception: {ex.InnerException.Message}");
+                    Console.WriteLine($"Inner stack trace: {ex.InnerException.StackTrace}");
+                }
+                return Results.Problem(
+                    detail: ex.ToString(),
+                    statusCode: 500,
+                    title: "Failed to create GoogleDriveService"
+                );
+            }
+        });
 
         return group;
     }
@@ -390,14 +419,20 @@ public static class GoogleDriveEndpoints
 
     private static async Task<IResult> ScanAllDrives(JumpChainDbContext dbContext, IGoogleDriveService driveService)
     {
+        Console.WriteLine("===== ScanAllDrives ENDPOINT INVOKED =====");
         try
         {
+            Console.WriteLine("Starting scan - checking database for active drives...");
+            
             var drives = await dbContext.DriveConfigurations
                 .Where(d => d.IsActive)
                 .ToListAsync();
 
+            Console.WriteLine($"Database query complete. Found {drives.Count} active drives");
+
             if (drives.Count == 0)
             {
+                Console.WriteLine("No active drives configured");
                 return Results.BadRequest(new { success = false, error = "No active drives configured" });
             }
 
@@ -409,16 +444,21 @@ public static class GoogleDriveEndpoints
             {
                 try
                 {
-                    Console.WriteLine($"Scanning drive: {drive.DriveName}");
+                    Console.WriteLine($"Scanning drive: {drive.DriveName} (ID: {drive.DriveId})");
                     
                     // Get existing document count before scan
                     var existingCount = await dbContext.JumpDocuments
                         .Where(d => d.SourceDrive == drive.DriveName)
                         .CountAsync();
                     
+                    Console.WriteLine($"Existing documents for {drive.DriveName}: {existingCount}");
+                    
                     // Scan the drive using the Google Drive service
+                    Console.WriteLine($"Calling ScanDriveAsync for {drive.DriveName}");
                     var documents = await driveService.ScanDriveAsync(drive.DriveId, drive.DriveName);
                     var documentsList = documents.ToList();
+                    
+                    Console.WriteLine($"ScanDriveAsync returned {documentsList.Count} documents");
                     
                     // Update the drive configuration
                     drive.LastScanTime = DateTime.Now;
@@ -443,17 +483,21 @@ public static class GoogleDriveEndpoints
                 catch (Exception ex)
                 {
                     Console.WriteLine($"Error scanning drive {drive.DriveName}: {ex.Message}");
+                    Console.WriteLine($"Stack trace: {ex.StackTrace}");
                     results.Add(new
                     {
                         drive = drive.DriveName,
                         success = false,
-                        error = ex.Message
+                        error = ex.Message,
+                        stackTrace = ex.StackTrace
                     });
                 }
             }
 
+            Console.WriteLine("Saving changes to database");
             await dbContext.SaveChangesAsync();
 
+            Console.WriteLine("Scan complete!");
             return Results.Ok(new
             {
                 success = true,
@@ -466,7 +510,22 @@ public static class GoogleDriveEndpoints
         }
         catch (Exception ex)
         {
-            return Results.BadRequest(new { success = false, error = ex.Message });
+            Console.WriteLine($"===== CRITICAL ERROR in ScanAllDrives =====");
+            Console.WriteLine($"Exception Type: {ex.GetType().FullName}");
+            Console.WriteLine($"Message: {ex.Message}");
+            Console.WriteLine($"Stack Trace: {ex.StackTrace}");
+            if (ex.InnerException != null)
+            {
+                Console.WriteLine($"Inner Exception: {ex.InnerException.Message}");
+                Console.WriteLine($"Inner Stack Trace: {ex.InnerException.StackTrace}");
+            }
+            Console.WriteLine($"===========================================");
+            
+            return Results.Problem(
+                detail: ex.ToString(),
+                statusCode: 500,
+                title: "Scan failed"
+            );
         }
     }
 

@@ -83,6 +83,7 @@ public static class RedirectEndpoints
                         mimeType = d.MimeType,
                         size = d.Size,
                         webViewLink = d.WebViewLink,
+                        createdTime = d.CreatedTime,
                         modifiedTime = d.ModifiedTime,
                         tags = d.Tags.Select(t => t.TagName).ToList(),
                         urls = d.Urls.Select(u => new {

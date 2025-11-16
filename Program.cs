@@ -113,6 +113,9 @@ app.MapTagVotingEndpoints();
 // Map batch processing API (extraction background jobs)
 app.MapGroup("/api/batch").MapBatchProcessingEndpoints();
 
+// Map Google Drive API endpoints
+app.MapGroup("/api/google-drive").MapGoogleDriveEndpoints();
+
 // Tag management redirects
 app.MapGet("/debug-tag-inconsistencies", () => Results.Redirect("/api/tags/debug-inconsistencies"));
 app.MapPost("/fix-tag-inconsistencies", () => Results.Redirect("/api/tags/fix-inconsistencies"));
@@ -192,6 +195,7 @@ app.MapGet("/search", async (JumpChainDbContext context, string? q = "", int lim
                 mimeType = d.MimeType,
                 size = d.Size,
                 webViewLink = d.WebViewLink,
+                createdTime = d.CreatedTime,
                 modifiedTime = d.ModifiedTime,
                 tags = d.Tags.Select(t => t.TagName).ToList(),
                 urls = d.Urls.Select(u => new {

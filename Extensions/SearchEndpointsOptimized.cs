@@ -130,6 +130,8 @@ public static class SearchEndpointsOptimized
                         HasExtractedText = !string.IsNullOrEmpty(x.Document.ExtractedText),
                         ExtractedTextLength = x.Document.ExtractedText != null ? x.Document.ExtractedText.Length : 0,
                         Tags = x.Document.Tags.Select(t => t.TagName).ToList(),
+                        x.Document.CreatedTime,
+                        x.Document.ModifiedTime,
                         x.Document.LastModified,
                         x.Score
                     })
@@ -187,6 +189,8 @@ public static class SearchEndpointsOptimized
                         HasExtractedText = !string.IsNullOrEmpty(d.ExtractedText),
                         ExtractedTextLength = d.ExtractedText != null ? d.ExtractedText.Length : 0,
                         Tags = d.Tags.Select(t => t.TagName).ToList(),
+                        d.CreatedTime,
+                        d.ModifiedTime,
                         d.LastModified,
                         Score = 0
                     })

@@ -377,6 +377,10 @@
                                         <div class="col-8">@FormatFileSize(selectedDocument.Size)</div>
                                     </div>
                                     <div class="row mb-2">
+                                        <div class="col-4 fw-bold text-muted">Created:</div>
+                                        <div class="col-8">@selectedDocument.CreatedTime.ToString("MMMM dd, yyyy 'at' hh:mm tt")</div>
+                                    </div>
+                                    <div class="row mb-2">
                                         <div class="col-4 fw-bold text-muted">Modified:</div>
                                         <div class="col-8">@selectedDocument.ModifiedTime.ToString("MMMM dd, yyyy 'at' hh:mm tt")</div>
                                     </div>
@@ -738,6 +742,7 @@
         public string MimeType { get; set; } = "";
         public long Size { get; set; }
         public string WebViewLink { get; set; } = "";
+        public DateTime CreatedTime { get; set; }
         public DateTime ModifiedTime { get; set; }
         public string Description { get; set; } = "";
         public List<string> Tags { get; set; } = new List<string>();
