@@ -13,6 +13,11 @@ echo "Cloudflare IP Whitelist for UFW"
 echo "=========================================="
 echo ""
 
+# First, ensure SSH is allowed (prevent lockout)
+echo "Ensuring SSH access is allowed..."
+sudo ufw allow 22/tcp comment 'SSH'
+echo ""
+
 # Cloudflare IPv4 ranges (from https://www.cloudflare.com/ips-v4/)
 CF_IPV4=(
   "173.245.48.0/20"
