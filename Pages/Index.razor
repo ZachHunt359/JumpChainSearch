@@ -61,17 +61,24 @@
     <aside class="row mb-3" aria-label="Tag filters">
         <div class="col-12">
             <div class="tag-filter-wrapper">
-                <h6 class="mb-3">
-                    <i class="fas fa-filter me-2"></i>Filter by Tags
+                <div class="tag-filter-header" @onclick="ToggleTagFilterPanel" role="button" tabindex="0" @onkeypress="HandleTagFilterKeyPress">
+                    <h6 class="mb-0">
+                        <i class="fas @(isTagFilterExpanded ? "fa-chevron-down" : "fa-chevron-right") me-2"></i>
+                        <i class="fas fa-filter me-2"></i>Filter by Tags
+                        @if (HasAnyTagFilters())
+                        {
+                            <span class="badge bg-primary ms-2">@(includedTags.Count + excludedTags.Count) active</span>
+                        }
+                    </h6>
                     @if (HasAnyTagFilters())
                     {
-                        <button class="btn btn-outline-secondary btn-sm ms-2" @onclick="ClearAllTags">
+                        <button class="btn btn-outline-secondary btn-sm" @onclick="ClearAllTags" @onclick:stopPropagation="true">
                             <i class="fas fa-times me-1"></i>Clear All
                         </button>
                     }
-                </h6>
+                </div>
                     
-                @if (HasAnyTagFilters())
+                @if (isTagFilterExpanded && HasAnyTagFilters())
                 {
                     <div class="selected-tags mb-3">
                         <small class="text-muted d-block mb-2">Active Filters:</small>
@@ -102,38 +109,43 @@
                     </div>
                 }
                 
-                @if (availableTags.Any())
+                @if (isTagFilterExpanded)
                 {
-                    <div class="tag-filter-compact">
-                        @foreach (var category in availableTags.GroupBy(t => t.Category).OrderBy(g => GetCategoryOrder(g.Key)))
+                    <div class="tag-filter-content mt-3">
+                        @if (availableTags.Any())
                         {
-                            <div class="tag-category-inline mb-2">
-                                <span class="category-label">@category.Key:</span>
-                                @foreach (var tag in category.OrderByDescending(t => t.Count))
+                            <div class="tag-filter-compact">
+                                @foreach (var category in availableTags.GroupBy(t => t.Category).OrderBy(g => GetCategoryOrder(g.Key)))
                                 {
-                                    <span class="badge @GetTagFilterClass(tag.Name) me-1 mb-1 clickable-tag" 
-                                          @onclick="() => ToggleTagFilter(tag.Name)"
-                                          title="@GetTagFilterTitle(tag.Name, tag.Count)">
-                                        @tag.Name (@tag.Count)
-                                    </span>
+                                    <div class="tag-category-inline mb-2">
+                                        <span class="category-label">@category.Key:</span>
+                                        @foreach (var tag in category.OrderByDescending(t => t.Count))
+                                        {
+                                            <span class="badge @GetTagFilterClass(tag.Name) me-1 mb-1 clickable-tag" 
+                                                  @onclick="() => ToggleTagFilter(tag.Name)"
+                                                  title="@GetTagFilterTitle(tag.Name, tag.Count)">
+                                                @tag.Name (@tag.Count)
+                                            </span>
+                                        }
+                                    </div>
                                 }
                             </div>
                         }
-                    </div>
-                }
-                else if (isLoadingTags)
-                {
-                    <div class="text-center text-muted py-2">
-                        <small>
-                            <span class="spinner-border spinner-border-sm me-1"></span>
-                            Loading tags...
-                        </small>
-                    </div>
-                }
-                else
-                {
-                    <div class="text-center text-muted py-2">
-                        <small>No tags available</small>
+                        else if (isLoadingTags)
+                        {
+                            <div class="text-center text-muted py-2">
+                                <small>
+                                    <span class="spinner-border spinner-border-sm me-1"></span>
+                                    Loading tags...
+                                </small>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="text-center text-muted py-2">
+                                <small>No tags available</small>
+                            </div>
+                        }
                     </div>
                 }
             </div>
@@ -721,6 +733,7 @@
     private HashSet<string> includedTags = new HashSet<string>(); // Tags to include (green)
     private HashSet<string> excludedTags = new HashSet<string>(); // Tags to exclude (red)
     private HashSet<string> expandedCategories = new HashSet<string>();
+    private bool isTagFilterExpanded = false; // Start collapsed
     #pragma warning disable CS0414 // Field is assigned but its value is never used
     private bool isLoadingTags = false;
     #pragma warning restore CS0414
@@ -1074,6 +1087,20 @@
             expandedCategories.Add(category);
         }
         StateHasChanged();
+    }
+
+    private void ToggleTagFilterPanel()
+    {
+        isTagFilterExpanded = !isTagFilterExpanded;
+        StateHasChanged();
+    }
+
+    private void HandleTagFilterKeyPress(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter" || e.Key == " ")
+        {
+            ToggleTagFilterPanel();
+        }
     }
 
     private string GetTagFilterClass(string tagName)
@@ -1792,16 +1819,63 @@
     }
     
     .tag-filter-wrapper {
-        /* Wrapper styling if needed */
+        background: var(--bg-secondary);
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        overflow: hidden;
+    }
+
+    .tag-filter-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.75rem 1rem;
+        background: var(--bg-tertiary);
+        border-bottom: 1px solid var(--border-color);
+        cursor: pointer;
+        transition: background-color 0.2s ease;
+        user-select: none;
+    }
+
+    .tag-filter-header:hover {
+        background: var(--bg-primary);
+        filter: brightness(1.1);
+    }
+
+    .tag-filter-header:active {
+        filter: brightness(0.95);
+    }
+
+    .tag-filter-header h6 {
+        display: flex;
+        align-items: center;
+        margin: 0;
+        color: var(--text-secondary);
+    }
+
+    .tag-filter-header .fa-chevron-right,
+    .tag-filter-header .fa-chevron-down {
+        transition: transform 0.2s ease;
+        color: var(--text-muted);
+    }
+
+    .tag-filter-content {
+        padding: 0.75rem 1rem;
+    }
+
+    .selected-tags {
+        padding: 0.75rem 1rem;
+        background: var(--bg-secondary);
+        border-bottom: 1px solid var(--border-color);
     }
     
     .selected {
-        box-shadow: 0 0 0 2px #007bff !important;
+        box-shadow: 0 0 0 2px var(--accent-primary) !important;
         font-weight: bold;
     }
     
     .tag-category {
-        border-bottom: 1px solid #dee2e6;
+        border-bottom: 1px solid var(--border-color);
         padding-bottom: 0.5rem;
     }
     
@@ -1810,10 +1884,10 @@
     }
 
     .tag-filter-compact {
-        border: 1px solid #dee2e6;
+        border: 1px solid var(--border-color);
         border-radius: 0.375rem;
         padding: 0.75rem;
-        background: #f8f9fa;
+        background: var(--bg-tertiary);
     }
 
     .tag-category-inline {
@@ -1821,7 +1895,7 @@
         flex-wrap: wrap;
         align-items: center;
         gap: 0.25rem;
-        border-bottom: 1px solid #e9ecef;
+        border-bottom: 1px solid var(--border-color);
         padding-bottom: 0.5rem;
     }
 
@@ -1832,7 +1906,7 @@
 
     .category-label {
         font-weight: 600;
-        color: #495057;
+        color: var(--text-secondary);
         min-width: 80px;
         font-size: 0.875rem;
         margin-right: 0.5rem;
