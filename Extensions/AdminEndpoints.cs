@@ -575,10 +575,18 @@ public static class AdminEndpoints
             }});
             
             // Show selected tab
-            document.getElementById(tabName).classList.add('active');
+            const tabElement = document.getElementById(tabName);
+            if (tabElement) {{
+                tabElement.classList.add('active');
+            }}
             
-            // Activate button
-            event.target.closest('.tab-button').classList.add('active');
+            // Activate button (handle case where event might not be defined)
+            if (typeof event !== 'undefined' && event.target) {{
+                const button = event.target.closest('.tab-button');
+                if (button) {{
+                    button.classList.add('active');
+                }}
+            }}
             
             // Auto-load data for certain tabs
             if (tabName === 'review') {{
