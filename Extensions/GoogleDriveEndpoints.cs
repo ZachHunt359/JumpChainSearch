@@ -684,11 +684,13 @@ public static class GoogleDriveEndpoints
             }
             Console.WriteLine($"===========================================");
             
-            return Results.Problem(
-                detail: ex.ToString(),
-                statusCode: 500,
-                title: "Scan failed"
-            );
+            return Results.Json(new
+            {
+                success = false,
+                error = ex.Message,
+                detail = ex.ToString(),
+                stackTrace = ex.StackTrace
+            }, statusCode: 500);
         }
     }
 
@@ -908,11 +910,12 @@ Text Preview: {text?.Substring(0, Math.Min(200, text?.Length ?? 0))}
         catch (Exception ex)
         {
             Console.WriteLine($"Error syncing drive configurations: {ex.Message}");
-            return Results.Problem(
-                detail: ex.ToString(),
-                statusCode: 500,
-                title: "Sync failed"
-            );
+            return Results.Json(new
+            {
+                success = false,
+                error = ex.Message,
+                detail = ex.ToString()
+            }, statusCode: 500);
         }
     }
 
@@ -950,11 +953,12 @@ Text Preview: {text?.Substring(0, Math.Min(200, text?.Length ?? 0))}
         catch (Exception ex)
         {
             Console.WriteLine($"Error: {ex.Message}");
-            return Results.Problem(
-                detail: ex.ToString(),
-                statusCode: 500,
-                title: "Scan failed"
-            );
+            return Results.Json(new
+            {
+                success = false,
+                error = ex.Message,
+                detail = ex.ToString()
+            }, statusCode: 500);
         }
     }
 
@@ -994,11 +998,12 @@ Text Preview: {text?.Substring(0, Math.Min(200, text?.Length ?? 0))}
         catch (Exception ex)
         {
             Console.WriteLine($"Error: {ex.Message}");
-            return Results.Problem(
-                detail: ex.ToString(),
-                statusCode: 500,
-                title: "Discovery failed"
-            );
+            return Results.Json(new
+            {
+                success = false,
+                error = ex.Message,
+                detail = ex.ToString()
+            }, statusCode: 500);
         }
     }
 }
