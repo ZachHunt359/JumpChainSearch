@@ -1264,24 +1264,54 @@ public static class AdminEndpoints
 
         try
         {
-            var restartScript = @"
+            bool isWindows = OperatingSystem.IsWindows();
+            string scriptPath;
+            ProcessStartInfo startInfo;
+
+            if (isWindows)
+            {
+                // Windows: PowerShell script
+                var restartScript = @"
 Start-Sleep -Seconds 2
 Get-Process -Name 'dotnet' -ErrorAction SilentlyContinue | Where-Object { $_.MainModule.FileName -like '*JumpChainSearch*' } | Stop-Process -Force
 Start-Sleep -Seconds 3
 Set-Location '" + Directory.GetCurrentDirectory() + @"'
 Start-Process -FilePath 'dotnet' -ArgumentList 'run --urls http://0.0.0.0:5248' -WindowStyle Hidden
 ";
-            
-            File.WriteAllText("restart-server.ps1", restartScript);
-            
-            // Execute restart script in background
-            var startInfo = new ProcessStartInfo
+                
+                scriptPath = "restart-server.ps1";
+                File.WriteAllText(scriptPath, restartScript);
+                
+                startInfo = new ProcessStartInfo
+                {
+                    FileName = "powershell.exe",
+                    Arguments = "-ExecutionPolicy Bypass -File restart-server.ps1",
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                };
+            }
+            else
             {
-                FileName = "powershell.exe",
-                Arguments = "-ExecutionPolicy Bypass -File restart-server.ps1",
-                UseShellExecute = false,
-                CreateNoWindow = true
-            };
+                // Linux: Bash script with systemctl
+                var restartScript = @"#!/bin/bash
+sleep 2
+sudo systemctl restart jumpchain
+";
+                
+                scriptPath = "restart-server.sh";
+                File.WriteAllText(scriptPath, restartScript);
+                
+                // Make script executable
+                Process.Start("chmod", $"+x {scriptPath}")?.WaitForExit();
+                
+                startInfo = new ProcessStartInfo
+                {
+                    FileName = "/bin/bash",
+                    Arguments = scriptPath,
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                };
+            }
             
             Process.Start(startInfo);
             
@@ -1407,8 +1437,15 @@ Start-Process -FilePath 'dotnet' -ArgumentList 'run --urls http://0.0.0.0:5248' 
                 return Results.BadRequest(new { success = false, error = "No drives configured. Please configure drives first." });
             }
 
-            // Create PowerShell script to scan drives
-            var scanScript = @"
+            // Detect platform and create appropriate script
+            bool isWindows = OperatingSystem.IsWindows();
+            string scriptPath;
+            ProcessStartInfo startInfo;
+
+            if (isWindows)
+            {
+                // Windows: PowerShell script
+                var scanScript = @"
 $scriptPath = '" + Directory.GetCurrentDirectory() + @"'
 Set-Location $scriptPath
 
@@ -1428,18 +1465,54 @@ try {
 }
 ";
 
-            var scriptPath = Path.Combine(Directory.GetCurrentDirectory(), "drive-scan.ps1");
-            File.WriteAllText(scriptPath, scanScript);
+                scriptPath = Path.Combine(Directory.GetCurrentDirectory(), "drive-scan.ps1");
+                File.WriteAllText(scriptPath, scanScript);
 
-            var startInfo = new ProcessStartInfo
+                startInfo = new ProcessStartInfo
+                {
+                    FileName = "powershell.exe",
+                    Arguments = $"-ExecutionPolicy Bypass -File \"{scriptPath}\"",
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true
+                };
+            }
+            else
             {
-                FileName = "powershell.exe",
-                Arguments = $"-ExecutionPolicy Bypass -File \"{scriptPath}\"",
-                UseShellExecute = false,
-                CreateNoWindow = true,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true
-            };
+                // Linux: Bash script
+                var scanScript = @"#!/bin/bash
+cd " + Directory.GetCurrentDirectory() + @"
+
+timestamp=$(date +'%Y-%m-%d_%H-%M-%S')
+logFile=""logs/drive-scan-$timestamp.log""
+
+echo ""Starting drive scan at $(date)"" >> ""$logFile""
+
+curl -X POST http://localhost:5248/api/google-drive/scan-all \
+     -H 'Content-Type: application/json' \
+     >> ""$logFile"" 2>&1
+
+echo ""Scan completed at $(date)"" >> ""$logFile""
+rm -f drive-scan.pid
+";
+
+                scriptPath = Path.Combine(Directory.GetCurrentDirectory(), "drive-scan.sh");
+                File.WriteAllText(scriptPath, scanScript);
+                
+                // Make script executable on Linux
+                Process.Start("chmod", $"+x \"{scriptPath}\"")?.WaitForExit();
+
+                startInfo = new ProcessStartInfo
+                {
+                    FileName = "/bin/bash",
+                    Arguments = $"\"{scriptPath}\"",
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true
+                };
+            }
 
             var process = Process.Start(startInfo);
             if (process != null)

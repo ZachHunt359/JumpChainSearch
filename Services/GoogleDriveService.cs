@@ -876,8 +876,12 @@ namespace JumpChainSearch.Services
                     System.IO.File.AppendAllText("ocr-debug.txt", $"[{DateTime.Now}] TesseractEngine initialized OK\n");
                     
                     // Convert PDF to images using ImageMagick
-                    // Configure Ghostscript path explicitly
-                    MagickNET.SetGhostscriptDirectory(@"C:\Program Files\gs\gs10.03.1\bin");
+                    // Configure Ghostscript path explicitly for Windows only
+                    if (OperatingSystem.IsWindows())
+                    {
+                        MagickNET.SetGhostscriptDirectory(@"C:\Program Files\gs\gs10.03.1\bin");
+                    }
+                    // On Linux, Ghostscript is typically in PATH and will be auto-detected
                     
                     _logger.LogInformation("Creating MagickImageCollection for PDF");
                     var images = new MagickImageCollection();
