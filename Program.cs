@@ -116,6 +116,9 @@ app.MapGroup("/api/batch").MapBatchProcessingEndpoints();
 // Map Google Drive API endpoints
 app.MapGroup("/api/google-drive").MapGoogleDriveEndpoints();
 
+// Map Tag Management API endpoints
+app.MapGroup("/api/tags").MapTagManagementEndpoints();
+
 // Tag management redirects
 app.MapGet("/debug-tag-inconsistencies", () => Results.Redirect("/api/tags/debug-inconsistencies"));
 app.MapPost("/fix-tag-inconsistencies", () => Results.Redirect("/api/tags/fix-inconsistencies"));

@@ -28,6 +28,7 @@ public static class TagManagementEndpoints
         group.MapPost("/regenerate-extraction-tags", RegenerateExtractionTags);
         group.MapPost("/fix-naruto-tags", FixNarutoTags);
         group.MapPost("/regenerate-franchise-tags", RegenerateFranchiseTags);
+        group.MapPost("/regenerate-genre-tags", RegenerateGenreTags);
         
         return group;
     }
@@ -1625,6 +1626,69 @@ public static class TagManagementEndpoints
                 addedCount = newTags.Count,
                 totalDocuments = allDocuments.Count,
                 documentsWithFranchiseTags = newTags.Select(t => t.JumpDocumentId).Distinct().Count()
+            });
+        }
+        catch (Exception ex)
+        {
+            return Results.Json(new
+            {
+                success = false,
+                error = ex.Message,
+                stackTrace = ex.StackTrace
+            }, statusCode: 500);
+        }
+    }
+
+    private static async Task<IResult> RegenerateGenreTags(JumpChainDbContext context)
+    {
+        try
+        {
+            // Remove all existing genre tags
+            var existingGenreTags = await context.DocumentTags
+                .Where(t => t.TagCategory == "Genre")
+                .ToListAsync();
+            
+            context.DocumentTags.RemoveRange(existingGenreTags);
+            await context.SaveChangesAsync();
+            
+            var removedCount = existingGenreTags.Count;
+            
+            // Get all documents
+            var allDocuments = await context.JumpDocuments.ToListAsync();
+            
+            // Regenerate genre tags for each document using GoogleDriveFileId matching
+            var newTags = new List<DocumentTag>();
+            var documentsWithFileIds = 0;
+            var documentsWithoutFileIds = 0;
+            
+            foreach (var document in allDocuments)
+            {
+                if (!string.IsNullOrEmpty(document.GoogleDriveFileId))
+                {
+                    documentsWithFileIds++;
+                    var docTags = new List<DocumentTag>();
+                    TagGenerationHelpers.AddGenreTagsByFileId(docTags, document.GoogleDriveFileId, document.Id);
+                    newTags.AddRange(docTags);
+                }
+                else
+                {
+                    documentsWithoutFileIds++;
+                }
+            }
+            
+            context.DocumentTags.AddRange(newTags);
+            await context.SaveChangesAsync();
+            
+            return Results.Ok(new
+            {
+                success = true,
+                message = "Successfully regenerated genre tags using file ID matching",
+                removedCount = removedCount,
+                addedCount = newTags.Count,
+                totalDocuments = allDocuments.Count,
+                documentsWithGenreTags = newTags.Select(t => t.JumpDocumentId).Distinct().Count(),
+                documentsWithFileIds = documentsWithFileIds,
+                documentsWithoutFileIds = documentsWithoutFileIds
             });
         }
         catch (Exception ex)

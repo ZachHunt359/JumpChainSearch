@@ -20,12 +20,13 @@ namespace JumpChainSearch.Services
     public interface IGoogleDriveService
     {
         Task<IEnumerable<JumpDocument>> ScanDriveAsync(string driveId, string driveName);
-        Task<IEnumerable<JumpDocument>> ScanFolderAsync(string folderId, string folderName);
-        Task<IEnumerable<JumpDocument>> ScanPublicFolderAsync(string folderId, string folderName);
+        Task<IEnumerable<JumpDocument>> ScanFolderAsync(string folderId, string folderName, string? resourceKey = null, string? parentDriveName = null);
+        Task<IEnumerable<JumpDocument>> ScanPublicFolderAsync(string folderId, string folderName, string? resourceKey = null, string? parentDriveName = null);
         Task<string?> ExtractTextFromDocumentAsync(string fileId);
         Task<(string? text, string? method)> ExtractTextWithMethodAsync(string fileId);
         Task<IEnumerable<DriveData>> GetAvailableDrivesAsync();
         Task<object> DebugFilePropertiesAsync(string fileId);
+        Task<List<(string folderId, string folderName, string? resourceKey)>> DiscoverFolderHierarchyAsync(string rootFolderId, string? rootResourceKey = null);
     }
 
     public record DriveData(string Id, string Name, string? Description);
@@ -190,13 +191,14 @@ namespace JumpChainSearch.Services
             return documents;
         }
 
-        public async Task<IEnumerable<JumpDocument>> ScanFolderAsync(string folderId, string folderName)
+        public async Task<IEnumerable<JumpDocument>> ScanFolderAsync(string folderId, string folderName, string? resourceKey = null, string? parentDriveName = null)
         {
+            var tagDriveName = parentDriveName ?? folderName;
             var documents = new List<JumpDocument>();
             
             try
             {
-                await ScanFolderRecursiveAsync(folderId, folderName, documents, $"/{folderName}");
+                await ScanFolderRecursiveAsync(folderId, tagDriveName, documents, $"/{folderName}", resourceKey);
                 _logger.LogInformation($"Scanned {documents.Count} documents from folder {folderName}");
             }
             catch (Exception ex)
@@ -207,13 +209,14 @@ namespace JumpChainSearch.Services
             return documents;
         }
 
-        public async Task<IEnumerable<JumpDocument>> ScanPublicFolderAsync(string folderId, string folderName)
+        public async Task<IEnumerable<JumpDocument>> ScanPublicFolderAsync(string folderId, string folderName, string? resourceKey = null, string? parentDriveName = null)
         {
+            var tagDriveName = parentDriveName ?? folderName;
             var documents = new List<JumpDocument>();
             
             try
             {
-                await ScanPublicFolderRecursiveAsync(folderId, folderName, documents, $"/{folderName}");
+                await ScanPublicFolderRecursiveAsync(folderId, tagDriveName, documents, $"/{folderName}", resourceKey);
                 _logger.LogInformation($"Scanned {documents.Count} documents from public folder {folderName}");
             }
             catch (Exception ex)
@@ -224,14 +227,16 @@ namespace JumpChainSearch.Services
             return documents;
         }
 
-        private async Task ScanPublicFolderRecursiveAsync(string folderId, string rootFolderName, List<JumpDocument> documents, string currentPath)
+        private async Task ScanPublicFolderRecursiveAsync(string folderId, string rootFolderName, List<JumpDocument> documents, string currentPath, string? resourceKey = null)
         {
             try
             {
                 var request = _publicDriveService.Files.List();
                 request.Q = $"'{folderId}' in parents and trashed=false";
-                request.Fields = "nextPageToken, files(id, name, description, mimeType, size, createdTime, modifiedTime, parents, webViewLink, thumbnailLink, hasThumbnail)";
+                request.Fields = "nextPageToken, files(id, name, description, mimeType, size, createdTime, modifiedTime, parents, webViewLink, thumbnailLink, hasThumbnail, resourceKey)";
                 request.PageSize = 1000;
+                // Note: Resource key for parent folder should be provided by caller
+                // Child folder resource keys will be automatically included in response
 
                 string? pageToken = null;
                 do
@@ -245,8 +250,9 @@ namespace JumpChainSearch.Services
                         {
                             if (file.MimeType == "application/vnd.google-apps.folder")
                             {
-                                // Recursively scan subfolders
-                                await ScanPublicFolderRecursiveAsync(file.Id, rootFolderName, documents, $"{currentPath}/{file.Name}");
+                                // Recursively scan subfolders, using the subfolder's resource key if it has one
+                                var subfolderResourceKey = file.ResourceKey ?? resourceKey;
+                                await ScanPublicFolderRecursiveAsync(file.Id, rootFolderName, documents, $"{currentPath}/{file.Name}", subfolderResourceKey);
                             }
                             else if (IsRelevantFileType(file.MimeType))
                             {
@@ -268,14 +274,16 @@ namespace JumpChainSearch.Services
             }
         }
 
-        private async Task ScanFolderRecursiveAsync(string folderId, string rootFolderName, List<JumpDocument> documents, string currentPath)
+        private async Task ScanFolderRecursiveAsync(string folderId, string rootFolderName, List<JumpDocument> documents, string currentPath, string? resourceKey = null)
         {
             try
             {
                 var request = _driveService.Files.List();
                 request.Q = $"'{folderId}' in parents and trashed=false";
-                request.Fields = "nextPageToken, files(id, name, description, mimeType, size, createdTime, modifiedTime, parents, webViewLink, exportLinks, thumbnailLink, hasThumbnail)";
+                request.Fields = "nextPageToken, files(id, name, description, mimeType, size, createdTime, modifiedTime, parents, webViewLink, exportLinks, thumbnailLink, hasThumbnail, resourceKey)";
                 request.PageSize = 1000;
+                // Note: Resource key for parent folder should be provided by caller
+                // Child folder resource keys will be automatically included in response
 
                 string? pageToken = null;
                 do
@@ -289,8 +297,9 @@ namespace JumpChainSearch.Services
                         {
                             if (file.MimeType == "application/vnd.google-apps.folder")
                             {
-                                // Recursively scan subfolders
-                                await ScanFolderRecursiveAsync(file.Id, rootFolderName, documents, $"{currentPath}/{file.Name}");
+                                // Recursively scan subfolders, using the subfolder's resource key if it has one
+                                var subfolderResourceKey = file.ResourceKey ?? resourceKey;
+                                await ScanFolderRecursiveAsync(file.Id, rootFolderName, documents, $"{currentPath}/{file.Name}", subfolderResourceKey);
                             }
                             else if (IsRelevantFileType(file.MimeType))
                             {
@@ -1432,15 +1441,15 @@ namespace JumpChainSearch.Services
             string contentType = DetermineContentType(document.Name, folderPath);
             tags.Add(new DocumentTag { TagName = contentType, TagCategory = "ContentType" });
 
-            // Add folder hierarchy tags
-            var folders = folderPath.Split('/', StringSplitOptions.RemoveEmptyEntries);
-            foreach (var folder in folders.Take(3)) // Limit to first 3 folder levels to avoid clutter
-            {
-                if (!string.IsNullOrWhiteSpace(folder))
-                {
-                    tags.Add(new DocumentTag { TagName = folder.Trim(), TagCategory = "Folder" });
-                }
-            }
+            // NOTE: Folder hierarchy tags are intentionally NOT added
+            // Folder names are arbitrary organizational structures that don't reflect document content
+            // and create noise in the tagging system. We rely on content-based tags instead:
+            // - Drive: Source drive identification
+            // - ContentType: Gauntlet, Supplement, JumpDoc, etc. (detected from path/filename)
+            // - Format: PDF, Word Doc, Google Doc, etc.
+            // - Status: WIP, Complete, Draft (detected from path/filename)
+            // - Series: Marvel, DC, Star Wars, etc. (loaded from series-mappings.json)
+            // This prevents clutter and UNIQUE constraint violations from folder name collisions
 
             // File format tag based on MIME type and extension
             string fileFormat = DetermineFileFormat(document.MimeType, document.Name);
@@ -1462,7 +1471,14 @@ namespace JumpChainSearch.Services
             // Text extraction status
             AddTextExtractionTag(tags, document.ExtractedText);
 
-            return tags;
+            // Deduplicate tags by TagName to prevent UNIQUE constraint violations
+            // Keep the first occurrence of each tag name (preserves original category assignment)
+            var uniqueTags = tags
+                .GroupBy(t => t.TagName, StringComparer.OrdinalIgnoreCase)
+                .Select(g => g.First())
+                .ToList();
+
+            return uniqueTags;
         }
 
         private string DetermineContentType(string fileName, string folderPath)
@@ -1522,8 +1538,8 @@ namespace JumpChainSearch.Services
             if (fullPath.Contains("nsfw") || fullPath.Contains("adult"))
                 tags.Add(new DocumentTag { TagName = "NSFW", TagCategory = "Content" });
 
-            if (fullPath.Contains("sfw") || fullPath.Contains("safe"))
-                tags.Add(new DocumentTag { TagName = "SFW", TagCategory = "Content" });
+            // Note: No SFW tag - absence of NSFW tag implies safe content
+            // Users can filter by excluding NSFW to see safe content
 
             // Version indicators
             if (fullPath.Contains("v1.") || fullPath.Contains("version 1"))
@@ -1536,27 +1552,50 @@ namespace JumpChainSearch.Services
         {
             string fullPath = $"{folderPath}/{fileName}".ToLowerInvariant();
 
-            // Popular franchises/series detection
-            var franchises = new Dictionary<string, string[]>
-            {
-                ["Marvel"] = new[] { "marvel", "x-men", "avengers", "spider-man", "iron man", "captain america" },
-                ["DC Comics"] = new[] { "batman", "superman", "wonder woman", "justice league", "flash", "green lantern" },
-                ["Star Wars"] = new[] { "star wars", "jedi", "sith", "clone wars" },
-                ["Pokemon"] = new[] { "pokemon", "pokémon" },
-                ["Naruto"] = new[] { "naruto", "konoha", "ninja" },
-                ["Harry Potter"] = new[] { "harry potter", "hogwarts", "wizarding world" },
-                ["Warhammer"] = new[] { "warhammer", "40k", "space marine" },
-                ["Generic"] = new[] { "generic" }
-            };
+            // Load series mappings from JSON file (single source of truth)
+            var franchises = LoadSeriesMappingsFromJson();
 
             foreach (var franchise in franchises)
             {
-                if (franchise.Value.Any(keyword => fullPath.Contains(keyword)))
+                // Use negative lookahead (?!anon) to prevent "skyrim" from matching "skyrimanon"
+                if (franchise.Value.Any(keyword => System.Text.RegularExpressions.Regex.IsMatch(fullPath, $@"\b{System.Text.RegularExpressions.Regex.Escape(keyword)}(?!anon)\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase)))
                 {
-                    tags.Add(new DocumentTag { TagName = franchise.Key, TagCategory = "Franchise" });
-                    break; // Only add the first match to avoid duplicates
+                    tags.Add(new DocumentTag { TagName = franchise.Key, TagCategory = "Series" });
+                    // Can add more than one series tag
                 }
             }
+        }
+
+        private Dictionary<string, List<string>> LoadSeriesMappingsFromJson()
+        {
+            var jsonPath = Path.Combine(Directory.GetCurrentDirectory(), "series-mappings.json");
+            
+            if (!System.IO.File.Exists(jsonPath))
+            {
+                // Return empty dictionary if file doesn't exist
+                _logger.LogWarning($"series-mappings.json not found at {jsonPath}");
+                return new Dictionary<string, List<string>>();
+            }
+            
+            var json = System.IO.File.ReadAllText(jsonPath);
+            var doc = System.Text.Json.JsonDocument.Parse(json);
+            
+            var mappings = new Dictionary<string, List<string>>();
+            
+            if (doc.RootElement.TryGetProperty("seriesMappings", out var seriesMappingsElement))
+            {
+                foreach (var series in seriesMappingsElement.EnumerateObject())
+                {
+                    var patterns = new List<string>();
+                    foreach (var pattern in series.Value.EnumerateArray())
+                    {
+                        patterns.Add(pattern.GetString() ?? "");
+                    }
+                    mappings[series.Name] = patterns;
+                }
+            }
+            
+            return mappings;
         }
 
         private void AddTextExtractionTag(List<DocumentTag> tags, string? extractedText)
@@ -1637,6 +1676,74 @@ namespace JumpChainSearch.Services
             }
             
             return new { success = false, error = "All authentication methods failed" };
+        }
+
+        public async Task<List<(string folderId, string folderName, string? resourceKey)>> DiscoverFolderHierarchyAsync(string rootFolderId, string? rootResourceKey = null)
+        {
+            var allFolders = new List<(string folderId, string folderName, string? resourceKey)>();
+            var apiKey = Environment.GetEnvironmentVariable("GOOGLE_API_KEY");
+            
+            if (string.IsNullOrEmpty(apiKey))
+            {
+                _logger.LogError("GOOGLE_API_KEY not configured");
+                return allFolders;
+            }
+
+            using var httpClient = new HttpClient();
+            await DiscoverFoldersRecursiveAsync(httpClient, apiKey, rootFolderId, rootResourceKey, "", allFolders);
+            
+            return allFolders;
+        }
+
+        private async Task DiscoverFoldersRecursiveAsync(
+            HttpClient httpClient, 
+            string apiKey, 
+            string folderId, 
+            string? resourceKey, 
+            string path,
+            List<(string folderId, string folderName, string? resourceKey)> allFolders)
+        {
+            try
+            {
+                // Build the API request URL
+                var query = Uri.EscapeDataString($"'{folderId}' in parents and trashed=false and mimeType='application/vnd.google-apps.folder'");
+                var url = $"https://www.googleapis.com/drive/v3/files?q={query}&fields=files(id,name,resourceKey,webViewLink)&key={apiKey}";
+                
+                // Add resource key header if provided
+                if (!string.IsNullOrEmpty(resourceKey))
+                {
+                    httpClient.DefaultRequestHeaders.Remove("X-Goog-Drive-Resource-Keys");
+                    httpClient.DefaultRequestHeaders.Add("X-Goog-Drive-Resource-Keys", $"{folderId}/{resourceKey}");
+                }
+
+                var response = await httpClient.GetStringAsync(url);
+                var jsonDoc = System.Text.Json.JsonDocument.Parse(response);
+                
+                if (!jsonDoc.RootElement.TryGetProperty("files", out var filesArray))
+                {
+                    return;
+                }
+
+                foreach (var file in filesArray.EnumerateArray())
+                {
+                    var childId = file.GetProperty("id").GetString() ?? "";
+                    var childName = file.GetProperty("name").GetString() ?? "";
+                    var childResourceKey = file.TryGetProperty("resourceKey", out var rkProp) ? rkProp.GetString() : null;
+                    var childPath = string.IsNullOrEmpty(path) ? childName : $"{path}/{childName}";
+
+                    _logger.LogInformation($"Discovered folder: {childPath} (ID: {childId}, ResourceKey: {childResourceKey ?? "none"})");
+                    
+                    // Add to results
+                    allFolders.Add((childId, childPath, childResourceKey));
+                    
+                    // Recursively discover subfolders
+                    await DiscoverFoldersRecursiveAsync(httpClient, apiKey, childId, childResourceKey, childPath, allFolders);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error discovering folders in {folderId}: {ex.Message}");
+            }
         }
     }
 }

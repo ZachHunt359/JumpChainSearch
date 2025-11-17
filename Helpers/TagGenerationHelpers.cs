@@ -143,6 +143,85 @@ public static class TagGenerationHelpers
         }
     }
 
+    /// <summary>
+    /// Add genre tags by matching Google Drive File ID from scraped community genre mappings.
+    /// This is more accurate than name-based matching as it prevents false positives.
+    /// </summary>
+    public static void AddGenreTagsByFileId(List<DocumentTag> tags, string googleDriveFileId, int documentId)
+    {
+        if (string.IsNullOrEmpty(googleDriveFileId))
+            return;
+
+        var genreMappings = LoadGenreMappingsFromJson();
+
+        foreach (var genre in genreMappings)
+        {
+            if (genre.Value.Any(doc => doc.DriveFileId == googleDriveFileId))
+            {
+                tags.Add(new DocumentTag { TagName = genre.Key, TagCategory = "Genre", JumpDocumentId = documentId });
+                // Can add more than one genre tag - don't break
+            }
+        }
+    }
+
+    private static Dictionary<string, List<GenreDocumentMapping>> LoadGenreMappingsFromJson()
+    {
+        var jsonPath = Path.Combine(Directory.GetCurrentDirectory(), "genre-mappings-scraped.json");
+        
+        if (!File.Exists(jsonPath))
+        {
+            Console.WriteLine($"Warning: genre-mappings-scraped.json not found at {jsonPath}");
+            return new Dictionary<string, List<GenreDocumentMapping>>();
+        }
+        
+        var json = File.ReadAllText(jsonPath);
+        var doc = System.Text.Json.JsonDocument.Parse(json);
+        
+        var mappings = new Dictionary<string, List<GenreDocumentMapping>>();
+        
+        if (doc.RootElement.TryGetProperty("genreMappings", out var genreMappingsElement))
+        {
+            foreach (var genre in genreMappingsElement.EnumerateObject())
+            {
+                var documents = new List<GenreDocumentMapping>();
+                
+                // Handle both old format (string array) and new format (object array with driveFileId)
+                foreach (var item in genre.Value.EnumerateArray())
+                {
+                    if (item.ValueKind == System.Text.Json.JsonValueKind.String)
+                    {
+                        // Old format: just document name (skip these, we need file IDs)
+                        continue;
+                    }
+                    else if (item.ValueKind == System.Text.Json.JsonValueKind.Object)
+                    {
+                        // New format: object with name and driveFileId
+                        string name = item.TryGetProperty("name", out var nameElement) ? nameElement.GetString() ?? "" : "";
+                        string fileId = item.TryGetProperty("driveFileId", out var fileIdElement) ? fileIdElement.GetString() ?? "" : "";
+                        
+                        if (!string.IsNullOrEmpty(fileId))
+                        {
+                            documents.Add(new GenreDocumentMapping { Name = name, DriveFileId = fileId });
+                        }
+                    }
+                }
+                
+                if (documents.Any())
+                {
+                    mappings[genre.Name] = documents;
+                }
+            }
+        }
+        
+        return mappings;
+    }
+
+    public class GenreDocumentMapping
+    {
+        public string Name { get; set; } = "";
+        public string DriveFileId { get; set; } = "";
+    }
+
     public static void AddTextExtractionTag(List<DocumentTag> tags, string? extractedText, int documentId)
     {
         // Only add "Has Text" tag if there is actually extracted text

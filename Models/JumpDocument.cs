@@ -107,6 +107,19 @@ namespace JumpChainSearch.Models
         public virtual JumpDocument JumpDocument { get; set; } = null!;
     }
     
+    // CONSTRAINT DOCUMENTATION:
+    // The database has a UNIQUE constraint on (JumpDocumentId, TagName) to prevent duplicate tags.
+    // This means the same TagName cannot be added twice to the same document, regardless of TagCategory.
+    // 
+    // Handling Strategy:
+    // 1. Prevention: GenerateTags() deduplicates tags case-insensitively before returning
+    // 2. Folder tags removed: Folder names often collide with content tags (e.g., "NSFW" folder + NSFW content tag)
+    // 3. Graceful degradation: If duplicates somehow reach the database, Entity Framework throws
+    //    DbUpdateException with inner SqliteException: "UNIQUE constraint failed: DocumentTags.JumpDocumentId, DocumentTags.TagName"
+    //    The scan endpoint catches this, logs it, clears the change tracker, and continues.
+    // 
+    // This design ensures tags reflect document content/metadata, not arbitrary folder organization.
+    
     
 
     public class DocumentPurchasable

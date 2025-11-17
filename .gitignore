@@ -1,5 +1,6 @@
 ﻿## Root-level ignores
-.github/
+.github/*
+!.github/public-reference/
 
 # Build results
 bin/
