@@ -711,10 +711,17 @@ public static class AdminEndpoints
             try {{
                 const resp = await fetch('/admin/batch/start', {{ method: 'POST' }});
                 const data = await resp.json();
+                
+                if (!resp.ok) {{
+                    alert('Failed to start batch: ' + (data.error || data.message || 'Unknown error'));
+                    return;
+                }}
+                
                 alert(data.message || (data.success ? 'Batch processing started!' : 'Failed to start batch processing'));
                 updateStatus();
             }} catch (e) {{
-                alert('Error: ' + e.message);
+                console.error('Batch start error:', e);
+                alert('Error starting batch: ' + e.message);
             }}
         }}
         
@@ -735,10 +742,17 @@ public static class AdminEndpoints
             try {{
                 const resp = await fetch('/admin/drives/scan', {{ method: 'POST' }});
                 const data = await resp.json();
+                
+                if (!resp.ok) {{
+                    alert('Failed to start scan: ' + (data.error || data.message || 'Unknown error'));
+                    return;
+                }}
+                
                 alert(data.message || (data.success ? 'Drive scan started!' : 'Failed to start scan'));
                 updateStatus();
             }} catch (e) {{
-                alert('Error: ' + e.message);
+                console.error('Drive scan error:', e);
+                alert('Error starting drive scan: ' + e.message);
             }}
         }}
         
@@ -747,10 +761,17 @@ public static class AdminEndpoints
             try {{
                 const resp = await fetch('/admin/drives/scan/stop', {{ method: 'POST' }});
                 const data = await resp.json();
+                
+                if (!resp.ok) {{
+                    alert('Failed to stop scan: ' + (data.error || data.message || 'Unknown error'));
+                    return;
+                }}
+                
                 alert(data.message || 'Drive scan stopped');
                 updateStatus();
             }} catch (e) {{
-                alert('Error: ' + e.message);
+                console.error('Stop scan error:', e);
+                alert('Error stopping scan: ' + e.message);
             }}
         }}
         
