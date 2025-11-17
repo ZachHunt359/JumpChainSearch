@@ -82,8 +82,36 @@ builder.Services.AddServerSideBlazor(options =>
     options.MaximumReceiveMessageSize = 64 * 1024; // 64KB
 });
 
+// Add Swagger/OpenAPI support for API testing
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen(options =>
+{
+    options.SwaggerDoc("v1", new Microsoft.OpenApi.Models.OpenApiInfo
+    {
+        Title = "JumpChain Search API",
+        Version = "v1",
+        Description = "API for searching and managing JumpChain documents across Google Drives"
+    });
+    
+    // Only document endpoints under /api/* and /admin/* to avoid conflicts with redirects
+    options.DocInclusionPredicate((docName, apiDesc) =>
+    {
+        var routeTemplate = apiDesc.RelativePath ?? "";
+        return routeTemplate.StartsWith("api/") || routeTemplate.StartsWith("admin/");
+    });
+});
+
 // Build the app
 var app = builder.Build();
+
+// Enable Swagger in all environments (useful for testing on VPS)
+app.UseSwagger();
+app.UseSwaggerUI(options =>
+{
+    options.SwaggerEndpoint("/swagger/v1/swagger.json", "JumpChain Search API v1");
+    options.RoutePrefix = "swagger"; // Access at /swagger
+    options.DocumentTitle = "JumpChain Search API";
+});
 
 // Serve static files from wwwroot (CSS, JS, images)
 app.UseStaticFiles();

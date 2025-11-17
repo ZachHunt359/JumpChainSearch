@@ -1,0 +1,24 @@
+﻿{
+  "seriesMappings": {
+    "Marvel": ["marvel", "x-men", "avengers", "spider-man", "iron man", "captain america"],
+    "DC Comics": ["batman", "superman", "wonder woman", "justice league", "flash", "green lantern"],
+    "Star Wars": ["star wars", "jedi", "sith", "clone wars"],
+    "Star Trek": ["star trek", "enterprise", "voyager", "ds9", "picard"],
+    "Pokemon": ["pokemon", "pokémon"],
+    "Naruto": ["naruto", "konoha"],
+    "My Hero Academia": ["my hero academia", "my hero academy", "boku no hero", "plus ultra"],
+    "Dragon Ball": ["dragon ball", "goku", "vegeta", "frieza"],
+    "Harry Potter": ["harry potter", "hogwarts", "wizarding world"],
+    "Warhammer 40K": ["warhammer 40k", "40k", "space marine", "tyranid"],
+    "Warhammer Fantasy": ["warhammer fantasy", "grand cathay", "rise of sigmar", "bretonnia", "skaven"],
+    "Generic": ["generic"],
+    "Out of Context": ["out of context", "ooc"],
+    "Isekai": ["isekai"],
+    "Jurassic World": ["jurassic park", "jurassic world", "dinosaurs", "isla nublar"],
+    "Men in Black": ["men in black", "mib"],
+    "Nasuverse": ["fate/stay night", "fate zero", "nasuverse", "type-moon", "type moon", "fate/"],
+    "Elder Scrolls": ["elder scrolls", "skyrim", "morrowind", "tes skyrim", "tes morrowind", "tes oblivion", "tes iv", "tes v"],
+    "The Witcher": ["witcher", "geralt", "yennefer", "cirilla"],
+    "Lord of the Rings": ["lord of the rings", "lotr", "middle-earth", "middle earth", "gondor", "shire", "sauron", "celebrimbor"]
+  }
+}

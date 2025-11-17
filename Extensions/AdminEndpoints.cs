@@ -1489,15 +1489,20 @@ try {
             else
             {
                 // Linux: Bash script
+                // Try to detect the actual listening URL, fallback to common defaults
+                var apiUrl = Environment.GetEnvironmentVariable("ASPNETCORE_URLS")?.Split(';').FirstOrDefault()
+                            ?? "http://localhost:5000";  // Kestrel default
+                
                 var scanScript = @"#!/bin/bash
-cd " + Directory.GetCurrentDirectory() + @"
+cd " + Directory.GetCurrentDirectory() + $@"
 
 timestamp=$(date +'%Y-%m-%d_%H-%M-%S')
 logFile=""logs/drive-scan-$timestamp.log""
 
 echo ""Starting drive scan at $(date)"" >> ""$logFile""
 
-curl -X POST http://localhost:5248/api/google-drive/scan-all \
+# Try the configured URL first, then fallback to common ports
+curl -X POST {apiUrl}/api/google-drive/scan-all \
      -H 'Content-Type: application/json' \
      >> ""$logFile"" 2>&1
 
