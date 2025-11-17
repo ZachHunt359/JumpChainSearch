@@ -35,17 +35,22 @@ sudo systemctl stop $SERVICE_NAME
 echo "✓ Service stopped"
 echo ""
 
-echo "Step 3: Building the application..."
+echo "Step 3: Cleaning previous build..."
+rm -rf "$PUBLISH_DIR"
+echo "✓ Previous build cleaned"
+echo ""
+
+echo "Step 4: Building the application..."
 dotnet publish -c Release -o "$PUBLISH_DIR"
 echo "✓ Build completed"
 echo ""
 
-echo "Step 4: Starting the service..."
+echo "Step 5: Starting the service..."
 sudo systemctl start $SERVICE_NAME
 echo "✓ Service started"
 echo ""
 
-echo "Step 5: Checking service status..."
+echo "Step 6: Checking service status..."
 sleep 2
 if sudo systemctl is-active --quiet $SERVICE_NAME; then
     echo "✓ Service is running"
