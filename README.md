@@ -128,7 +128,33 @@ The script will:
    - **Development**: OAuth 2.0
    - **Production**: Service Account
 
-### Environment Variables
+### Database Configuration
+
+The application uses SQLite with a **single, consistent approach** across all environments:
+
+### Connection String Priority (in order)
+1. `ConnectionStrings__DefaultConnection` (appsettings.json or environment variable)
+2. `CONNECTION_STRING` environment variable  
+3. **Default**: `Data Source={AppContext.BaseDirectory}/jumpchain.db;Mode=ReadWrite`
+
+### Environment Variable (Optional)
+If you need the database in a specific location (e.g., `/var/lib/jumpchain/jumpsearch.db` in production), set **ONE** of these:
+
+```bash
+# Option 1: Full connection string (recommended for production)
+CONNECTION_STRING="Data Source=/var/lib/jumpchain/jumpsearch.db;Mode=ReadWrite"
+
+# Option 2: Just the path (app will build connection string)
+JUMPCHAIN_DB_PATH="/var/lib/jumpchain/jumpsearch.db"
+```
+
+### Why This Approach?
+- **No symlinks needed**: App reads from configured location directly
+- **Same code path**: Dev and production use identical logic
+- **Clear precedence**: Explicit config > environment variable > sensible default
+- **Migration-friendly**: deploy.sh reads from systemd and applies migrations to correct database
+
+## Environment Variables
 
 Copy `.env.example` to `.env` and fill in your credentials.
 

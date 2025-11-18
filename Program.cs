@@ -45,11 +45,12 @@ if (cliResult >= 0) return cliResult;
 var builder = WebApplication.CreateBuilder(args);
 
 // Determine connection string (fallback to SQLite file if not set)
+// Use absolute path to avoid confusion between dev/prod environments
+var dbPath = Environment.GetEnvironmentVariable("JUMPCHAIN_DB_PATH") 
+             ?? Path.Combine(AppContext.BaseDirectory, "jumpchain.db");
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
-                       ?? builder.Configuration["ConnectionStrings:DefaultConnection"]
-                       ?? Environment.GetEnvironmentVariable("DefaultConnection")
                        ?? Environment.GetEnvironmentVariable("CONNECTION_STRING")
-                       ?? "Data Source=jumpchain.db";
+                       ?? $"Data Source={dbPath};Mode=ReadWrite";
 
 // Register core services
 builder.Services.AddMemoryCache();

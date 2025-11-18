@@ -18,6 +18,14 @@ PUBLISH_DIR="$APP_DIR/publish"
 SERVICE_NAME="jumpchain"
 BRANCH="main"
 
+# Extract the production database path from systemd service
+DB_CONNECTION=$(sudo systemctl show $SERVICE_NAME -p Environment --value | grep -o 'CONNECTION_STRING=[^"]*' | cut -d'=' -f2)
+if [ -z "$DB_CONNECTION" ]; then
+    echo "⚠ Warning: Could not read CONNECTION_STRING from systemd service"
+    DB_CONNECTION="Data Source=/var/lib/jumpchain/jumpsearch.db;Mode=ReadWrite"
+fi
+echo "Database: $DB_CONNECTION"
+
 # Check if we're in the right directory
 if [ ! -f "JumpChainSearch.csproj" ]; then
     echo "Error: JumpChainSearch.csproj not found. Are you in the project directory?"
@@ -31,12 +39,14 @@ echo "✓ Code updated to latest commit"
 echo ""
 
 echo "Step 2: Backing up database..."
-BACKUP_FILE="$APP_DIR/jumpchain.db.backup-$(date +%Y%m%d-%H%M%S)"
-if [ -f "$APP_DIR/jumpchain.db" ]; then
-    cp "$APP_DIR/jumpchain.db" "$BACKUP_FILE"
+# Extract database file path from connection string
+DB_PATH=$(echo "$DB_CONNECTION" | grep -o 'Data Source=[^;]*' | cut -d'=' -f2)
+BACKUP_FILE="$DB_PATH.backup-$(date +%Y%m%d-%H%M%S)"
+if [ -f "$DB_PATH" ]; then
+    cp "$DB_PATH" "$BACKUP_FILE"
     echo "✓ Database backed up to: $BACKUP_FILE"
 else
-    echo "⚠ No database file found (first deployment?)"
+    echo "⚠ No database file found at: $DB_PATH (first deployment?)"
 fi
 echo ""
 
@@ -55,22 +65,15 @@ dotnet publish -c Release -o "$PUBLISH_DIR"
 echo "✓ Build completed"
 echo ""
 
-echo "Step 5.5: Creating database symlink..."
-if [ -f "$APP_DIR/jumpchain.db" ]; then
-    ln -sf "$APP_DIR/jumpchain.db" "$PUBLISH_DIR/jumpchain.db"
-    echo "✓ Database symlink created"
-else
-    echo "⚠ No database file found - symlink not created"
-fi
-echo ""
-
 echo "Step 6: Applying database migrations..."
 # Ensure dotnet-ef is in PATH
 export PATH="$PATH:$HOME/.dotnet/tools"
 if command -v dotnet-ef &> /dev/null; then
     cd "$APP_DIR"
+    # Use the same connection string as the production service
+    export ConnectionStrings__DefaultConnection="$DB_CONNECTION"
     dotnet ef database update
-    echo "✓ Migrations applied"
+    echo "✓ Migrations applied to $DB_PATH"
 else
     echo "⚠ dotnet-ef not found. Install with: dotnet tool install --global dotnet-ef"
     echo "⚠ Skipping migrations - you may need to run manually"
