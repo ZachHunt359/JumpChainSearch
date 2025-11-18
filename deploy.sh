@@ -55,7 +55,16 @@ dotnet publish -c Release -o "$PUBLISH_DIR"
 echo "✓ Build completed"
 echo ""
 
-echo "Step 5.5: Applying database migrations..."
+echo "Step 5.5: Creating database symlink..."
+if [ -f "$APP_DIR/jumpchain.db" ]; then
+    ln -sf "$APP_DIR/jumpchain.db" "$PUBLISH_DIR/jumpchain.db"
+    echo "✓ Database symlink created"
+else
+    echo "⚠ No database file found - symlink not created"
+fi
+echo ""
+
+echo "Step 6: Applying database migrations..."
 # Ensure dotnet-ef is in PATH
 export PATH="$PATH:$HOME/.dotnet/tools"
 if command -v dotnet-ef &> /dev/null; then
@@ -68,12 +77,12 @@ else
 fi
 echo ""
 
-echo "Step 6: Starting the service..."
+echo "Step 7: Starting the service..."
 sudo systemctl start $SERVICE_NAME
 echo "✓ Service started"
 echo ""
 
-echo "Step 7: Checking service status..."
+echo "Step 8: Checking service status..."
 sleep 2
 if sudo systemctl is-active --quiet $SERVICE_NAME; then
     echo "✓ Service is running"
