@@ -290,7 +290,7 @@ public static class TagVotingEndpoints
                     r.Id,
                     r.JumpDocumentId,
                     DocumentName = r.JumpDocument.Name,
-                    GoogleDriveLink = r.JumpDocument.GoogleDriveWebViewLink,
+                    GoogleDriveLink = r.JumpDocument.WebViewLink,
                     r.TagName,
                     r.TagCategory,
                     r.RequestedByUserId,
@@ -332,7 +332,7 @@ public static class TagVotingEndpoints
                     s.Id,
                     s.JumpDocumentId,
                     DocumentName = s.JumpDocument.Name,
-                    GoogleDriveLink = s.JumpDocument.GoogleDriveWebViewLink,
+                    GoogleDriveLink = s.JumpDocument.WebViewLink,
                     s.TagName,
                     s.TagCategory,
                     s.SuggestedByUserId,
@@ -342,7 +342,6 @@ public static class TagVotingEndpoints
                     AgainstVotes = s.Votes.Where(v => !v.IsInFavor).Sum(v => v.Weight),
                     AgreementPercentage = s.Votes.Sum(v => v.Weight) > 0 ? 
                         s.Votes.Where(v => v.IsInFavor).Sum(v => v.Weight) / s.Votes.Sum(v => v.Weight) * 100 : 0
-                })      s.Votes.Where(v => v.IsInFavor).Sum(v => v.Weight) / s.Votes.Sum(v => v.Weight) * 100 : 0
                 })
                 .OrderByDescending(s => s.VoteCount)
                 .ToListAsync();
@@ -355,7 +354,7 @@ public static class TagVotingEndpoints
                     r.Id,
                     r.JumpDocumentId,
                     DocumentName = r.JumpDocument.Name,
-                    GoogleDriveLink = r.JumpDocument.GoogleDriveWebViewLink,
+                    GoogleDriveLink = r.JumpDocument.WebViewLink,
                     r.TagName,
                     r.TagCategory,
                     r.RequestedByUserId,
