@@ -55,6 +55,11 @@ dotnet publish -c Release -o "$PUBLISH_DIR"
 echo "✓ Build completed"
 echo ""
 
+echo "Step 5.5: Applying database migrations..."
+dotnet ef database update --project "$APP_DIR" --startup-project "$APP_DIR"
+echo "✓ Migrations applied"
+echo ""
+
 echo "Step 6: Starting the service..."
 sudo systemctl start $SERVICE_NAME
 echo "✓ Service started"
