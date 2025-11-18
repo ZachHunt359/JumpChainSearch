@@ -12,6 +12,15 @@ echo "JumpChain Search - Deployment Script"
 echo "======================================"
 echo ""
 
+# Request sudo password upfront to minimize downtime later
+echo "Requesting sudo access (needed for service restart)..."
+sudo -v
+echo "✓ Sudo access granted"
+echo ""
+
+# Keep sudo alive in background (refreshes every 60 seconds)
+while true; do sudo -n true; sleep 60; kill -0 "$$" || exit; done 2>/dev/null &
+
 # Configuration
 APP_DIR=$(pwd)
 PUBLISH_DIR="$APP_DIR/publish"
