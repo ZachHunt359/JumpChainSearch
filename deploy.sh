@@ -56,7 +56,14 @@ echo "✓ Build completed"
 echo ""
 
 echo "Step 5.5: Applying database migrations..."
-dotnet ef database update --project "$APP_DIR" --startup-project "$APP_DIR"
+# Check if dotnet-ef is installed, if not install it
+if ! command -v dotnet-ef &> /dev/null; then
+    echo "Installing dotnet-ef tool..."
+    dotnet tool install --global dotnet-ef
+    export PATH="$PATH:$HOME/.dotnet/tools"
+fi
+cd "$APP_DIR"
+dotnet ef database update
 echo "✓ Migrations applied"
 echo ""
 
