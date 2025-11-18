@@ -1852,7 +1852,9 @@ rm -f drive-scan.pid
         }
         catch (Exception ex)
         {
-            return Results.BadRequest(new { success = false, error = ex.Message });
+            Console.WriteLine($"[ERROR] GetDriveConfigurations failed: {ex.Message}");
+            Console.WriteLine($"[ERROR] Stack trace: {ex.StackTrace}");
+            return Results.BadRequest(new { success = false, error = ex.Message, stackTrace = ex.StackTrace });
         }
     }
 
