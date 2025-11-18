@@ -56,15 +56,16 @@ echo "✓ Build completed"
 echo ""
 
 echo "Step 5.5: Applying database migrations..."
-# Check if dotnet-ef is installed, if not install it
-if ! command -v dotnet-ef &> /dev/null; then
-    echo "Installing dotnet-ef tool..."
-    dotnet tool install --global dotnet-ef
-    export PATH="$PATH:$HOME/.dotnet/tools"
+# Ensure dotnet-ef is in PATH
+export PATH="$PATH:$HOME/.dotnet/tools"
+if command -v dotnet-ef &> /dev/null; then
+    cd "$APP_DIR"
+    dotnet ef database update
+    echo "✓ Migrations applied"
+else
+    echo "⚠ dotnet-ef not found. Install with: dotnet tool install --global dotnet-ef"
+    echo "⚠ Skipping migrations - you may need to run manually"
 fi
-cd "$APP_DIR"
-dotnet ef database update
-echo "✓ Migrations applied"
 echo ""
 
 echo "Step 6: Starting the service..."
