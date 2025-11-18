@@ -18,12 +18,9 @@ PUBLISH_DIR="$APP_DIR/publish"
 SERVICE_NAME="jumpchain"
 BRANCH="main"
 
-# Extract the production database path from systemd service
-DB_CONNECTION=$(sudo systemctl show $SERVICE_NAME -p Environment --value | grep -o 'CONNECTION_STRING=[^"]*' | cut -d'=' -f2)
-if [ -z "$DB_CONNECTION" ]; then
-    echo "⚠ Warning: Could not read CONNECTION_STRING from systemd service"
-    DB_CONNECTION="Data Source=/var/lib/jumpchain/jumpsearch.db;Mode=ReadWrite"
-fi
+# Production database location (matches systemd service configuration)
+DB_PATH="/var/lib/jumpchain/jumpsearch.db"
+DB_CONNECTION="Data Source=$DB_PATH;Mode=ReadWrite"
 echo "Database: $DB_CONNECTION"
 
 # Check if we're in the right directory
