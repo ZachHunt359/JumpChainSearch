@@ -25,6 +25,7 @@ public static class TagManagementEndpoints
         group.MapPost("/batch-simple", BatchSimpleTagging);
         group.MapPost("/batch-comprehensive", BatchComprehensiveTagging);
         group.MapPost("/remove-sfw", RemoveSfwTags);
+        group.MapPost("/remove-folder-tags", RemoveFolderTags);
         group.MapPost("/regenerate-extraction-tags", RegenerateExtractionTags);
         group.MapPost("/fix-naruto-tags", FixNarutoTags);
         group.MapPost("/regenerate-franchise-tags", RegenerateFranchiseTags);
@@ -277,12 +278,6 @@ public static class TagManagementEndpoints
                     string sizeCategory = DetermineSizeCategory(document.Size);
                     newTags.Add(new DocumentTag { TagName = sizeCategory, TagCategory = "Size", JumpDocumentId = document.Id });
 
-                    var folders = (document.FolderPath ?? "").Split('/', StringSplitOptions.RemoveEmptyEntries);
-                    if (folders.Length > 0 && !string.IsNullOrWhiteSpace(folders[0]))
-                    {
-                        newTags.Add(new DocumentTag { TagName = folders[0].Trim(), TagCategory = "Folder", JumpDocumentId = document.Id });
-                    }
-
                     AddQualityTags(newTags, document.Name ?? "", document.FolderPath ?? "", document.Id);
                     AddSeriesTags(newTags, document.Name ?? "", document.FolderPath ?? "", document.Id);
                     TagGenerationHelpers.AddTextExtractionTag(newTags, document.ExtractedText, document.Id);
@@ -396,12 +391,6 @@ public static class TagManagementEndpoints
 
                         string sizeCategory = DetermineSizeCategory(document.Size);
                         newTags.Add(new DocumentTag { TagName = sizeCategory, TagCategory = "Size", JumpDocumentId = document.Id });
-
-                        var folders = (document.FolderPath ?? "").Split('/', StringSplitOptions.RemoveEmptyEntries);
-                        if (folders.Length > 0 && !string.IsNullOrWhiteSpace(folders[0]))
-                        {
-                            newTags.Add(new DocumentTag { TagName = folders[0].Trim(), TagCategory = "Folder", JumpDocumentId = document.Id });
-                        }
 
                         AddQualityTags(newTags, document.Name ?? "", document.FolderPath ?? "", document.Id);
                         AddSeriesTags(newTags, document.Name ?? "", document.FolderPath ?? "", document.Id);
@@ -534,12 +523,6 @@ public static class TagManagementEndpoints
 
                 string sizeCategory = DetermineSizeCategory(untaggedDocument.Size);
                 newTags.Add(new DocumentTag { TagName = sizeCategory, TagCategory = "Size", JumpDocumentId = untaggedDocument.Id });
-
-                var folders = (untaggedDocument.FolderPath ?? "").Split('/', StringSplitOptions.RemoveEmptyEntries);
-                if (folders.Length > 0 && !string.IsNullOrWhiteSpace(folders[0]))
-                {
-                    newTags.Add(new DocumentTag { TagName = folders[0].Trim(), TagCategory = "Folder", JumpDocumentId = untaggedDocument.Id });
-                }
 
                 AddQualityTags(newTags, untaggedDocument.Name ?? "", untaggedDocument.FolderPath ?? "", untaggedDocument.Id);
                 AddSeriesTags(newTags, untaggedDocument.Name ?? "", untaggedDocument.FolderPath ?? "", untaggedDocument.Id);
@@ -854,12 +837,6 @@ public static class TagManagementEndpoints
             string sizeCategory = DetermineSizeCategory(document.Size);
             newTags.Add(new DocumentTag { TagName = sizeCategory, TagCategory = "Size", JumpDocumentId = document.Id });
 
-            var folders = (document.FolderPath ?? "").Split('/', StringSplitOptions.RemoveEmptyEntries);
-            if (folders.Length > 0 && !string.IsNullOrWhiteSpace(folders[0]))
-            {
-                newTags.Add(new DocumentTag { TagName = folders[0].Trim(), TagCategory = "Folder", JumpDocumentId = document.Id });
-            }
-
             AddQualityTags(newTags, document.Name ?? "", document.FolderPath ?? "", document.Id);
             AddSeriesTags(newTags, document.Name ?? "", document.FolderPath ?? "", document.Id);
             TagGenerationHelpers.AddTextExtractionTag(newTags, document.ExtractedText, document.Id);
@@ -1085,12 +1062,6 @@ public static class TagManagementEndpoints
 
                 string sizeCategory = DetermineSizeCategory(document.Size);
                 newTags.Add(new DocumentTag { TagName = sizeCategory, TagCategory = "Size", JumpDocumentId = document.Id });
-
-                var folders = (document.FolderPath ?? "").Split('/', StringSplitOptions.RemoveEmptyEntries);
-                if (folders.Length > 0 && !string.IsNullOrWhiteSpace(folders[0]))
-                {
-                    newTags.Add(new DocumentTag { TagName = folders[0].Trim(), TagCategory = "Folder", JumpDocumentId = document.Id });
-                }
 
                 AddQualityTags(newTags, document.Name ?? "", document.FolderPath ?? "", document.Id);
                 AddSeriesTags(newTags, document.Name ?? "", document.FolderPath ?? "", document.Id);
@@ -1345,12 +1316,6 @@ public static class TagManagementEndpoints
                         string sizeCategory = DetermineSizeCategory(document.Size);
                         newTags.Add(new DocumentTag { TagName = sizeCategory, TagCategory = "Size", JumpDocumentId = document.Id });
 
-                        var folders = (document.FolderPath ?? "").Split('/', StringSplitOptions.RemoveEmptyEntries);
-                        if (folders.Length > 0 && !string.IsNullOrWhiteSpace(folders[0]))
-                        {
-                            newTags.Add(new DocumentTag { TagName = folders[0].Trim(), TagCategory = "Folder", JumpDocumentId = document.Id });
-                        }
-
                         AddQualityTags(newTags, document.Name ?? "", document.FolderPath ?? "", document.Id);
                         AddSeriesTags(newTags, document.Name ?? "", document.FolderPath ?? "", document.Id);
                         TagGenerationHelpers.AddTextExtractionTag(newTags, document.ExtractedText, document.Id);
@@ -1454,6 +1419,42 @@ public static class TagManagementEndpoints
                 success = true,
                 message = $"Successfully removed {sfwTags.Count} SFW tags",
                 removedCount = sfwTags.Count
+            });
+        }
+        catch (Exception ex)
+        {
+            return Results.BadRequest(new { 
+                success = false, 
+                error = ex.Message,
+                details = ex.InnerException?.Message
+            });
+        }
+    }
+    
+    private static async Task<IResult> RemoveFolderTags(JumpChainDbContext context)
+    {
+        try
+        {
+            var folderTags = await context.DocumentTags
+                .Where(t => t.TagCategory == "Folder")
+                .ToListAsync();
+
+            if (!folderTags.Any())
+            {
+                return Results.Ok(new {
+                    success = true,
+                    message = "No Folder tags found to remove",
+                    removedCount = 0
+                });
+            }
+
+            context.DocumentTags.RemoveRange(folderTags);
+            await context.SaveChangesAsync();
+
+            return Results.Ok(new {
+                success = true,
+                message = $"Successfully removed {folderTags.Count} Folder tags",
+                removedCount = folderTags.Count
             });
         }
         catch (Exception ex)

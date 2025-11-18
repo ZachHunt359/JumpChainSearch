@@ -3,6 +3,7 @@ using System;
 using JumpChainSearch.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -10,9 +11,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace JumpChainSearch.Migrations
 {
     [DbContext(typeof(JumpChainDbContext))]
-    partial class JumpChainDbContextModelSnapshot : ModelSnapshot
+    [Migration("20251117144241_AddPreferredAuthMethodToDriveConfiguration")]
+    partial class AddPreferredAuthMethodToDriveConfiguration
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder.HasAnnotation("ProductVersion", "8.0.10");
@@ -402,74 +405,6 @@ namespace JumpChainSearch.Migrations
                     b.HasIndex("DriveName");
 
                     b.ToTable("DriveConfigurations");
-                });
-
-            modelBuilder.Entity("JumpChainSearch.Models.FolderConfiguration", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("INTEGER");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("Description")
-                        .HasMaxLength(500)
-                        .HasColumnType("TEXT");
-
-                    b.Property<int>("DocumentCount")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<string>("FolderId")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("FolderName")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("FolderPath")
-                        .IsRequired()
-                        .HasMaxLength(1000)
-                        .HasColumnType("TEXT");
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<bool>("IsAutoDiscovered")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<DateTime>("LastScanTime")
-                        .HasColumnType("TEXT");
-
-                    b.Property<int>("ParentDriveId")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<string>("PreferredAuthMethod")
-                        .HasMaxLength(50)
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("ResourceKey")
-                        .HasMaxLength(200)
-                        .HasColumnType("TEXT");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("TEXT");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("FolderId")
-                        .IsUnique();
-
-                    b.HasIndex("FolderPath");
-
-                    b.HasIndex("ParentDriveId");
-
-                    b.HasIndex("ParentDriveId", "FolderName");
-
-                    b.ToTable("FolderConfigurations");
                 });
 
             modelBuilder.Entity("JumpChainSearch.Models.JumpDocument", b =>
@@ -874,17 +809,6 @@ namespace JumpChainSearch.Migrations
                         .IsRequired();
 
                     b.Navigation("JumpDocument");
-                });
-
-            modelBuilder.Entity("JumpChainSearch.Models.FolderConfiguration", b =>
-                {
-                    b.HasOne("JumpChainSearch.Models.DriveConfiguration", "ParentDrive")
-                        .WithMany()
-                        .HasForeignKey("ParentDriveId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("ParentDrive");
                 });
 
             modelBuilder.Entity("JumpChainSearch.Models.TagRemovalRequest", b =>

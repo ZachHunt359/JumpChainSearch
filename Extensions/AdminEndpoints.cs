@@ -28,6 +28,10 @@ public static class AdminEndpoints
         group.MapGet("/drives/status", GetDriveScanStatus);
         group.MapPost("/drives/scan", StartDriveScan);
         group.MapPost("/drives/scan/stop", StopDriveScan);
+        group.MapGet("/drive-configurations", GetDriveConfigurations);
+        group.MapGet("/drives/{driveName}/folders", GetDriveFolders);
+        group.MapPost("/drives/{driveName}/scan", ScanSingleDrive);
+        group.MapPost("/drives/{driveName}/refresh-folders", RefreshDriveFolders);
         
         // Genre tagging endpoints
         group.MapPost("/tags/apply-community-genres", ApplyCommunityGenreTags);
@@ -472,16 +476,21 @@ public static class AdminEndpoints
         <!-- Drive Scanning Tab -->
         <div id=""drives"" class=""tab-content"">
             <section>
-                <h2>💾 Google Drive Scanning</h2>
+                <h2>💾 Google Drive Management</h2>
                 <div class=""action-card"">
                     <h3>Drive Sync Status</h3>
                     <p>Scan configured Google Drives for new JumpChain documents.</p>
                     <span class=""status status-idle"" id=""drive-status"">Checking...</span>
                     <div class=""btn-group"" style=""margin-top: 1rem;"">
-                        <button class=""btn btn-success"" onclick=""startDriveScan()"">Start Scan</button>
+                        <button class=""btn btn-success"" onclick=""startDriveScan()"">Scan All Drives</button>
                         <button class=""btn btn-danger"" onclick=""stopDriveScan()"">Stop</button>
+                        <button class=""btn btn-primary"" onclick=""loadDriveList()"">Refresh Drive List</button>
                     </div>
                     <div id=""drive-info"" style=""margin-top: 1rem; color: var(--text-secondary); font-size: 0.85rem;""></div>
+                </div>
+                
+                <div id=""drive-list"" style=""margin-top: 1.5rem;"">
+                    <p style=""color: var(--text-secondary);"">Click ""Refresh Drive List"" to load drives...</p>
                 </div>
             </section>
         </div>
@@ -593,6 +602,8 @@ public static class AdminEndpoints
                 loadReviewQueue();
             }} else if (tabName === 'voting') {{
                 loadPendingTags();
+            }} else if (tabName === 'drives') {{
+                loadDriveList();
             }}
         }}
         
@@ -1112,6 +1123,169 @@ public static class AdminEndpoints
             if (modal) modal.remove();
         }}
         
+        // Drive Management Functions
+        async function loadDriveList() {{
+            const container = document.getElementById('drive-list');
+            container.innerHTML = '<div style=""color: var(--text-secondary);"">Loading drives...</div>';
+            
+            try {{
+                const response = await fetch('/admin/drive-configurations');
+                const data = await response.json();
+                
+                if (!data.success || !data.drives || data.drives.length === 0) {{
+                    container.innerHTML = '<div style=""color: var(--text-secondary);"">No drives configured.</div>';
+                    return;
+                }}
+                
+                let html = '<div style=""display: flex; flex-direction: column; gap: 1rem;"">';
+                
+                data.drives.forEach((drive, index) => {{
+                    const lastScan = drive.lastScanTime ? new Date(drive.lastScanTime).toLocaleString() : 'Never';
+                    const statusColor = drive.isActive ? 'var(--success)' : 'var(--danger)';
+                    
+                    html += `
+                        <div style=""background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: 8px; padding: 1rem;"">
+                            <div style=""display: flex; justify-content: space-between; align-items: start; cursor: pointer;"" onclick=""toggleDriveFolders(${{index}}, '${{escapeHtml(drive.driveName)}}')"">
+                                <div style=""flex: 1;"">
+                                    <h3 style=""margin: 0 0 0.5rem 0; color: var(--text-primary); font-size: 1.1rem;"">
+                                        <span id=""drive-arrow-${{index}}"" style=""display: inline-block; width: 20px; transition: transform 0.3s;"">▶</span>
+                                        ${{escapeHtml(drive.driveName)}}
+                                    </h3>
+                                    <div style=""display: flex; gap: 2rem; color: var(--text-secondary); font-size: 0.85rem;"">
+                                        <span>📊 ${{drive.documentCount}} documents</span>
+                                        <span>📁 ${{drive.folderCount}} folders</span>
+                                        <span>⏱️ Last scan: ${{lastScan}}</span>
+                                        <span style=""color: ${{statusColor}};"">● ${{drive.isActive ? 'Active' : 'Inactive'}}</span>
+                                    </div>
+                                </div>
+                                <div style=""display: flex; gap: 0.5rem;"" onclick=""event.stopPropagation();"">
+                                    <button class=""btn btn-success"" style=""padding: 0.4rem 0.8rem; font-size: 0.85rem;"" onclick=""scanDrive('${{escapeHtml(drive.driveName)}}', ${{index}})"">\ud83d\udd04 Scan</button>
+                                    <button class=""btn btn-primary"" style=""padding: 0.4rem 0.8rem; font-size: 0.85rem;"" onclick=""refreshFolders('${{escapeHtml(drive.driveName)}}', ${{index}})"">\ud83d\udcc2 Refresh Folders</button>
+                                </div>
+                            </div>
+                            <div id=""drive-folders-${{index}}"" style=""display: none; margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border);"">
+                                <p style=""color: var(--text-secondary); font-size: 0.85rem;"">Click to load folders...</p>
+                            </div>
+                            <div id=""drive-status-${{index}}"" style=""margin-top: 0.5rem; display: none; padding: 0.5rem; background: var(--bg-secondary); border-radius: 4px; font-size: 0.85rem;""></div>
+                        </div>
+                    `;
+                }});
+                
+                html += '</div>';
+                container.innerHTML = html;
+            }} catch (error) {{
+                container.innerHTML = `<div style=""color: var(--danger);"">Error loading drives: ${{error.message}}</div>`;
+            }}
+        }}
+        
+        async function toggleDriveFolders(index, driveName) {{
+            const arrow = document.getElementById(`drive-arrow-${{index}}`);
+            const container = document.getElementById(`drive-folders-${{index}}`);
+            
+            if (container.style.display === 'none') {{
+                arrow.style.transform = 'rotate(90deg)';
+                container.style.display = 'block';
+                await loadDriveFolders(index, driveName);
+            }} else {{
+                arrow.style.transform = 'rotate(0deg)';
+                container.style.display = 'none';
+            }}
+        }}
+        
+        async function loadDriveFolders(index, driveName) {{
+            const container = document.getElementById(`drive-folders-${{index}}`);
+            container.innerHTML = '<div style=""color: var(--text-secondary); font-size: 0.85rem;""><span class=""spinner""></span> Loading folders...</div>';
+            
+            try {{
+                const response = await fetch(`/admin/drives/${{encodeURIComponent(driveName)}}/folders`);
+                const folders = await response.json();
+                
+                if (!folders || folders.length === 0) {{
+                    container.innerHTML = '<div style=""color: var(--text-secondary); font-size: 0.85rem;"">No folders found (flat structure)</div>';
+                    return;
+                }}
+                
+                let html = '<div style=""display: flex; flex-direction: column; gap: 0.25rem;"">';
+                folders.forEach(folder => {{
+                    html += `
+                        <div style=""padding: 0.4rem 0.8rem; background: var(--bg-secondary); border-radius: 4px; font-size: 0.85rem; display: flex; justify-content: space-between; align-items: center;"">
+                            <span>📁 ${{escapeHtml(folder.folderName)}}</span>
+                            <span style=""color: var(--text-muted); font-size: 0.75rem;"">ID: ${{folder.folderId}}</span>
+                        </div>
+                    `;
+                }});
+                html += '</div>';
+                
+                container.innerHTML = html;
+            }} catch (error) {{
+                container.innerHTML = `<div style=""color: var(--danger); font-size: 0.85rem;"">Error: ${{error.message}}</div>`;
+            }}
+        }}
+        
+        async function scanDrive(driveName, index) {{
+            const statusDiv = document.getElementById(`drive-status-${{index}}`);
+            statusDiv.style.display = 'block';
+            statusDiv.style.color = 'var(--text-secondary)';
+            statusDiv.innerHTML = '<span class=""spinner""></span> Scanning drive...';
+            
+            try {{
+                const response = await fetch(`/admin/drives/${{encodeURIComponent(driveName)}}/scan`, {{
+                    method: 'POST'
+                }});
+                const data = await response.json();
+                
+                if (data.success) {{
+                    statusDiv.style.color = 'var(--success)';
+                    statusDiv.innerHTML = `✓ Scan complete! Found ${{data.newDocuments}} new documents`;
+                    setTimeout(() => {{
+                        statusDiv.style.display = 'none';
+                        loadDriveList();
+                    }}, 3000);
+                }} else {{
+                    statusDiv.style.color = 'var(--danger)';
+                    statusDiv.innerHTML = `✗ Error: ${{data.error}}`;
+                }}
+            }} catch (error) {{
+                statusDiv.style.color = 'var(--danger)';
+                statusDiv.innerHTML = `✗ Error: ${{error.message}}`;
+            }}
+        }}
+        
+        async function refreshFolders(driveName, index) {{
+            const statusDiv = document.getElementById(`drive-status-${{index}}`);
+            statusDiv.style.display = 'block';
+            statusDiv.style.color = 'var(--text-secondary)';
+            statusDiv.innerHTML = '<span class=""spinner""></span> Discovering folders...';
+            
+            try {{
+                const response = await fetch(`/admin/drives/${{encodeURIComponent(driveName)}}/refresh-folders`, {{
+                    method: 'POST'
+                }});
+                const data = await response.json();
+                
+                if (data.success) {{
+                    statusDiv.style.color = 'var(--success)';
+                    statusDiv.innerHTML = `✓ ${{data.message}} (${{data.foldersCreated}} new, ${{data.foldersUpdated}} updated)`;
+                    
+                    const container = document.getElementById(`drive-folders-${{index}}`);
+                    if (container.style.display === 'block') {{
+                        await loadDriveFolders(index, driveName);
+                    }}
+                    
+                    setTimeout(() => {{
+                        statusDiv.style.display = 'none';
+                        loadDriveList();
+                    }}, 3000);
+                }} else {{
+                    statusDiv.style.color = 'var(--danger)';
+                    statusDiv.innerHTML = `✗ Error: ${{data.error}}`;
+                }}
+            }} catch (error) {{
+                statusDiv.style.color = 'var(--danger)';
+                statusDiv.innerHTML = `✗ Error: ${{error.message}}`;
+            }}
+        }}
+        
         function escapeHtml(text) {{
             if (!text) return '';
             const div = document.createElement('div');
@@ -1586,6 +1760,208 @@ rm -f drive-scan.pid
         }
     }
 
+    /// <summary>
+    /// Get all folders for a specific drive
+    /// </summary>
+    private static async Task<IResult> GetDriveFolders(string driveName, HttpContext context, JumpChainDbContext dbContext, AdminAuthService authService)
+    {
+        var (valid, user) = await ValidateSession(context, authService);
+        if (!valid)
+            return Results.Unauthorized();
+
+        try
+        {
+            var drive = await dbContext.DriveConfigurations
+                .FirstOrDefaultAsync(d => d.DriveName == driveName);
+            
+            if (drive == null)
+            {
+                return Results.NotFound(new { success = false, error = $"Drive '{driveName}' not found" });
+            }
+
+            var folders = await dbContext.FolderConfigurations
+                .Where(f => f.ParentDriveId == drive.Id)
+                .OrderBy(f => f.FolderName)
+                .Select(f => new
+                {
+                    folderId = f.FolderId,
+                    folderName = f.FolderName,
+                    resourceKey = f.ResourceKey
+                })
+                .ToListAsync();
+
+            return Results.Ok(folders);
+        }
+        catch (Exception ex)
+        {
+            return Results.BadRequest(new { success = false, error = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Get all drive configurations with folder counts
+    /// </summary>
+    private static async Task<IResult> GetDriveConfigurations(HttpContext context, JumpChainDbContext dbContext, AdminAuthService authService)
+    {
+        var (valid, user) = await ValidateSession(context, authService);
+        if (!valid)
+            return Results.Unauthorized();
+
+        try
+        {
+            var drives = await dbContext.DriveConfigurations
+                .OrderBy(d => d.DriveName)
+                .Select(d => new
+                {
+                    id = d.Id,
+                    driveName = d.DriveName,
+                    driveId = d.DriveId,
+                    documentCount = d.DocumentCount,
+                    lastScanTime = d.LastScanTime,
+                    isActive = d.IsActive,
+                    description = d.Description
+                })
+                .ToListAsync();
+
+            // Get folder counts for each drive
+            var driveData = new List<object>();
+            foreach (var drive in drives)
+            {
+                var folderCount = await dbContext.FolderConfigurations
+                    .Where(f => f.ParentDriveId == drive.id)
+                    .CountAsync();
+
+                driveData.Add(new
+                {
+                    drive.id,
+                    drive.driveName,
+                    drive.driveId,
+                    drive.documentCount,
+                    drive.lastScanTime,
+                    drive.isActive,
+                    drive.description,
+                    folderCount
+                });
+            }
+
+            return Results.Ok(new
+            {
+                success = true,
+                drives = driveData
+            });
+        }
+        catch (Exception ex)
+        {
+            return Results.BadRequest(new { success = false, error = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Scan a single drive
+    /// </summary>
+    private static async Task<IResult> ScanSingleDrive(string driveName, HttpContext context, IGoogleDriveService driveService, JumpChainDbContext dbContext, AdminAuthService authService)
+    {
+        var (valid, user) = await ValidateSession(context, authService);
+        if (!valid)
+            return Results.Unauthorized();
+
+        try
+        {
+            // Get drive configuration to get driveId
+            var drive = await dbContext.DriveConfigurations
+                .FirstOrDefaultAsync(d => d.DriveName == driveName);
+
+            if (drive == null)
+            {
+                return Results.NotFound(new { success = false, error = "Drive not found" });
+            }
+
+            var result = await driveService.ScanDriveAsync(drive.DriveId, driveName);
+            return Results.Ok(new
+            {
+                success = true,
+                message = $"Scan completed for {driveName}",
+                newDocuments = result.Count()
+            });
+        }
+        catch (Exception ex)
+        {
+            return Results.BadRequest(new { success = false, error = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Refresh folder list for a drive
+    /// </summary>
+    private static async Task<IResult> RefreshDriveFolders(string driveName, HttpContext context, IGoogleDriveService driveService, JumpChainDbContext dbContext, AdminAuthService authService)
+    {
+        var (valid, user) = await ValidateSession(context, authService);
+        if (!valid)
+            return Results.Unauthorized();
+
+        try
+        {
+            var drive = await dbContext.DriveConfigurations
+                .FirstOrDefaultAsync(d => d.DriveName == driveName);
+
+            if (drive == null)
+            {
+                return Results.NotFound(new { success = false, error = "Drive not found" });
+            }
+
+            var folders = await driveService.DiscoverFolderHierarchyAsync(drive.DriveId, drive.ResourceKey);
+            
+            int created = 0;
+            int updated = 0;
+
+            foreach (var folder in folders)
+            {
+                var existing = await dbContext.FolderConfigurations
+                    .FirstOrDefaultAsync(f => f.FolderId == folder.folderId && f.ParentDriveId == drive.Id);
+
+                if (existing == null)
+                {
+                    dbContext.FolderConfigurations.Add(new FolderConfiguration
+                    {
+                        FolderId = folder.folderId,
+                        FolderName = folder.folderName,
+                        ParentDriveId = drive.Id,
+                        ResourceKey = folder.resourceKey,
+                        FolderPath = null,
+                        IsActive = true,
+                        IsAutoDiscovered = true,
+                        CreatedAt = DateTime.UtcNow,
+                        UpdatedAt = DateTime.UtcNow
+                    });
+                    created++;
+                }
+                else
+                {
+                    existing.FolderName = folder.folderName;
+                    existing.ResourceKey = folder.resourceKey;
+                    existing.FolderPath = null;
+                    existing.UpdatedAt = DateTime.UtcNow;
+                    updated++;
+                }
+            }
+
+            await dbContext.SaveChangesAsync();
+
+            return Results.Ok(new
+            {
+                success = true,
+                message = $"Discovered {folders.Count} folders",
+                foldersDiscovered = folders.Count,
+                foldersCreated = created,
+                foldersUpdated = updated
+            });
+        }
+        catch (Exception ex)
+        {
+            return Results.BadRequest(new { success = false, error = ex.Message });
+        }
+    }
+
     private static async Task<IResult> ApplyCommunityGenreTags(HttpContext context, GenreTagService genreService, AdminAuthService authService)
     {
         var (valid, user) = await ValidateSession(context, authService);
@@ -1684,5 +2060,423 @@ rm -f drive-scan.pid
         }
 
         return await authService.ValidateSessionAsync(sessionToken);
+    }
+
+    /// <summary>
+    /// Admin page for managing drives and folders with hierarchical view
+    /// </summary>
+    private static async Task<IResult> GetDriveManagementPage(HttpContext context, AdminAuthService authService, JumpChainDbContext dbContext)
+    {
+        // Check session authentication
+        var (valid, user) = await ValidateSession(context, authService);
+        
+        if (!valid)
+        {
+            return Results.Redirect("/Admin/Login");
+        }
+
+        var username = user?.Username ?? "Admin";
+        
+        // Get all drives with their folder counts and document counts
+        var drives = await dbContext.DriveConfigurations
+            .OrderBy(d => d.DriveName)
+            .ToListAsync();
+        
+        var driveData = new List<(DriveConfiguration drive, int folderCount, int docCount, DateTime? lastScan)>();
+        
+        foreach (var drive in drives)
+        {
+            var folderCount = await dbContext.FolderConfigurations
+                .CountAsync(f => f.ParentDriveId == drive.Id);
+            
+            var docCount = await dbContext.JumpDocuments
+                .CountAsync(d => d.SourceDrive == drive.DriveName);
+            
+            driveData.Add((drive, folderCount, docCount, drive.LastScanTime));
+        }
+        
+        context.Response.ContentType = "text/html";
+        var html = $@"<!DOCTYPE html>
+<html lang=""en"">
+<head>
+    <meta charset=""UTF-8"">
+    <meta name=""viewport"" content=""width=device-width, initial-scale=1.0"">
+    <title>Drive Management - JumpChain Search</title>
+    <style>
+        * {{ margin: 0; padding: 0; box-sizing: border-box; }}
+        
+        :root {{
+            --bg-primary: #1a1a2e;
+            --bg-secondary: #16213e;
+            --bg-tertiary: #0f3460;
+            --accent: #e94560;
+            --accent-hover: #c93551;
+            --text-primary: #eee;
+            --text-secondary: #aaa;
+            --success: #2ecc71;
+            --warning: #f39c12;
+            --danger: #e74c3c;
+            --border: #2a2a4e;
+        }}
+        
+        body {{
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.6;
+            min-height: 100vh;
+        }}
+        
+        header {{
+            background: var(--bg-secondary);
+            border-bottom: 2px solid var(--accent);
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }}
+        
+        header h1 {{
+            font-size: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }}
+        
+        nav {{
+            display: flex;
+            gap: 1rem;
+        }}
+        
+        nav a {{
+            color: var(--text-secondary);
+            text-decoration: none;
+            padding: 0.5rem 1rem;
+            border-radius: 4px;
+            transition: all 0.3s;
+        }}
+        
+        nav a:hover, nav a.active {{
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+        }}
+        
+        main {{
+            padding: 2rem;
+            max-width: 1400px;
+            margin: 0 auto;
+        }}
+        
+        .drive-card {{
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            overflow: hidden;
+        }}
+        
+        .drive-header {{
+            padding: 1rem 1.5rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+            transition: background 0.2s;
+        }}
+        
+        .drive-header:hover {{
+            background: var(--bg-tertiary);
+        }}
+        
+        .drive-info {{
+            flex: 1;
+        }}
+        
+        .drive-name {{
+            font-size: 1.2rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }}
+        
+        .drive-stats {{
+            display: flex;
+            gap: 2rem;
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }}
+        
+        .drive-stat {{
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }}
+        
+        .drive-actions {{
+            display: flex;
+            gap: 0.5rem;
+        }}
+        
+        .btn {{
+            padding: 0.5rem 1rem;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: all 0.3s;
+            text-decoration: none;
+            display: inline-block;
+        }}
+        
+        .btn-primary {{
+            background: var(--accent);
+            color: white;
+        }}
+        
+        .btn-primary:hover {{
+            background: var(--accent-hover);
+        }}
+        
+        .btn-secondary {{
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+        }}
+        
+        .btn-secondary:hover {{
+            background: #0a2540;
+        }}
+        
+        .folder-list {{
+            display: none;
+            padding: 1rem 1.5rem;
+            background: var(--bg-primary);
+            border-top: 1px solid var(--border);
+            max-height: 400px;
+            overflow-y: auto;
+        }}
+        
+        .folder-list.expanded {{
+            display: block;
+        }}
+        
+        .folder-item {{
+            padding: 0.5rem;
+            margin-bottom: 0.25rem;
+            background: var(--bg-secondary);
+            border-radius: 4px;
+            font-size: 0.9rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }}
+        
+        .folder-name {{
+            color: var(--text-secondary);
+        }}
+        
+        .expand-icon {{
+            transition: transform 0.3s;
+        }}
+        
+        .expand-icon.rotated {{
+            transform: rotate(90deg);
+        }}
+        
+        .loading {{
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid var(--border);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }}
+        
+        @keyframes spin {{
+            to {{ transform: rotate(360deg); }}
+        }}
+        
+        .scan-status {{
+            margin-top: 0.5rem;
+            padding: 0.5rem;
+            background: var(--bg-tertiary);
+            border-radius: 4px;
+            font-size: 0.85rem;
+            display: none;
+        }}
+        
+        .scan-status.active {{
+            display: block;
+        }}
+    </style>
+</head>
+<body>
+    <header>
+        <h1>
+            <span>🔧</span>
+            Drive Management
+        </h1>
+        <nav>
+            <a href=""/api/admin"">Dashboard</a>
+            <a href=""/api/admin/drives"" class=""active"">Drives</a>
+            <a href=""/"">Search</a>
+        </nav>
+    </header>
+    
+    <main>
+        <section>
+            <h2 style=""margin-bottom: 1.5rem;"">Configured Drives</h2>
+            
+            {string.Join("\n", driveData.Select((data, index) => $@"
+            <article class=""drive-card"">
+                <div class=""drive-header"" onclick=""toggleFolders({index})"">
+                    <div class=""drive-info"">
+                        <h3 class=""drive-name"">
+                            <span class=""expand-icon"" id=""icon-{index}"">▶</span>
+                            {data.drive.DriveName}
+                        </h3>
+                        <div class=""drive-stats"">
+                            <div class=""drive-stat"">
+                                <span>📊</span>
+                                <span>{data.docCount:N0} documents</span>
+                            </div>
+                            {(data.folderCount > 0 ? $@"
+                            <div class=""drive-stat"">
+                                <span>📁</span>
+                                <span>{data.folderCount} folders</span>
+                            </div>" : "")}
+                            <div class=""drive-stat"">
+                                <span>⏱️</span>
+                                <span>Last scan: {(data.lastScan.HasValue ? $"{(DateTime.Now - data.lastScan.Value).TotalHours:F1} hours ago" : "Never")}</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class=""drive-actions"" onclick=""event.stopPropagation()"">
+                        <button class=""btn btn-primary"" onclick=""scanDrive('{data.drive.DriveName}')"">Scan Drive</button>
+                        <button class=""btn btn-secondary"" onclick=""refreshFolders('{data.drive.DriveName}')"">Refresh Folders</button>
+                    </div>
+                </div>
+                <div class=""folder-list"" id=""folders-{index}"">
+                    <div class=""loading""></div>
+                    <p style=""color: var(--text-secondary); margin-left: 2rem;"">Loading folders...</p>
+                </div>
+                <div class=""scan-status"" id=""scan-status-{index}""></div>
+            </article>"))}
+        </section>
+    </main>
+    
+    <script>
+        async function toggleFolders(index) {{
+            const folderList = document.getElementById(`folders-${{index}}`);
+            const icon = document.getElementById(`icon-${{index}}`);
+            
+            if (folderList.classList.contains('expanded')) {{
+                folderList.classList.remove('expanded');
+                icon.classList.remove('rotated');
+            }} else {{
+                // Load folders if not already loaded
+                if (folderList.querySelector('.loading')) {{
+                    const driveName = folderList.closest('.drive-card').querySelector('.drive-name').textContent.trim().replace('▶', '').trim();
+                    await loadFolders(index, driveName);
+                }}
+                folderList.classList.add('expanded');
+                icon.classList.add('rotated');
+            }}
+        }}
+        
+        async function loadFolders(index, driveName) {{
+            const folderList = document.getElementById(`folders-${{index}}`);
+            
+            try {{
+                const response = await fetch(`/api/admin/drives/${{encodeURIComponent(driveName)}}/folders`);
+                const folders = await response.json();
+                
+                if (folders.length === 0) {{
+                    folderList.innerHTML = '<p style=""color: var(--text-secondary); padding: 1rem;"">No subfolders (flat drive structure)</p>';
+                }} else {{
+                    folderList.innerHTML = folders.map(f => `
+                        <div class=""folder-item"">
+                            <span class=""folder-name"">📁 ${{f.folderName}}</span>
+                            <span style=""color: var(--text-secondary); font-size: 0.85rem;"">ID: ${{f.folderId.substring(0, 12)}}...</span>
+                        </div>
+                    `).join('');
+                }}
+            }} catch (error) {{
+                folderList.innerHTML = `<p style=""color: var(--danger); padding: 1rem;"">Error loading folders: ${{error.message}}</p>`;
+            }}
+        }}
+        
+        async function scanDrive(driveName) {{
+            const statusDiv = Array.from(document.querySelectorAll('.drive-card')).find(card => 
+                card.querySelector('.drive-name').textContent.includes(driveName)
+            )?.querySelector('.scan-status');
+            
+            if (statusDiv) {{
+                statusDiv.classList.add('active');
+                statusDiv.innerHTML = '<div class=""loading"" style=""display: inline-block; margin-right: 0.5rem;""></div> Scanning drive...';
+            }}
+            
+            try {{
+                const response = await fetch(`/api/google-drive/scan-drive/${{encodeURIComponent(driveName)}}`, {{
+                    method: 'POST'
+                }});
+                const result = await response.json();
+                
+                if (result.success) {{
+                    if (statusDiv) {{
+                        statusDiv.innerHTML = `✅ Scan complete! Found ${{result.documentsFound}} documents (${{result.newDocuments}} new)`;
+                        setTimeout(() => statusDiv.classList.remove('active'), 5000);
+                    }}
+                    setTimeout(() => location.reload(), 2000);
+                }} else {{
+                    if (statusDiv) {{
+                        statusDiv.innerHTML = `❌ Scan failed: ${{result.error || 'Unknown error'}}`;
+                    }}
+                }}
+            }} catch (error) {{
+                if (statusDiv) {{
+                    statusDiv.innerHTML = `❌ Error: ${{error.message}}`;
+                }}
+            }}
+        }}
+        
+        async function refreshFolders(driveName) {{
+            const statusDiv = Array.from(document.querySelectorAll('.drive-card')).find(card => 
+                card.querySelector('.drive-name').textContent.includes(driveName)
+            )?.querySelector('.scan-status');
+            
+            if (statusDiv) {{
+                statusDiv.classList.add('active');
+                statusDiv.innerHTML = '<div class=""loading"" style=""display: inline-block; margin-right: 0.5rem;""></div> Discovering folders...';
+            }}
+            
+            try {{
+                const response = await fetch(`/api/google-drive/save-folders/${{encodeURIComponent(driveName)}}`, {{
+                    method: 'POST'
+                }});
+                const result = await response.json();
+                
+                if (result.success) {{
+                    if (statusDiv) {{
+                        statusDiv.innerHTML = `✅ Folder discovery complete! ${{result.foldersDiscovered}} folders (${{result.foldersCreated}} new, ${{result.foldersUpdated}} updated)`;
+                        setTimeout(() => statusDiv.classList.remove('active'), 5000);
+                    }}
+                    setTimeout(() => location.reload(), 2000);
+                }} else {{
+                    if (statusDiv) {{
+                        statusDiv.innerHTML = `❌ Discovery failed: ${{result.error || 'Unknown error'}}`;
+                    }}
+                }}
+            }} catch (error) {{
+                if (statusDiv) {{
+                    statusDiv.innerHTML = `❌ Error: ${{error.message}}`;
+                }}
+            }}
+        }}
+    </script>
+</body>
+</html>";
+        
+        await context.Response.WriteAsync(html);
+        return Results.Empty;
     }
 }

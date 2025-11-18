@@ -15,6 +15,7 @@ namespace JumpChainSearch.Data
         public DbSet<DocumentUrl> DocumentUrls { get; set; }
         public DbSet<DocumentPurchasable> DocumentPurchasables { get; set; }
         public DbSet<DriveConfiguration> DriveConfigurations { get; set; }
+        public DbSet<FolderConfiguration> FolderConfigurations { get; set; }
         
         // Tag voting system
         public DbSet<TagSuggestion> TagSuggestions { get; set; }
@@ -116,6 +117,28 @@ namespace JumpChainSearch.Data
                 entity.Property(e => e.DriveId).HasMaxLength(100);
                 entity.Property(e => e.DriveName).HasMaxLength(200);
                 entity.Property(e => e.Description).HasMaxLength(500);
+            });
+
+            // Configure FolderConfiguration
+            modelBuilder.Entity<FolderConfiguration>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.HasIndex(e => e.FolderId).IsUnique();
+                entity.HasIndex(e => e.ParentDriveId);
+                entity.HasIndex(e => new { e.ParentDriveId, e.FolderName });
+                entity.HasIndex(e => e.FolderPath);
+                
+                entity.Property(e => e.FolderId).HasMaxLength(100);
+                entity.Property(e => e.FolderName).HasMaxLength(200);
+                entity.Property(e => e.FolderPath).HasMaxLength(1000);
+                entity.Property(e => e.ResourceKey).HasMaxLength(200);
+                entity.Property(e => e.PreferredAuthMethod).HasMaxLength(50);
+                entity.Property(e => e.Description).HasMaxLength(500);
+
+                entity.HasOne(f => f.ParentDrive)
+                    .WithMany()
+                    .HasForeignKey(f => f.ParentDriveId)
+                    .OnDelete(DeleteBehavior.Cascade);
             });
 
             // Configure TagSuggestion

@@ -20,8 +20,11 @@ namespace JumpChainSearch.Services
     public interface IGoogleDriveService
     {
         Task<IEnumerable<JumpDocument>> ScanDriveAsync(string driveId, string driveName);
+        [Obsolete("Use ScanDriveUnifiedAsync instead - this method doesn't properly handle resource keys")]
         Task<IEnumerable<JumpDocument>> ScanFolderAsync(string folderId, string folderName, string? resourceKey = null, string? parentDriveName = null);
+        [Obsolete("Use ScanDriveUnifiedAsync instead - this method doesn't properly handle resource keys")]
         Task<IEnumerable<JumpDocument>> ScanPublicFolderAsync(string folderId, string folderName, string? resourceKey = null, string? parentDriveName = null);
+        Task<(IEnumerable<JumpDocument> documents, string successfulMethod)> ScanDriveUnifiedAsync(DriveConfiguration driveConfig);
         Task<string?> ExtractTextFromDocumentAsync(string fileId);
         Task<(string? text, string? method)> ExtractTextWithMethodAsync(string fileId);
         Task<IEnumerable<DriveData>> GetAvailableDrivesAsync();
@@ -227,6 +230,66 @@ namespace JumpChainSearch.Services
             return documents;
         }
 
+        public async Task<(IEnumerable<JumpDocument> documents, string successfulMethod)> ScanDriveUnifiedAsync(DriveConfiguration driveConfig)
+        {
+            var tagDriveName = driveConfig.ParentDriveName ?? driveConfig.DriveName;
+            _logger.LogInformation($"Starting unified HTTP-based scan for {driveConfig.DriveName} (PreferredMethod: {driveConfig.PreferredAuthMethod ?? "Auto-detect"})");
+
+            // Try methods in order: preferred first (if set), then fallback
+            var methodsToTry = new List<string>();
+            
+            if (!string.IsNullOrEmpty(driveConfig.PreferredAuthMethod))
+            {
+                methodsToTry.Add(driveConfig.PreferredAuthMethod);
+                // Add the other method as fallback
+                methodsToTry.Add(driveConfig.PreferredAuthMethod == "ServiceAccount" ? "ApiKey" : "ServiceAccount");
+            }
+            else
+            {
+                // No preference - try ServiceAccount first (most reliable), then ApiKey
+                methodsToTry.Add("ServiceAccount");
+                methodsToTry.Add("ApiKey");
+            }
+
+            foreach (var method in methodsToTry)
+            {
+                try
+                {
+                    _logger.LogInformation($"Attempting {method} authentication for {driveConfig.DriveName}...");
+                    
+                    var documents = new List<JumpDocument>();
+                    
+                    // Use HTTP-based scanning that properly handles resource keys
+                    await ScanFolderRecursiveHttpAsync(
+                        driveConfig.DriveId, 
+                        tagDriveName, 
+                        documents, 
+                        $"/{driveConfig.DriveName}", 
+                        driveConfig.ResourceKey,
+                        method);
+                    
+                    if (documents.Count > 0)
+                    {
+                        _logger.LogInformation($"✅ {method} succeeded for {driveConfig.DriveName} - found {documents.Count} documents");
+                        return (documents, method);
+                    }
+                    else
+                    {
+                        _logger.LogWarning($"⚠️ {method} returned 0 documents for {driveConfig.DriveName} - trying next method...");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, $"❌ {method} failed for {driveConfig.DriveName}: {ex.Message}");
+                }
+            }
+
+            // Both methods failed
+            _logger.LogError($"All authentication methods failed for {driveConfig.DriveName}");
+            return (new List<JumpDocument>(), "None");
+        }
+
+        [Obsolete("Use ScanDriveUnifiedAsync instead - this method doesn't properly handle resource keys")]
         private async Task ScanPublicFolderRecursiveAsync(string folderId, string rootFolderName, List<JumpDocument> documents, string currentPath, string? resourceKey = null)
         {
             try
@@ -328,6 +391,155 @@ namespace JumpChainSearch.Services
             return mimeType == "application/pdf" ||
                    mimeType == "application/vnd.google-apps.document" ||
                    mimeType == "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+        }
+
+        /// <summary>
+        /// HTTP-based recursive folder scanning that properly handles resource keys for both auth methods.
+        /// This replaces the old .NET client library methods which couldn't set custom headers.
+        /// </summary>
+        private async Task ScanFolderRecursiveHttpAsync(
+            string folderId, 
+            string rootFolderName, 
+            List<JumpDocument> documents, 
+            string currentPath, 
+            string? resourceKey = null,
+            string authMethod = "ApiKey")
+        {
+            try
+            {
+                using var httpClient = new HttpClient();
+                string? accessToken = null;
+                
+                // Get access token for ServiceAccount method
+                if (authMethod == "ServiceAccount")
+                {
+                    try
+                    {
+                        var credential = _driveService.HttpClientInitializer as ServiceAccountCredential;
+                        if (credential != null)
+                        {
+                            accessToken = await credential.GetAccessTokenForRequestAsync();
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, $"Failed to get ServiceAccount access token: {ex.Message}");
+                        return;
+                    }
+                }
+                
+                // Build API request URL
+                var query = Uri.EscapeDataString($"'{folderId}' in parents and trashed=false");
+                var apiKey = Environment.GetEnvironmentVariable("GOOGLE_API_KEY");
+                
+                string url;
+                if (authMethod == "ServiceAccount" && !string.IsNullOrEmpty(accessToken))
+                {
+                    url = $"https://www.googleapis.com/drive/v3/files?q={query}&fields=nextPageToken,files(id,name,description,mimeType,size,createdTime,modifiedTime,parents,webViewLink,resourceKey,thumbnailLink,hasThumbnail)&pageSize=1000";
+                    httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", accessToken);
+                }
+                else
+                {
+                    url = $"https://www.googleapis.com/drive/v3/files?q={query}&fields=nextPageToken,files(id,name,description,mimeType,size,createdTime,modifiedTime,parents,webViewLink,resourceKey,thumbnailLink,hasThumbnail)&pageSize=1000&key={apiKey}";
+                }
+                
+                // Set resource key header if provided
+                if (!string.IsNullOrEmpty(resourceKey))
+                {
+                    httpClient.DefaultRequestHeaders.Remove("X-Goog-Drive-Resource-Keys");
+                    httpClient.DefaultRequestHeaders.Add("X-Goog-Drive-Resource-Keys", $"{folderId}/{resourceKey}");
+                    _logger.LogDebug($"Set resource key header for folder {folderId}: {resourceKey}");
+                }
+                
+                string? pageToken = null;
+                do
+                {
+                    var requestUrl = pageToken != null ? $"{url}&pageToken={pageToken}" : url;
+                    var response = await httpClient.GetStringAsync(requestUrl);
+                    var jsonDoc = System.Text.Json.JsonDocument.Parse(response);
+                    
+                    if (!jsonDoc.RootElement.TryGetProperty("files", out var filesArray))
+                    {
+                        break;
+                    }
+
+                    foreach (var fileElement in filesArray.EnumerateArray())
+                    {
+                        var fileId = fileElement.GetProperty("id").GetString() ?? "";
+                        var fileName = fileElement.GetProperty("name").GetString() ?? "";
+                        var mimeType = fileElement.TryGetProperty("mimeType", out var mt) ? mt.GetString() : null;
+                        
+                        if (mimeType == "application/vnd.google-apps.folder")
+                        {
+                            // Recursively scan subfolders
+                            var subfolderResourceKey = fileElement.TryGetProperty("resourceKey", out var rk) ? rk.GetString() : resourceKey;
+                            await ScanFolderRecursiveHttpAsync(fileId, rootFolderName, documents, $"{currentPath}/{fileName}", subfolderResourceKey, authMethod);
+                        }
+                        else if (IsRelevantFileType(mimeType))
+                        {
+                            // Parse size safely - it might be a string, number, or missing
+                            long size = 0;
+                            if (fileElement.TryGetProperty("size", out var sizeElement))
+                            {
+                                if (sizeElement.ValueKind == System.Text.Json.JsonValueKind.Number)
+                                {
+                                    size = sizeElement.GetInt64();
+                                }
+                                else if (sizeElement.ValueKind == System.Text.Json.JsonValueKind.String)
+                                {
+                                    long.TryParse(sizeElement.GetString(), out size);
+                                }
+                            }
+                            
+                            // Parse dates safely
+                            DateTime createdTime = DateTime.MinValue;
+                            if (fileElement.TryGetProperty("createdTime", out var ctElement) && ctElement.ValueKind == System.Text.Json.JsonValueKind.String)
+                            {
+                                DateTime.TryParse(ctElement.GetString(), out createdTime);
+                            }
+                            
+                            DateTime modifiedTime = DateTime.MinValue;
+                            if (fileElement.TryGetProperty("modifiedTime", out var mtElement) && mtElement.ValueKind == System.Text.Json.JsonValueKind.String)
+                            {
+                                DateTime.TryParse(mtElement.GetString(), out modifiedTime);
+                            }
+                            
+                            // Convert to JumpDocument
+                            var doc = new JumpDocument
+                            {
+                                GoogleDriveFileId = fileId,
+                                Name = fileName,
+                                Description = fileElement.TryGetProperty("description", out var desc) && desc.ValueKind == System.Text.Json.JsonValueKind.String ? desc.GetString() ?? "" : "",
+                                MimeType = mimeType ?? "",
+                                Size = size,
+                                CreatedTime = createdTime,
+                                ModifiedTime = modifiedTime,
+                                WebViewLink = fileElement.TryGetProperty("webViewLink", out var wvl) && wvl.ValueKind == System.Text.Json.JsonValueKind.String ? wvl.GetString() ?? "" : "",
+                                ThumbnailLink = fileElement.TryGetProperty("thumbnailLink", out var tl) && tl.ValueKind == System.Text.Json.JsonValueKind.String ? tl.GetString() ?? "" : "",
+                                HasThumbnail = fileElement.TryGetProperty("hasThumbnail", out var ht) && ht.ValueKind == System.Text.Json.JsonValueKind.True,
+                                SourceDrive = rootFolderName,
+                                FolderPath = currentPath,
+                                LastScanned = DateTime.Now,
+                                LastModified = DateTime.Now
+                            };
+                            
+                            // Generate comprehensive tags (NSFW, ContentType, Format, Series, etc.)
+                            doc.Tags = GenerateTags(doc, currentPath, rootFolderName);
+                            
+                            documents.Add(doc);
+                            _logger.LogDebug($"Found document: {fileName} at {currentPath}");
+                        }
+                    }
+
+                    pageToken = jsonDoc.RootElement.TryGetProperty("nextPageToken", out var token) ? token.GetString() : null;
+                } while (pageToken != null);
+                
+                _logger.LogDebug($"Scanned folder {currentPath}: found {documents.Count} total documents so far");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error scanning folder {currentPath} via HTTP: {ex.Message}");
+            }
         }
 
         public async Task<string?> ExtractTextFromDocumentAsync(string fileId)

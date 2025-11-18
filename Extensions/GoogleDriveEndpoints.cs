@@ -24,6 +24,9 @@ public static class GoogleDriveEndpoints
         // Drive scanning endpoint for admin portal
         group.MapPost("/scan-all", ScanAllDrives);
         
+        // Scan a single drive and save to database
+        group.MapPost("/scan-drive/{driveName}", ScanSingleDrive);
+        
         // Sync drive configurations from .env
         group.MapPost("/sync-drives", SyncDriveConfigurations);
         
@@ -32,6 +35,55 @@ public static class GoogleDriveEndpoints
         
         // Discover folder hierarchy with resource keys
         group.MapGet("/discover-folders/{driveName}", DiscoverFolderHierarchy);
+        
+        // Save discovered folders to FolderConfigurations table
+        group.MapPost("/save-folders/{driveName}", SaveDiscoveredFolders);
+        
+        // Debug endpoint to check drive configuration
+        group.MapGet("/debug-drive-config/{driveName}", async (string driveName, JumpChainDbContext dbContext) => {
+            var drive = await dbContext.DriveConfigurations
+                .FirstOrDefaultAsync(d => d.DriveName == driveName);
+            
+            if (drive == null)
+            {
+                return Results.NotFound(new { success = false, error = $"Drive '{driveName}' not found" });
+            }
+            
+            return Results.Ok(new {
+                driveName = drive.DriveName,
+                driveId = drive.DriveId,
+                resourceKey = drive.ResourceKey,
+                preferredAuthMethod = drive.PreferredAuthMethod,
+                isActive = drive.IsActive,
+                parentDriveName = drive.ParentDriveName
+            });
+        });
+        
+        // Quick update endpoint for resource keys
+        group.MapPost("/update-resource-key/{driveName}", async (string driveName, HttpContext context, JumpChainDbContext dbContext) => {
+            var body = await context.Request.ReadFromJsonAsync<ResourceKeyUpdate>();
+            if (body == null || string.IsNullOrEmpty(body.resourceKey))
+            {
+                return Results.BadRequest(new { success = false, error = "resourceKey is required" });
+            }
+            
+            var drive = await dbContext.DriveConfigurations
+                .FirstOrDefaultAsync(d => d.DriveName == driveName);
+            
+            if (drive == null)
+            {
+                return Results.NotFound(new { success = false, error = $"Drive '{driveName}' not found" });
+            }
+            
+            drive.ResourceKey = body.resourceKey;
+            await dbContext.SaveChangesAsync();
+            
+            return Results.Ok(new {
+                success = true,
+                driveName = drive.DriveName,
+                resourceKey = drive.ResourceKey
+            });
+        });
         
         // Test endpoint without any dependencies
         group.MapGet("/test-ping", () => {
@@ -462,44 +514,73 @@ public static class GoogleDriveEndpoints
                     
                     Console.WriteLine($"Existing documents for {drive.DriveName}: {existingCount}");
                     
-                    // Scan the drive/folder using the Google Drive service
-                    // Use ScanFolderAsync for authenticated access (uses service account)
-                    Console.WriteLine($"Calling ScanFolderAsync for {drive.DriveName}");
-                    var documents = await driveService.ScanFolderAsync(drive.DriveId, drive.DriveName, drive.ResourceKey, drive.ParentDriveName);
+                    // Use unified scan method that auto-detects and stores the preferred auth method
+                    Console.WriteLine($"Calling ScanDriveUnifiedAsync for {drive.DriveName} (PreferredMethod: {drive.PreferredAuthMethod ?? "Auto-detect"})");
+                    var (documents, successfulMethod) = await driveService.ScanDriveUnifiedAsync(drive);
                     var documentsList = documents.ToList();
                     
-                    Console.WriteLine($"ScanFolderAsync returned {documentsList.Count} documents");
+                    Console.WriteLine($"ScanDriveUnifiedAsync returned {documentsList.Count} documents using {successfulMethod} method");
+                    
+                    // Update preferred auth method if it worked
+                    if (successfulMethod != "None" && drive.PreferredAuthMethod != successfulMethod)
+                    {
+                        drive.PreferredAuthMethod = successfulMethod;
+                        Console.WriteLine($"✅ Updated {drive.DriveName} preferred auth method to: {successfulMethod}");
+                    }
                     
                     // Save or update documents in database (optimized batch approach)
                     var newDocsInDrive = 0;
                     var updatedDocs = 0;
+                    var driveTagsAdded = 0;
                     
                     if (documentsList.Count > 0)
                     {
-                        // Simple approach: Only select existing FileIDs to avoid any EF tracking issues with Tags
+                        // Get existing documents with their IDs
                         var fileIds = documentsList.Select(d => d.GoogleDriveFileId).ToList();
-                        var existingFileIdsList = await dbContext.JumpDocuments
-                            .AsNoTracking()
+                        var existingDocuments = await dbContext.JumpDocuments
                             .Where(d => fileIds.Contains(d.GoogleDriveFileId))
-                            .Select(d => d.GoogleDriveFileId)
+                            .Select(d => new { d.Id, d.GoogleDriveFileId })
                             .ToListAsync();
-                        var existingFileIds = existingFileIdsList.ToHashSet();
+                        var existingFileIds = existingDocuments.ToDictionary(d => d.GoogleDriveFileId, d => d.Id);
                         
-                        Console.WriteLine($"Found {existingFileIds.Count} existing documents - will skip duplicates");
+                        Console.WriteLine($"Found {existingFileIds.Count} existing documents - will add drive tags where missing");
                         
                         var addedInThisBatch = new HashSet<string>();
                         
                         foreach (var doc in documentsList)
                         {
-                            if (!existingFileIds.Contains(doc.GoogleDriveFileId) && !addedInThisBatch.Contains(doc.GoogleDriveFileId))
+                            if (!existingFileIds.ContainsKey(doc.GoogleDriveFileId) && !addedInThisBatch.Contains(doc.GoogleDriveFileId))
                             {
-                                // New document - add to database
+                                // New document - add to database with drive tag already in Tags collection
                                 dbContext.JumpDocuments.Add(doc);
                                 addedInThisBatch.Add(doc.GoogleDriveFileId);
                                 newDocsInDrive++;
                             }
-                            // Skip existing documents and within-batch duplicates entirely to avoid tag constraint conflicts
+                            else if (existingFileIds.ContainsKey(doc.GoogleDriveFileId))
+                            {
+                                // Existing document - check if it has a Drive tag for this drive
+                                var docId = existingFileIds[doc.GoogleDriveFileId];
+                                var hasDriveTag = await dbContext.DocumentTags
+                                    .AnyAsync(t => t.JumpDocumentId == docId 
+                                                && t.TagCategory == "Drive" 
+                                                && t.TagName == drive.DriveName);
+                                
+                                if (!hasDriveTag)
+                                {
+                                    // Add drive tag for this location
+                                    dbContext.DocumentTags.Add(new DocumentTag
+                                    {
+                                        JumpDocumentId = docId,
+                                        TagCategory = "Drive",
+                                        TagName = drive.DriveName
+                                    });
+                                    driveTagsAdded++;
+                                    updatedDocs++;
+                                }
+                            }
                         }
+                        
+                        Console.WriteLine($"Added {driveTagsAdded} drive tags to existing documents");
                         
                         // ===== DIAGNOSTIC LOGGING BEFORE SAVE =====
                         Console.WriteLine($"\n=== PRE-SAVE DIAGNOSTIC for {drive.DriveName} ===");
@@ -507,7 +588,7 @@ public static class GoogleDriveEndpoints
                         
                         // Check for duplicate tags WITHIN each document
                         var docsWithDuplicateTags = 0;
-                        foreach (var doc in documentsList.Where(d => !existingFileIds.Contains(d.GoogleDriveFileId) && addedInThisBatch.Contains(d.GoogleDriveFileId)))
+                        foreach (var doc in documentsList.Where(d => !existingFileIds.ContainsKey(d.GoogleDriveFileId) && addedInThisBatch.Contains(d.GoogleDriveFileId)))
                         {
                             var duplicateTags = doc.Tags
                                 .GroupBy(t => t.TagName)
@@ -574,7 +655,7 @@ public static class GoogleDriveEndpoints
                         try
                         {
                             await dbContext.SaveChangesAsync();
-                            Console.WriteLine($"✅ SAVE SUCCESSFUL: Saved {newDocsInDrive} new documents, updated {updatedDocs} existing documents");
+                            Console.WriteLine($"✅ SAVE SUCCESSFUL: Saved {newDocsInDrive} new documents, added drive tags to {driveTagsAdded} existing documents");
                         }
                         catch (Exception saveEx)
                         {
@@ -640,7 +721,8 @@ public static class GoogleDriveEndpoints
                         drive = drive.DriveName,
                         success = true,
                         totalDocuments = currentCount,
-                        newDocuments = newDocsInDrive
+                        newDocuments = newDocsInDrive,
+                        driveTagsAdded = driveTagsAdded
                     });
                 }
                 catch (Exception ex)
@@ -690,6 +772,153 @@ public static class GoogleDriveEndpoints
                 error = ex.Message,
                 detail = ex.ToString(),
                 stackTrace = ex.StackTrace
+            }, statusCode: 500);
+        }
+    }
+
+    private static async Task<IResult> ScanSingleDrive(string driveName, JumpChainDbContext dbContext, IGoogleDriveService driveService)
+    {
+        Console.WriteLine($"===== ScanSingleDrive ENDPOINT INVOKED for {driveName} =====");
+        try
+        {
+            var drive = await dbContext.DriveConfigurations
+                .FirstOrDefaultAsync(d => d.DriveName == driveName);
+            
+            if (drive == null)
+            {
+                Console.WriteLine($"Drive '{driveName}' not found in configuration");
+                return Results.NotFound(new { success = false, error = $"Drive '{driveName}' not found" });
+            }
+            
+            if (!drive.IsActive)
+            {
+                Console.WriteLine($"Drive '{driveName}' is not active");
+                return Results.BadRequest(new { success = false, error = $"Drive '{driveName}' is not active" });
+            }
+            
+            Console.WriteLine($"Scanning drive: {drive.DriveName} (ID: {drive.DriveId})");
+            
+            // Get existing document count before scan
+            var existingCount = await dbContext.JumpDocuments
+                .Where(d => d.SourceDrive == drive.DriveName)
+                .CountAsync();
+            
+            Console.WriteLine($"Existing documents for {drive.DriveName}: {existingCount}");
+            
+            // Use unified scan method
+            Console.WriteLine($"Calling ScanDriveUnifiedAsync for {drive.DriveName} (PreferredMethod: {drive.PreferredAuthMethod ?? "Auto-detect"})");
+            var (documents, successfulMethod) = await driveService.ScanDriveUnifiedAsync(drive);
+            var documentsList = documents.ToList();
+            
+            Console.WriteLine($"ScanDriveUnifiedAsync returned {documentsList.Count} documents using {successfulMethod} method");
+            
+            // Update preferred auth method if it worked
+            if (successfulMethod != "None" && drive.PreferredAuthMethod != successfulMethod)
+            {
+                drive.PreferredAuthMethod = successfulMethod;
+                Console.WriteLine($"✅ Updated {drive.DriveName} preferred auth method to: {successfulMethod}");
+            }
+            
+            // Save or update documents in database
+            var newDocsInDrive = 0;
+            var driveTagsAdded = 0;
+            
+            if (documentsList.Count > 0)
+            {
+                // Get existing documents with their IDs
+                var fileIds = documentsList.Select(d => d.GoogleDriveFileId).ToList();
+                var existingDocuments = await dbContext.JumpDocuments
+                    .Where(d => fileIds.Contains(d.GoogleDriveFileId))
+                    .Select(d => new { d.Id, d.GoogleDriveFileId })
+                    .ToListAsync();
+                var existingFileIds = existingDocuments.ToDictionary(d => d.GoogleDriveFileId, d => d.Id);
+                
+                Console.WriteLine($"Found {existingFileIds.Count} existing documents - will add drive tags where missing");
+                
+                var addedInThisBatch = new HashSet<string>();
+                
+                foreach (var doc in documentsList)
+                {
+                    if (!existingFileIds.ContainsKey(doc.GoogleDriveFileId) && !addedInThisBatch.Contains(doc.GoogleDriveFileId))
+                    {
+                        // New document - add to database
+                        dbContext.JumpDocuments.Add(doc);
+                        addedInThisBatch.Add(doc.GoogleDriveFileId);
+                        newDocsInDrive++;
+                    }
+                    else if (existingFileIds.ContainsKey(doc.GoogleDriveFileId))
+                    {
+                        // Existing document - check if it has a Drive tag for this drive
+                        var docId = existingFileIds[doc.GoogleDriveFileId];
+                        var hasDriveTag = await dbContext.DocumentTags
+                            .AnyAsync(t => t.JumpDocumentId == docId 
+                                        && t.TagCategory == "Drive" 
+                                        && t.TagName == drive.DriveName);
+                        
+                        if (!hasDriveTag)
+                        {
+                            // Add drive tag for this location
+                            dbContext.DocumentTags.Add(new DocumentTag
+                            {
+                                JumpDocumentId = docId,
+                                TagCategory = "Drive",
+                                TagName = drive.DriveName
+                            });
+                            driveTagsAdded++;
+                        }
+                    }
+                }
+                
+                Console.WriteLine($"Added {driveTagsAdded} drive tags to existing documents");
+                
+                // Save changes
+                try
+                {
+                    await dbContext.SaveChangesAsync();
+                    Console.WriteLine($"✅ SAVE SUCCESSFUL: Saved {newDocsInDrive} new documents, added drive tags to {driveTagsAdded} existing documents");
+                }
+                catch (Exception saveEx)
+                {
+                    Console.WriteLine($"❌ SAVE FAILED: {saveEx.Message}");
+                    throw;
+                }
+            }
+            
+            // Update drive configuration
+            drive.LastScanTime = DateTime.Now;
+            
+            var currentCount = await dbContext.JumpDocuments
+                .Where(d => d.SourceDrive == drive.DriveName)
+                .CountAsync();
+            drive.DocumentCount = currentCount;
+            
+            await dbContext.SaveChangesAsync();
+            
+            Console.WriteLine($"✅ Scan complete for {drive.DriveName}");
+            
+            return Results.Ok(new
+            {
+                success = true,
+                driveName = drive.DriveName,
+                documentsFound = documentsList.Count,
+                newDocuments = newDocsInDrive,
+                driveTagsAdded = driveTagsAdded,
+                totalDocuments = currentCount,
+                authMethod = successfulMethod
+            });
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"===== ERROR in ScanSingleDrive for {driveName} =====");
+            Console.WriteLine($"Message: {ex.Message}");
+            Console.WriteLine($"Stack Trace: {ex.StackTrace}");
+            
+            return Results.Json(new
+            {
+                success = false,
+                driveName = driveName,
+                error = ex.Message,
+                detail = ex.ToString()
             }, statusCode: 500);
         }
     }
@@ -871,6 +1100,7 @@ Text Preview: {text?.Substring(0, Math.Min(200, text?.Length ?? 0))}
                         DriveId = drive.folderId,
                         DriveName = drive.name,
                         ResourceKey = drive.resourceKey,
+                        ParentDriveName = drive.parentDriveName,
                         Description = "JumpChain community drive",
                         IsActive = true,
                         LastScanTime = DateTime.MinValue,
@@ -879,11 +1109,12 @@ Text Preview: {text?.Substring(0, Math.Min(200, text?.Length ?? 0))}
                     added++;
                     Console.WriteLine($"Added: {drive.name}");
                 }
-                else if (existing.DriveName != drive.name || existing.ResourceKey != drive.resourceKey)
+                else if (existing.DriveName != drive.name || existing.ResourceKey != drive.resourceKey || existing.ParentDriveName != drive.parentDriveName)
                 {
-                    // Update name or resource key if changed
+                    // Update name, resource key, or parent drive name if changed
                     existing.DriveName = drive.name;
                     existing.ResourceKey = drive.resourceKey;
+                    existing.ParentDriveName = drive.parentDriveName;
                     updated++;
                     Console.WriteLine($"Updated: {drive.name}");
                 }
@@ -1006,6 +1237,112 @@ Text Preview: {text?.Substring(0, Math.Min(200, text?.Length ?? 0))}
             }, statusCode: 500);
         }
     }
+    
+    /// <summary>
+    /// Save discovered folders to FolderConfigurations table for hierarchical management
+    /// </summary>
+    private static async Task<IResult> SaveDiscoveredFolders(string driveName, JumpChainDbContext dbContext, IGoogleDriveService driveService)
+    {
+        try
+        {
+            var drive = await dbContext.DriveConfigurations
+                .FirstOrDefaultAsync(d => d.DriveName == driveName);
+                
+            if (drive == null)
+            {
+                return Results.NotFound(new { success = false, error = $"Drive '{driveName}' not found in configuration" });
+            }
+            
+            Console.WriteLine($"===== SAVING FOLDERS FOR {driveName} =====");
+            
+            // Discover folders
+            var discoveredFolders = await driveService.DiscoverFolderHierarchyAsync(drive.DriveId, drive.ResourceKey);
+            Console.WriteLine($"Discovered {discoveredFolders.Count} folders");
+            
+            // Get existing folders for this drive
+            var existingFolders = await dbContext.FolderConfigurations
+                .Where(f => f.ParentDriveId == drive.Id)
+                .ToListAsync();
+            var existingFolderIds = existingFolders.Select(f => f.FolderId).ToHashSet();
+            
+            Console.WriteLine($"Found {existingFolders.Count} existing folder configurations");
+            
+            int newCount = 0;
+            int updatedCount = 0;
+            
+            foreach (var folder in discoveredFolders)
+            {
+                if (existingFolderIds.Contains(folder.folderId))
+                {
+                    // Update existing folder
+                    var existing = existingFolders.First(f => f.FolderId == folder.folderId);
+                    var changed = false;
+                    
+                    if (existing.FolderName != folder.folderName)
+                    {
+                        existing.FolderName = folder.folderName;
+                        changed = true;
+                    }
+                    
+                    if (existing.ResourceKey != folder.resourceKey)
+                    {
+                        existing.ResourceKey = folder.resourceKey;
+                        changed = true;
+                    }
+                    
+                    if (changed)
+                    {
+                        existing.UpdatedAt = DateTime.Now;
+                        updatedCount++;
+                    }
+                }
+                else
+                {
+                    // Create new folder configuration
+                    var newFolder = new FolderConfiguration
+                    {
+                        FolderId = folder.folderId,
+                        FolderName = folder.folderName,
+                        ParentDriveId = drive.Id,
+                        ResourceKey = folder.resourceKey,
+                        FolderPath = folder.folderName, // Full path with slashes
+                        IsActive = true,
+                        IsAutoDiscovered = true,
+                        CreatedAt = DateTime.Now,
+                        UpdatedAt = DateTime.Now
+                    };
+                    
+                    dbContext.FolderConfigurations.Add(newFolder);
+                    newCount++;
+                }
+            }
+            
+            await dbContext.SaveChangesAsync();
+            
+            Console.WriteLine($"✅ Saved: {newCount} new folders, {updatedCount} updated");
+            
+            return Results.Ok(new
+            {
+                success = true,
+                driveName = driveName,
+                foldersDiscovered = discoveredFolders.Count,
+                foldersCreated = newCount,
+                foldersUpdated = updatedCount,
+                totalFolders = newCount + existingFolders.Count
+            });
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"❌ Error saving folders: {ex.Message}");
+            return Results.Json(new
+            {
+                success = false,
+                error = ex.Message,
+                detail = ex.ToString()
+            }, statusCode: 500);
+        }
+    }
 }
 
-public record JumpChainDriveConfig(string name, string folderId, string? resourceKey = null);
+public record JumpChainDriveConfig(string name, string folderId, string? resourceKey = null, string? parentDriveName = null);
+public record ResourceKeyUpdate(string resourceKey);

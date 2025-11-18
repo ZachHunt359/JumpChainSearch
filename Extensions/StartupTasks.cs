@@ -40,6 +40,8 @@ public static class StartupTasks
                             {
                                 DriveId = drive.folderId,
                                 DriveName = drive.name,
+                                ResourceKey = drive.resourceKey,
+                                ParentDriveName = drive.parentDriveName,
                                 Description = $"JumpChain community drive",
                                 IsActive = true,
                                 LastScanTime = DateTime.MinValue,

@@ -27,5 +27,8 @@ namespace JumpChainSearch.Models
         // For subfolders: the parent drive name to use for tagging (e.g., "SB Drive")
         // If null, uses DriveName for tags. Allows subfolder scanning while preserving parent drive identity.
         public string? ParentDriveName { get; set; }
+
+        // Preferred authentication method: "ServiceAccount", "ApiKey", or null (auto-detect)
+        public string? PreferredAuthMethod { get; set; }
     }
 }
