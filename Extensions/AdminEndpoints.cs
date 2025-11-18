@@ -928,18 +928,20 @@ public static class AdminEndpoints
                                     <th style=""padding: 0.5rem;"">Tag</th>
                                     <th style=""padding: 0.5rem;"">Votes</th>
                                     <th style=""padding: 0.5rem;"">Actions</th>
+                                    <th style=""padding: 0.5rem;"">Drive Link</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 ${{suggestions.map(s => `
                                     <tr style=""border-bottom: 1px solid var(--border);"">
-                                        <td style=""padding: 0.5rem;"">${{escapeHtml(s.documentName || 'Doc #' + s.jumpDocumentId)}}</td>
+                                        <td style=""padding: 0.5rem;""><a href=""/?docId=${{s.jumpDocumentId}}"" target=""_blank"" style=""color: var(--accent); text-decoration: none;"">${{escapeHtml(s.documentName || 'Doc #' + s.jumpDocumentId)}}</a></td>
                                         <td style=""padding: 0.5rem;""><strong>${{escapeHtml(s.tagName)}}</strong></td>
                                         <td style=""padding: 0.5rem;"">👍 ${{Math.round(s.favorVotes)}} / 👎 ${{Math.round(s.againstVotes)}}</td>
                                         <td style=""padding: 0.5rem;"">
                                             <button onclick=""approveSuggestion(${{s.id}})"" style=""background: var(--success); color: white; border: none; padding: 0.3rem 0.6rem; border-radius: 4px; cursor: pointer; margin-right: 0.5rem;"">✓ Approve</button>
                                             <button onclick=""rejectSuggestion(${{s.id}})"" style=""background: var(--danger); color: white; border: none; padding: 0.3rem 0.6rem; border-radius: 4px; cursor: pointer;"">✗ Reject</button>
                                         </td>
+                                        <td style=""padding: 0.5rem;""><a href=""${{s.googleDriveLink || '#'}}"" target=""_blank"" style=""color: var(--accent); text-decoration: none;"" title=""Open in Google Drive"">🔗 Drive</a></td>
                                     </tr>
                                 `).join('')}}
                             </tbody>
@@ -957,18 +959,20 @@ public static class AdminEndpoints
                                     <th style=""padding: 0.5rem;"">Tag</th>
                                     <th style=""padding: 0.5rem;"">Votes</th>
                                     <th style=""padding: 0.5rem;"">Actions</th>
+                                    <th style=""padding: 0.5rem;"">Drive Link</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 ${{removals.map(r => `
                                     <tr style=""border-bottom: 1px solid var(--border);"">
-                                        <td style=""padding: 0.5rem;"">${{escapeHtml(r.documentName || 'Doc #' + r.jumpDocumentId)}}</td>
+                                        <td style=""padding: 0.5rem;""><a href=""/?docId=${{r.jumpDocumentId}}"" target=""_blank"" style=""color: var(--accent); text-decoration: none;"">${{escapeHtml(r.documentName || 'Doc #' + r.jumpDocumentId)}}</a></td>
                                         <td style=""padding: 0.5rem;""><strong>${{escapeHtml(r.tagName)}}</strong></td>
                                         <td style=""padding: 0.5rem;"">👍 ${{Math.round(r.favorVotes)}} / 👎 ${{Math.round(r.againstVotes)}}</td>
                                         <td style=""padding: 0.5rem;"">
                                             <button onclick=""approveRemoval(${{r.id}})"" style=""background: var(--success); color: white; border: none; padding: 0.3rem 0.6rem; border-radius: 4px; cursor: pointer; margin-right: 0.5rem;"">✓ Approve Removal</button>
                                             <button onclick=""rejectRemoval(${{r.id}})"" style=""background: var(--danger); color: white; border: none; padding: 0.3rem 0.6rem; border-radius: 4px; cursor: pointer;"">✗ Keep Tag</button>
                                         </td>
+                                        <td style=""padding: 0.5rem;""><a href=""${{r.googleDriveLink || '#'}}"" target=""_blank"" style=""color: var(--accent); text-decoration: none;"" title=""Open in Google Drive"">🔗 Drive</a></td>
                                     </tr>
                                 `).join('')}}
                             </tbody>
