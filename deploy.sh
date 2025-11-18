@@ -30,27 +30,37 @@ git reset --hard origin/$BRANCH
 echo "✓ Code updated to latest commit"
 echo ""
 
-echo "Step 2: Stopping the service..."
+echo "Step 2: Backing up database..."
+BACKUP_FILE="$APP_DIR/jumpchain.db.backup-$(date +%Y%m%d-%H%M%S)"
+if [ -f "$APP_DIR/jumpchain.db" ]; then
+    cp "$APP_DIR/jumpchain.db" "$BACKUP_FILE"
+    echo "✓ Database backed up to: $BACKUP_FILE"
+else
+    echo "⚠ No database file found (first deployment?)"
+fi
+echo ""
+
+echo "Step 3: Stopping the service..."
 sudo systemctl stop $SERVICE_NAME
 echo "✓ Service stopped"
 echo ""
 
-echo "Step 3: Cleaning previous build..."
+echo "Step 4: Cleaning previous build..."
 rm -rf "$PUBLISH_DIR"
 echo "✓ Previous build cleaned"
 echo ""
 
-echo "Step 4: Building the application..."
+echo "Step 5: Building the application..."
 dotnet publish -c Release -o "$PUBLISH_DIR"
 echo "✓ Build completed"
 echo ""
 
-echo "Step 5: Starting the service..."
+echo "Step 6: Starting the service..."
 sudo systemctl start $SERVICE_NAME
 echo "✓ Service started"
 echo ""
 
-echo "Step 6: Checking service status..."
+echo "Step 7: Checking service status..."
 sleep 2
 if sudo systemctl is-active --quiet $SERVICE_NAME; then
     echo "✓ Service is running"
