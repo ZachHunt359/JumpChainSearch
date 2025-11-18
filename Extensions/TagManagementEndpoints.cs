@@ -31,6 +31,12 @@ public static class TagManagementEndpoints
         group.MapPost("/regenerate-franchise-tags", RegenerateFranchiseTags);
         group.MapPost("/regenerate-genre-tags", RegenerateGenreTags);
         
+        // Tag hierarchy endpoints
+        group.MapGet("/hierarchy/all", GetAllTagHierarchies);
+        group.MapGet("/hierarchy/{tagName}", GetTagHierarchy);
+        group.MapPost("/hierarchy", AddTagHierarchy);
+        group.MapDelete("/hierarchy/{id:int}", RemoveTagHierarchy);
+        
         return group;
     }
     
@@ -1701,5 +1707,206 @@ public static class TagManagementEndpoints
                 stackTrace = ex.StackTrace
             }, statusCode: 500);
         }
+    }
+    
+    /// <summary>
+    /// Get tag hierarchy for a specific tag (both parent and child relationships)
+    /// </summary>
+    /// <summary>
+    /// Get all tag hierarchies (admin view)
+    /// </summary>
+    private static async Task<IResult> GetAllTagHierarchies(JumpChainDbContext context)
+    {
+        try
+        {
+            var hierarchies = await context.TagHierarchies
+                .OrderBy(h => h.ParentTagName)
+                .ThenBy(h => h.ChildTagName)
+                .Select(h => new
+                {
+                    h.Id,
+                    h.ParentTagName,
+                    h.ChildTagName,
+                    h.CreatedAt
+                })
+                .ToListAsync();
+            
+            return Results.Ok(new
+            {
+                success = true,
+                hierarchies = hierarchies,
+                count = hierarchies.Count
+            });
+        }
+        catch (Exception ex)
+        {
+            return Results.BadRequest(new
+            {
+                success = false,
+                error = ex.Message
+            });
+        }
+    }
+    
+    /// <summary>
+    /// Get tag hierarchies for a specific tag
+    /// </summary>
+    private static async Task<IResult> GetTagHierarchy(JumpChainDbContext context, string tagName)
+    {
+        try
+        {
+            var parents = await context.TagHierarchies
+                .Where(h => h.ChildTagName == tagName)
+                .Select(h => new { h.Id, h.ParentTagName, h.CreatedAt })
+                .ToListAsync();
+            
+            var children = await context.TagHierarchies
+                .Where(h => h.ParentTagName == tagName)
+                .Select(h => new { h.Id, h.ChildTagName, h.CreatedAt })
+                .ToListAsync();
+            
+            return Results.Ok(new
+            {
+                success = true,
+                tagName = tagName,
+                parents = parents,
+                children = children
+            });
+        }
+        catch (Exception ex)
+        {
+            return Results.BadRequest(new
+            {
+                success = false,
+                error = ex.Message
+            });
+        }
+    }
+    
+    /// <summary>
+    /// Add a parent-child tag relationship
+    /// </summary>
+    private static async Task<IResult> AddTagHierarchy(JumpChainDbContext context, TagHierarchyRequest request)
+    {
+        try
+        {
+            // Validate input
+            if (string.IsNullOrWhiteSpace(request.ParentTagName) || string.IsNullOrWhiteSpace(request.ChildTagName))
+            {
+                return Results.BadRequest(new
+                {
+                    success = false,
+                    error = "Both parent and child tag names are required"
+                });
+            }
+            
+            // Check if relationship already exists
+            var exists = await context.TagHierarchies
+                .AnyAsync(h => h.ParentTagName == request.ParentTagName && h.ChildTagName == request.ChildTagName);
+            
+            if (exists)
+            {
+                return Results.BadRequest(new
+                {
+                    success = false,
+                    error = "This tag hierarchy relationship already exists"
+                });
+            }
+            
+            // Get parent tag's category to inherit
+            var parentTag = await context.DocumentTags
+                .Where(t => t.TagName == request.ParentTagName)
+                .Select(t => new { t.TagCategory })
+                .FirstOrDefaultAsync();
+            
+            // Create new hierarchy
+            var hierarchy = new TagHierarchy
+            {
+                ParentTagName = request.ParentTagName,
+                ChildTagName = request.ChildTagName,
+                CreatedAt = DateTime.UtcNow
+            };
+            
+            context.TagHierarchies.Add(hierarchy);
+            
+            // Update all child tag instances to inherit parent's category
+            if (parentTag != null && !string.IsNullOrEmpty(parentTag.TagCategory))
+            {
+                var childTags = await context.DocumentTags
+                    .Where(t => t.TagName == request.ChildTagName)
+                    .ToListAsync();
+                
+                foreach (var tag in childTags)
+                {
+                    tag.TagCategory = parentTag.TagCategory;
+                }
+            }
+            
+            await context.SaveChangesAsync();
+            
+            return Results.Ok(new
+            {
+                success = true,
+                message = "Tag hierarchy created successfully",
+                hierarchy = new
+                {
+                    hierarchy.Id,
+                    hierarchy.ParentTagName,
+                    hierarchy.ChildTagName,
+                    hierarchy.CreatedAt
+                }
+            });
+        }
+        catch (Exception ex)
+        {
+            return Results.BadRequest(new
+            {
+                success = false,
+                error = ex.Message
+            });
+        }
+    }
+    
+    /// <summary>
+    /// Remove a tag hierarchy relationship
+    /// </summary>
+    private static async Task<IResult> RemoveTagHierarchy(JumpChainDbContext context, int id)
+    {
+        try
+        {
+            var hierarchy = await context.TagHierarchies.FindAsync(id);
+            
+            if (hierarchy == null)
+            {
+                return Results.NotFound(new
+                {
+                    success = false,
+                    error = "Tag hierarchy not found"
+                });
+            }
+            
+            context.TagHierarchies.Remove(hierarchy);
+            await context.SaveChangesAsync();
+            
+            return Results.Ok(new
+            {
+                success = true,
+                message = "Tag hierarchy removed successfully"
+            });
+        }
+        catch (Exception ex)
+        {
+            return Results.BadRequest(new
+            {
+                success = false,
+                error = ex.Message
+            });
+        }
+    }
+    
+    public class TagHierarchyRequest
+    {
+        public string ParentTagName { get; set; } = string.Empty;
+        public string ChildTagName { get; set; } = string.Empty;
     }
 }

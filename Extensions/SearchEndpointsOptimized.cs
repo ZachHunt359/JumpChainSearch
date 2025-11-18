@@ -36,10 +36,68 @@ public static class SearchEndpointsOptimized
         int limit = 50,
         int offset = 0,
         string? includeTags = null,
-        string? excludeTags = null)
+        string? excludeTags = null,
+        int? docId = null)
     {
         try
         {
+            // Skip caching if docId is provided (direct document lookup)
+            if (docId.HasValue)
+            {
+                // Direct document lookup - don't use cache
+                var query = context.JumpDocuments
+                    .AsNoTracking()
+                    .Include(d => d.Tags)
+                    .Where(d => d.Id == docId.Value);
+                
+                var document = await query.FirstOrDefaultAsync();
+                
+                if (document == null)
+                {
+                    return Results.Ok(new
+                    {
+                        success = true,
+                        query = q ?? "",
+                        includeTags = includeTags ?? "",
+                        excludeTags = excludeTags ?? "",
+                        resultCount = 0,
+                        totalCount = 0,
+                        results = new List<object>()
+                    });
+                }
+                
+                var result = new
+                {
+                    document.Id,
+                    document.Name,
+                    document.FolderPath,
+                    document.SourceDrive,
+                    document.MimeType,
+                    document.Size,
+                    document.GoogleDriveFileId,
+                    document.WebViewLink,
+                    document.DownloadLink,
+                    HasExtractedText = !string.IsNullOrEmpty(document.ExtractedText),
+                    ExtractedTextLength = document.ExtractedText != null ? document.ExtractedText.Length : 0,
+                    Tags = document.Tags.Select(t => t.TagName).ToList(),
+                    document.CreatedTime,
+                    document.ModifiedTime,
+                    document.LastModified,
+                    Score = 0
+                };
+                
+                return Results.Ok(new
+                {
+                    success = true,
+                    query = q ?? "",
+                    includeTags = includeTags ?? "",
+                    excludeTags = excludeTags ?? "",
+                    resultCount = 1,
+                    totalCount = 1,
+                    results = new[] { result }
+                });
+            }
+            
             // Generate cache key
             var cacheKey = GenerateCacheKey(q, limit, offset, includeTags, excludeTags);
             
@@ -93,6 +151,12 @@ public static class SearchEndpointsOptimized
                     .AsNoTracking()
                     .Include(d => d.Tags)
                     .Where(d => documentIds.Contains(d.Id));
+                
+                // Apply docId filter if provided
+                if (docId.HasValue)
+                {
+                    query = query.Where(d => d.Id == docId.Value);
+                }
                 
                 // Apply tag filters
                 query = ApplyTagFilters(query, includeTags, excludeTags);
@@ -166,6 +230,12 @@ public static class SearchEndpointsOptimized
                     .AsNoTracking()
                     .Include(d => d.Tags)
                     .AsQueryable();
+                
+                // Apply docId filter if provided
+                if (docId.HasValue)
+                {
+                    query = query.Where(d => d.Id == docId.Value);
+                }
                 
                 query = ApplyTagFilters(query, includeTags, excludeTags);
                 

@@ -122,11 +122,34 @@
                                         <span class="category-label">@category.Key:</span>
                                         @foreach (var tag in category.OrderByDescending(t => t.Count))
                                         {
-                                            <span class="badge @GetTagFilterClass(tag.Name) me-1 mb-1 clickable-tag" 
-                                                  @onclick="() => ToggleTagFilter(tag.Name)"
-                                                  title="@GetTagFilterTitle(tag.Name, tag.Count)">
-                                                @tag.Name (@tag.Count)
-                                            </span>
+                                            @* Only show parent tags or tags without hierarchy in main list *@
+                                            @if (!childTags.Contains(tag.Name))
+                                            {
+                                                <span class="badge @GetTagFilterClass(tag.Name) me-1 mb-1 clickable-tag" 
+                                                      @onclick="() => ToggleTagFilter(tag.Name)"
+                                                      title="@GetTagFilterTitle(tag.Name, tag.Count)">
+                                                    @tag.Name (@tag.Count)
+                                                </span>
+                                                
+                                                @* Show child tags indented if parent is selected *@
+                                                @if ((includedTags.Contains(tag.Name) || excludedTags.Contains(tag.Name)) && tagHierarchyMap.ContainsKey(tag.Name))
+                                                {
+                                                    <div class="ms-4 d-inline-block">
+                                                        @foreach (var childTagName in tagHierarchyMap[tag.Name])
+                                                        {
+                                                            var childTagInfo = availableTags.FirstOrDefault(t => t.Name == childTagName);
+                                                            @if (childTagInfo != null)
+                                                            {
+                                                                <span class="badge @GetTagFilterClass(childTagInfo.Name) me-1 mb-1 clickable-tag child-tag" 
+                                                                      @onclick="() => ToggleTagFilter(childTagInfo.Name)"
+                                                                      title="@GetTagFilterTitle(childTagInfo.Name, childTagInfo.Count)">
+                                                                    ↳ @childTagInfo.Name (@childTagInfo.Count)
+                                                                </span>
+                                                            }
+                                                        }
+                                                    </div>
+                                                }
+                                            }
                                         }
                                     </div>
                                 }
@@ -650,6 +673,7 @@
                                         <select class="form-select" @bind="newTagCategory">
                                             <option value="Genre">Genre (e.g., Fantasy, Sci-Fi, Horror)</option>
                                             <option value="Series">Series (e.g., Marvel, DC, Worm)</option>
+                                            <option value="Content">Content (e.g., NSFW)</option>
                                             <option value="ContentType">Content Type (e.g., Supplement, Gauntlet)</option>
                                             <option value="Quality">Quality (e.g., Complete, WIP, Popular)</option>
                                             <option value="Format">Format (e.g., PDF, Google Doc)</option>
@@ -731,6 +755,8 @@
     
     // Tag filtering with inclusion/exclusion support
     private List<TagInfo> availableTags = new List<TagInfo>();
+    private Dictionary<string, List<string>> tagHierarchyMap = new Dictionary<string, List<string>>(); // Parent -> Children
+    private HashSet<string> childTags = new HashSet<string>(); // All tags that are children
     private HashSet<string> includedTags = new HashSet<string>(); // Tags to include (green)
     private HashSet<string> excludedTags = new HashSet<string>(); // Tags to exclude (red)
     private HashSet<string> expandedCategories = new HashSet<string>();
@@ -1006,6 +1032,9 @@
                     Category = t.TagCategory,
                     Count = t.Count
                 }).ToList();
+                
+                // Load tag hierarchies after loading tags
+                await LoadTagHierarchies();
             }
         }
         catch (Exception)
@@ -1017,6 +1046,48 @@
             isLoadingTags = false;
             StateHasChanged();
         }
+    }
+    
+    private async Task LoadTagHierarchies()
+    {
+        try
+        {
+            var response = await Http.GetFromJsonAsync<TagHierarchyAllResponse>("/api/tags/hierarchy/all");
+            
+            if (response?.Success == true && response.Hierarchies != null)
+            {
+                // Build parent -> children map
+                tagHierarchyMap.Clear();
+                childTags.Clear();
+                
+                foreach (var hierarchy in response.Hierarchies)
+                {
+                    if (!tagHierarchyMap.ContainsKey(hierarchy.ParentTagName))
+                    {
+                        tagHierarchyMap[hierarchy.ParentTagName] = new List<string>();
+                    }
+                    tagHierarchyMap[hierarchy.ParentTagName].Add(hierarchy.ChildTagName);
+                    childTags.Add(hierarchy.ChildTagName);
+                }
+            }
+        }
+        catch (Exception)
+        {
+            // Handle error silently
+        }
+    }
+    
+    private class TagHierarchyAllResponse
+    {
+        public bool Success { get; set; }
+        public List<TagHierarchyInfo> Hierarchies { get; set; } = new List<TagHierarchyInfo>();
+    }
+    
+    private class TagHierarchyInfo
+    {
+        public int Id { get; set; }
+        public string ParentTagName { get; set; } = "";
+        public string ChildTagName { get; set; } = "";
     }
 
     private async Task LoadTotalDocumentCountAsync()
@@ -1065,6 +1136,10 @@
                 searchResults = response.Results;
                 totalResults = 1;
                 showNoResultsMessage = false;
+                
+                // Automatically select the document to show details
+                var document = response.Results.First();
+                await ShowDocumentDetails(document);
             }
             else
             {
@@ -2074,6 +2149,13 @@
     .vote-controls .btn {
         font-size: 0.75rem;
         padding: 0.25rem 0.5rem;
+    }
+    
+    /* Child tag styling */
+    .child-tag {
+        font-size: 0.85rem;
+        opacity: 0.9;
+        margin-left: 0.25rem;
     }
     
     .modal-overlay {

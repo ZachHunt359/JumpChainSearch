@@ -25,11 +25,19 @@ public static class SearchEndpoints
         int limit = 50,
         int offset = 0,
         string? includeTags = null, 
-        string? excludeTags = null)
+        string? excludeTags = null,
+        int? docId = null)
     {
         try
         {
             var query = context.JumpDocuments.Include(d => d.Tags).Include(d => d.Urls).AsQueryable();
+            
+            // Filter by specific document ID if provided
+            if (docId.HasValue)
+            {
+                query = query.Where(d => d.Id == docId.Value);
+                Console.WriteLine($"[DEBUG] Filtering by docId={docId.Value}");
+            }
             
             // Apply include tag filters if specified
             if (!string.IsNullOrWhiteSpace(includeTags))
@@ -136,6 +144,7 @@ public static class SearchEndpoints
             else
             {
                 // No search query - just return with filters applied
+                Console.WriteLine($"[DEBUG] No search query. Query count before pagination: {await query.CountAsync()}");
                 totalCount = await query.CountAsync();
                 
                 var results = await query

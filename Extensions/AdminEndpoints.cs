@@ -534,6 +534,45 @@ public static class AdminEndpoints
                 </div>
                 <div id=""pending-tags-info"" style=""margin-top: 1rem;""></div>
             </section>
+            
+            <section style=""margin-top: 2rem; border-top: 2px solid var(--border); padding-top: 2rem;"">
+                <h2>🔗 Tag Relationships</h2>
+                <p style=""color: var(--text-secondary); margin-bottom: 1rem;"">Define parent-child relationships between tags for hierarchical organization.</p>
+                
+                <div class=""action-card"" style=""margin-bottom: 2rem;"">
+                    <h3>Add Tag Relationship</h3>
+                    <div style=""display: grid; grid-template-columns: 2fr auto 2fr auto; gap: 1rem; align-items: end; margin-top: 1rem;"">
+                        <div>
+                            <label style=""display: block; margin-bottom: 0.5rem; font-weight: 500;"">Parent Tag</label>
+                            <input type=""text"" id=""parent-tag"" placeholder=""e.g., Star Wars"" 
+                                   style=""width: 100%; padding: 0.5rem; border: 1px solid var(--border); border-radius: 4px; background: var(--bg);"" />
+                        </div>
+                        <div style=""text-align: center; padding-top: 1.5rem;"">
+                            <i class=""fas fa-arrow-right"" style=""color: var(--accent); font-size: 1.5rem;""></i>
+                        </div>
+                        <div>
+                            <label style=""display: block; margin-bottom: 0.5rem; font-weight: 500;"">Child Tag</label>
+                            <input type=""text"" id=""child-tag"" placeholder=""e.g., Prequel Trilogy"" 
+                                   style=""width: 100%; padding: 0.5rem; border: 1px solid var(--border); border-radius: 4px; background: var(--bg);"" />
+                        </div>
+                        <button onclick=""addTagHierarchy()"" class=""btn btn-primary"" style=""white-space: nowrap;"">
+                            <i class=""fas fa-plus""></i> Add Relationship
+                        </button>
+                    </div>
+                </div>
+                
+                <div class=""action-card"">
+                    <div style=""display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;"">
+                        <h3 style=""margin: 0;"">Existing Relationships</h3>
+                        <button class=""btn btn-secondary"" onclick=""loadTagHierarchies()"">
+                            <i class=""fas fa-sync""></i> Refresh
+                        </button>
+                    </div>
+                    <div id=""hierarchy-list"" style=""margin-top: 1rem;"">
+                        <p style=""color: var(--text-secondary);"">Click Refresh to load existing tag relationships</p>
+                    </div>
+                </div>
+            </section>
         </div>
         
         <!-- Text Review Tab -->
@@ -943,6 +982,7 @@ public static class AdminEndpoints
                                                 <option value=""Drive"" ${{s.tagCategory === 'Drive' ? 'selected' : ''}}>Drive</option>
                                                 <option value=""Genre"" ${{s.tagCategory === 'Genre' ? 'selected' : ''}}>Genre</option>
                                                 <option value=""Series"" ${{s.tagCategory === 'Series' ? 'selected' : ''}}>Series</option>
+                                                <option value=""Content"" ${{s.tagCategory === 'Content' ? 'selected' : ''}}>Content</option>
                                                 <option value=""ContentType"" ${{s.tagCategory === 'ContentType' ? 'selected' : ''}}>Content Type</option>
                                                 <option value=""Quality"" ${{s.tagCategory === 'Quality' ? 'selected' : ''}}>Quality</option>
                                                 <option value=""Format"" ${{s.tagCategory === 'Format' ? 'selected' : ''}}>Format</option>
@@ -1150,6 +1190,136 @@ public static class AdminEndpoints
         function closeVotingConfig() {{
             const modal = document.querySelector('div[style*=""position: fixed""]');
             if (modal) modal.remove();
+        }}
+        
+        // Tag Hierarchy Functions
+        async function loadTagHierarchies() {{
+            const container = document.getElementById('hierarchy-list');
+            container.innerHTML = '<div style=""color: var(--text-secondary);"">Loading tag relationships...</div>';
+            
+            try {{
+                const response = await fetch('/api/tags/hierarchy/all');
+                const data = await response.json();
+                
+                if (!data.success) {{
+                    container.innerHTML = `<div style=""color: var(--danger);"">Error: ${{data.message || 'Failed to load'}}</div>`;
+                    return;
+                }}
+                
+                const hierarchies = data.hierarchies || [];
+                
+                if (hierarchies.length === 0) {{
+                    container.innerHTML = '<div style=""color: var(--text-secondary); padding: 1rem; text-align: center;"">No tag relationships defined yet. Use the form above to create parent-child relationships.</div>';
+                    return;
+                }}
+                
+                // Group hierarchies by parent tag
+                const grouped = {{}};
+                hierarchies.forEach(h => {{
+                    if (!grouped[h.parentTagName]) {{
+                        grouped[h.parentTagName] = [];
+                    }}
+                    grouped[h.parentTagName].push(h);
+                }});
+                
+                let html = '<div style=""display: flex; flex-direction: column; gap: 1rem;"">';
+                
+                Object.keys(grouped).sort().forEach(parent => {{
+                    const children = grouped[parent].sort((a, b) => a.childTagName.localeCompare(b.childTagName));
+                    
+                    html += `
+                        <div style=""background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: 8px; padding: 1rem;"">
+                            <div style=""display: flex; align-items: center; margin-bottom: 0.75rem;"">
+                                <span style=""background: var(--accent); color: white; padding: 0.35rem 0.7rem; border-radius: 4px; font-weight: 500; font-size: 0.95rem;"">${{escapeHtml(parent)}}</span>
+                                <i class=""fas fa-arrow-right"" style=""margin: 0 1rem; color: var(--text-secondary);""></i>
+                                <span style=""color: var(--text-secondary); font-size: 0.9rem;"">has ${{children.length}} child tag${{children.length !== 1 ? 's' : ''}}</span>
+                            </div>
+                            <div style=""display: flex; flex-wrap: wrap; gap: 0.5rem; padding-left: 2rem;"">
+                                ${{children.map(c => `
+                                    <div style=""display: flex; align-items: center; gap: 0.5rem; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 4px; padding: 0.35rem 0.5rem;"">
+                                        <span style=""font-size: 0.9rem;"">${{escapeHtml(c.childTagName)}}</span>
+                                        <button onclick=""removeTagHierarchy(${{c.id}}, '${{escapeHtml(parent)}}', '${{escapeHtml(c.childTagName)}}')"" 
+                                                style=""background: none; border: none; color: var(--danger); cursor: pointer; padding: 0.1rem 0.3rem; font-size: 0.85rem;"" 
+                                                title=""Remove this relationship"">
+                                            <i class=""fas fa-trash""></i>
+                                        </button>
+                                    </div>
+                                `).join('')}}
+                            </div>
+                        </div>
+                    `;
+                }});
+                
+                html += '</div>';
+                container.innerHTML = html;
+            }} catch (error) {{
+                container.innerHTML = `<div style=""color: var(--danger);"">Error: ${{error.message}}</div>`;
+            }}
+        }}
+        
+        async function addTagHierarchy() {{
+            const parentInput = document.getElementById('parent-tag');
+            const childInput = document.getElementById('child-tag');
+            
+            const parentTag = parentInput.value.trim();
+            const childTag = childInput.value.trim();
+            
+            if (!parentTag || !childTag) {{
+                alert('Please enter both parent and child tag names');
+                return;
+            }}
+            
+            if (parentTag === childTag) {{
+                alert('Parent and child tags cannot be the same');
+                return;
+            }}
+            
+            try {{
+                const response = await fetch('/api/tags/hierarchy', {{
+                    method: 'POST',
+                    headers: {{ 'Content-Type': 'application/json' }},
+                    body: JSON.stringify({{
+                        parentTagName: parentTag,
+                        childTagName: childTag
+                    }})
+                }});
+                
+                const data = await response.json();
+                
+                if (data.success) {{
+                    alert(`✓ Tag relationship created: ${{parentTag}} → ${{childTag}}`);
+                    parentInput.value = '';
+                    childInput.value = '';
+                    await loadTagHierarchies();
+                }} else {{
+                    alert('Error: ' + (data.message || 'Failed to create relationship'));
+                }}
+            }} catch (error) {{
+                alert('Error: ' + error.message);
+            }}
+        }}
+        
+        async function removeTagHierarchy(hierarchyId, parentTag, childTag) {{
+            if (!confirm(`Remove relationship: ${{parentTag}} → ${{childTag}}?`)) {{
+                return;
+            }}
+            
+            try {{
+                const response = await fetch(`/api/tags/hierarchy/${{hierarchyId}}`, {{
+                    method: 'DELETE'
+                }});
+                
+                const data = await response.json();
+                
+                if (data.success) {{
+                    alert('✓ Tag relationship removed');
+                    await loadTagHierarchies();
+                }} else {{
+                    alert('Error: ' + (data.message || 'Failed to remove relationship'));
+                }}
+            }} catch (error) {{
+                alert('Error: ' + error.message);
+            }}
         }}
         
         // Drive Management Functions
