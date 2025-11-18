@@ -157,7 +157,8 @@ public static class GoogleDriveEndpoints
             }
 
             var targetFolder = drives[folderIndex!.Value % drives.Length];
-            var documents = await driveService.ScanPublicFolderAsync(targetFolder.folderId, targetFolder.name);
+            var driveConfig = new DriveConfiguration { DriveId = targetFolder.folderId, DriveName = targetFolder.name };
+            var (documents, method) = await driveService.ScanDriveUnifiedAsync(driveConfig);
             
             return Results.Ok(new { 
                 success = true, 
@@ -201,7 +202,8 @@ public static class GoogleDriveEndpoints
                 try
                 {
                     var drive = drives[i];
-                    var documents = await driveService.ScanPublicFolderAsync(drive.folderId, drive.name);
+                    var driveConfig = new DriveConfiguration { DriveId = drive.folderId, DriveName = drive.name };
+                    var (documents, method) = await driveService.ScanDriveUnifiedAsync(driveConfig);
                     var documentList = documents.ToList();
                     
                     results.Add(new
@@ -1167,7 +1169,7 @@ Text Preview: {text?.Substring(0, Math.Min(200, text?.Length ?? 0))}
             Console.WriteLine($"Found drive: {drive.DriveName} (ID: {drive.DriveId})");
             Console.WriteLine($"Scanning folder with service account authentication...");
             
-            var documents = await driveService.ScanFolderAsync(drive.DriveId, drive.DriveName, drive.ResourceKey, drive.ParentDriveName);
+            var (documents, method) = await driveService.ScanDriveUnifiedAsync(drive);
             var documentsList = documents.ToList();
             
             Console.WriteLine($"Scan returned {documentsList.Count} documents");

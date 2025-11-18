@@ -45,7 +45,8 @@ public static class DatabaseManagementEndpoints
             {
                 try
                 {
-                    var documents = await driveService.ScanPublicFolderAsync(drive.folderId, drive.name);
+                    var driveConfig = new DriveConfiguration { DriveId = drive.folderId, DriveName = drive.name };
+                    var (documents, method) = await driveService.ScanDriveUnifiedAsync(driveConfig);
                     var documentList = documents.ToList();
                     
                     // Save to database
@@ -151,7 +152,8 @@ public static class DatabaseManagementEndpoints
             {
                 try
                 {
-                    var documents = await driveService.ScanPublicFolderAsync(drive.folderId, drive.name);
+                    var driveConfig = new DriveConfiguration { DriveId = drive.folderId, DriveName = drive.name };
+                    var (documents, method) = await driveService.ScanDriveUnifiedAsync(driveConfig);
                     var documentList = documents.ToList();
                     
                     // Save to database without tags
