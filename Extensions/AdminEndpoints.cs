@@ -925,23 +925,38 @@ public static class AdminEndpoints
                             <thead>
                                 <tr style=""border-bottom: 2px solid var(--border); text-align: left;"">
                                     <th style=""padding: 0.5rem;"">Document</th>
+                                    <th style=""padding: 0.5rem;"">Drive Link</th>
                                     <th style=""padding: 0.5rem;"">Tag</th>
+                                    <th style=""padding: 0.5rem;"">Category</th>
                                     <th style=""padding: 0.5rem;"">Votes</th>
                                     <th style=""padding: 0.5rem;"">Actions</th>
-                                    <th style=""padding: 0.5rem;"">Drive Link</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 ${{suggestions.map(s => `
                                     <tr style=""border-bottom: 1px solid var(--border);"">
                                         <td style=""padding: 0.5rem;""><a href=""/?docId=${{s.jumpDocumentId}}"" target=""_blank"" style=""color: var(--accent); text-decoration: none;"">${{escapeHtml(s.documentName || 'Doc #' + s.jumpDocumentId)}}</a></td>
+                                        <td style=""padding: 0.5rem;""><a href=""${{s.googleDriveLink || '#'}}"" target=""_blank"" style=""color: var(--accent); text-decoration: none;"" title=""Open in Google Drive"">🔗 Drive</a></td>
                                         <td style=""padding: 0.5rem;""><strong>${{escapeHtml(s.tagName)}}</strong></td>
+                                        <td style=""padding: 0.5rem;"">
+                                            <select id=""category-${{s.id}}"" style=""padding: 0.2rem; border: 1px solid var(--border); border-radius: 4px; background: var(--bg);"">
+                                                <option value=""Drive"" ${{s.tagCategory === 'Drive' ? 'selected' : ''}}>Drive</option>
+                                                <option value=""Genre"" ${{s.tagCategory === 'Genre' ? 'selected' : ''}}>Genre</option>
+                                                <option value=""Series"" ${{s.tagCategory === 'Series' ? 'selected' : ''}}>Series</option>
+                                                <option value=""ContentType"" ${{s.tagCategory === 'ContentType' ? 'selected' : ''}}>Content Type</option>
+                                                <option value=""Quality"" ${{s.tagCategory === 'Quality' ? 'selected' : ''}}>Quality</option>
+                                                <option value=""Format"" ${{s.tagCategory === 'Format' ? 'selected' : ''}}>Format</option>
+                                                <option value=""Size"" ${{s.tagCategory === 'Size' ? 'selected' : ''}}>Size</option>
+                                                <option value=""Version"" ${{s.tagCategory === 'Version' ? 'selected' : ''}}>Version</option>
+                                                <option value=""Extraction"" ${{s.tagCategory === 'Extraction' ? 'selected' : ''}}>Extraction</option>
+                                                <option value=""Other"" ${{s.tagCategory === 'Other' ? 'selected' : ''}}>Other</option>
+                                            </select>
+                                        </td>
                                         <td style=""padding: 0.5rem;"">👍 ${{Math.round(s.favorVotes)}} / 👎 ${{Math.round(s.againstVotes)}}</td>
                                         <td style=""padding: 0.5rem;"">
                                             <button onclick=""approveSuggestion(${{s.id}})"" style=""background: var(--success); color: white; border: none; padding: 0.3rem 0.6rem; border-radius: 4px; cursor: pointer; margin-right: 0.5rem;"">✓ Approve</button>
                                             <button onclick=""rejectSuggestion(${{s.id}})"" style=""background: var(--danger); color: white; border: none; padding: 0.3rem 0.6rem; border-radius: 4px; cursor: pointer;"">✗ Reject</button>
                                         </td>
-                                        <td style=""padding: 0.5rem;""><a href=""${{s.googleDriveLink || '#'}}"" target=""_blank"" style=""color: var(--accent); text-decoration: none;"" title=""Open in Google Drive"">🔗 Drive</a></td>
                                     </tr>
                                 `).join('')}}
                             </tbody>
@@ -956,23 +971,25 @@ public static class AdminEndpoints
                             <thead>
                                 <tr style=""border-bottom: 2px solid var(--border); text-align: left;"">
                                     <th style=""padding: 0.5rem;"">Document</th>
+                                    <th style=""padding: 0.5rem;"">Drive Link</th>
                                     <th style=""padding: 0.5rem;"">Tag</th>
+                                    <th style=""padding: 0.5rem;"">Category</th>
                                     <th style=""padding: 0.5rem;"">Votes</th>
                                     <th style=""padding: 0.5rem;"">Actions</th>
-                                    <th style=""padding: 0.5rem;"">Drive Link</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 ${{removals.map(r => `
                                     <tr style=""border-bottom: 1px solid var(--border);"">
                                         <td style=""padding: 0.5rem;""><a href=""/?docId=${{r.jumpDocumentId}}"" target=""_blank"" style=""color: var(--accent); text-decoration: none;"">${{escapeHtml(r.documentName || 'Doc #' + r.jumpDocumentId)}}</a></td>
+                                        <td style=""padding: 0.5rem;""><a href=""${{r.googleDriveLink || '#'}}"" target=""_blank"" style=""color: var(--accent); text-decoration: none;"" title=""Open in Google Drive"">🔗 Drive</a></td>
                                         <td style=""padding: 0.5rem;""><strong>${{escapeHtml(r.tagName)}}</strong></td>
+                                        <td style=""padding: 0.5rem;"">${{escapeHtml(r.tagCategory || 'N/A')}}</td>
                                         <td style=""padding: 0.5rem;"">👍 ${{Math.round(r.favorVotes)}} / 👎 ${{Math.round(r.againstVotes)}}</td>
                                         <td style=""padding: 0.5rem;"">
                                             <button onclick=""approveRemoval(${{r.id}})"" style=""background: var(--success); color: white; border: none; padding: 0.3rem 0.6rem; border-radius: 4px; cursor: pointer; margin-right: 0.5rem;"">✓ Approve Removal</button>
                                             <button onclick=""rejectRemoval(${{r.id}})"" style=""background: var(--danger); color: white; border: none; padding: 0.3rem 0.6rem; border-radius: 4px; cursor: pointer;"">✗ Keep Tag</button>
                                         </td>
-                                        <td style=""padding: 0.5rem;""><a href=""${{r.googleDriveLink || '#'}}"" target=""_blank"" style=""color: var(--accent); text-decoration: none;"" title=""Open in Google Drive"">🔗 Drive</a></td>
                                     </tr>
                                 `).join('')}}
                             </tbody>
@@ -988,7 +1005,15 @@ public static class AdminEndpoints
         
         async function approveSuggestion(id) {{
             try {{
-                const response = await fetch(`/api/voting/admin/approve-suggestion/${{id}}`, {{ method: 'POST' }});
+                // Get the selected category from the dropdown
+                const categoryDropdown = document.getElementById(`category-${{id}}`);
+                const selectedCategory = categoryDropdown ? categoryDropdown.value : null;
+                
+                const url = selectedCategory 
+                    ? `/api/voting/admin/approve-suggestion/${{id}}?categoryOverride=${{encodeURIComponent(selectedCategory)}}`
+                    : `/api/voting/admin/approve-suggestion/${{id}}`;
+                    
+                const response = await fetch(url, {{ method: 'POST' }});
                 const data = await response.json();
                 if (data.success) {{
                     alert('✓ Tag suggestion approved!');

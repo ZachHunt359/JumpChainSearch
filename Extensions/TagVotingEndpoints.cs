@@ -111,13 +111,27 @@ public static class TagVotingEndpoints
             };
 
             context.UserTagOverrides.Add(userOverride);
+            
+            // Auto-create vote in favor from the suggester
+            var autoVote = new TagVote
+            {
+                TagSuggestionId = suggestion.Id,
+                TagRemovalRequestId = null,
+                UserId = request.UserId,
+                IsInFavor = true,
+                Weight = 1.0,
+                CreatedAt = DateTime.UtcNow
+            };
+            
+            context.TagVotes.Add(autoVote);
             await context.SaveChangesAsync();
 
             return Results.Ok(new { 
                 success = true, 
                 message = "Tag suggestion created", 
                 suggestionId = suggestion.Id,
-                userOverrideCreated = true
+                userOverrideCreated = true,
+                autoVoteCreated = true
             });
         }
         catch (Exception ex)
@@ -178,13 +192,27 @@ public static class TagVotingEndpoints
             };
 
             context.UserTagOverrides.Add(userOverride);
+            
+            // Auto-create vote in favor from the requester
+            var autoVote = new TagVote
+            {
+                TagSuggestionId = null,
+                TagRemovalRequestId = removalRequest.Id,
+                UserId = request.UserId,
+                IsInFavor = true,
+                Weight = 1.0,
+                CreatedAt = DateTime.UtcNow
+            };
+            
+            context.TagVotes.Add(autoVote);
             await context.SaveChangesAsync();
 
             return Results.Ok(new { 
                 success = true, 
                 message = "Tag removal request created", 
                 requestId = removalRequest.Id,
-                userOverrideCreated = true
+                userOverrideCreated = true,
+                autoVoteCreated = true
             });
         }
         catch (Exception ex)
@@ -457,7 +485,7 @@ public static class TagVotingEndpoints
         }
     }
 
-    private static async Task<IResult> ApproveTagSuggestion(HttpContext httpContext, JumpChainDbContext context, AdminAuthService authService, int id)
+    private static async Task<IResult> ApproveTagSuggestion(HttpContext httpContext, JumpChainDbContext context, AdminAuthService authService, int id, string? categoryOverride = null)
     {
         var (valid, user) = await ValidateSession(httpContext, authService);
         if (!valid)
@@ -473,20 +501,23 @@ public static class TagVotingEndpoints
             if (suggestion == null)
                 return Results.NotFound(new { success = false, message = "Suggestion not found" });
 
+            // Use override category if provided, otherwise use suggestion's category
+            var finalCategory = !string.IsNullOrWhiteSpace(categoryOverride) ? categoryOverride : suggestion.TagCategory;
+
             // Check if tag already exists
             var existingTag = await context.DocumentTags
                 .FirstOrDefaultAsync(t => t.JumpDocumentId == suggestion.JumpDocumentId && 
                                         t.TagName == suggestion.TagName && 
-                                        t.TagCategory == suggestion.TagCategory);
+                                        t.TagCategory == finalCategory);
 
             if (existingTag == null)
             {
-                // Add the tag
+                // Add the tag with the final category
                 var newTag = new DocumentTag
                 {
                     JumpDocumentId = suggestion.JumpDocumentId,
                     TagName = suggestion.TagName,
-                    TagCategory = suggestion.TagCategory
+                    TagCategory = finalCategory
                 };
 
                 context.DocumentTags.Add(newTag);
@@ -501,7 +532,7 @@ public static class TagVotingEndpoints
                 GoogleDriveFileId = suggestion.JumpDocument.GoogleDriveFileId,
                 DocumentName = suggestion.JumpDocument.Name,
                 TagName = suggestion.TagName,
-                TagCategory = suggestion.TagCategory,
+                TagCategory = finalCategory,
                 RuleType = "Add",
                 ApprovalSource = "AdminApproval",
                 ApprovedByUserId = user?.Username ?? "admin",
@@ -518,7 +549,7 @@ public static class TagVotingEndpoints
             var overrides = await context.UserTagOverrides
                 .Where(o => o.JumpDocumentId == suggestion.JumpDocumentId && 
                           o.TagName == suggestion.TagName && 
-                          o.TagCategory == suggestion.TagCategory &&
+                          o.TagCategory == finalCategory &&
                           o.IsAdded == true)
                 .ToListAsync();
 

@@ -1,6 +1,7 @@
 ﻿@page "/"
 @using System.Text.Json
 @using System.Text.Json.Serialization
+@using System.Web
 @inject HttpClient Http
 @inject IJSRuntime JSRuntime
 @inject NavigationManager NavigationManager
@@ -969,6 +970,16 @@
         
         // Load document count from API (which returns cached singleton value)
         await LoadTotalDocumentCountAsync();
+        
+        // Check for docId query parameter and load that document
+        var uri = new Uri(NavigationManager.Uri);
+        var queryParams = System.Web.HttpUtility.ParseQueryString(uri.Query);
+        var docIdParam = queryParams["docId"];
+        
+        if (!string.IsNullOrEmpty(docIdParam) && int.TryParse(docIdParam, out int docId))
+        {
+            await LoadDocumentById(docId);
+        }
     }
 
     private async Task LoadAvailableTagsAsync()
@@ -1030,6 +1041,48 @@
         {
             // Handle error silently - default to 0
             totalDocumentCount = 0;
+        }
+    }
+
+    private async Task LoadDocumentById(int docId)
+    {
+        try
+        {
+            isSearching = true;
+            StateHasChanged();
+            
+            var jsonOptions = new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true
+            };
+            
+            var httpResponse = await Http.GetAsync($"/api/search?docId={docId}&limit=1");
+            var jsonContent = await httpResponse.Content.ReadAsStringAsync();
+            var response = JsonSerializer.Deserialize<SearchResponse>(jsonContent, jsonOptions);
+            
+            if (response?.Success == true && response.Results.Any())
+            {
+                searchResults = response.Results;
+                totalResults = 1;
+                showNoResultsMessage = false;
+            }
+            else
+            {
+                searchResults.Clear();
+                totalResults = 0;
+                showNoResultsMessage = true;
+            }
+        }
+        catch (Exception)
+        {
+            searchResults.Clear();
+            totalResults = 0;
+            showNoResultsMessage = true;
+        }
+        finally
+        {
+            isSearching = false;
+            StateHasChanged();
         }
     }
 

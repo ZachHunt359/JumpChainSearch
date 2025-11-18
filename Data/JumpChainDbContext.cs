@@ -26,6 +26,9 @@ namespace JumpChainSearch.Data
         public DbSet<DocumentViewCount> DocumentViewCounts { get; set; }
         public DbSet<ApprovedTagRule> ApprovedTagRules { get; set; }
         
+        // Tag hierarchy
+        public DbSet<TagHierarchy> TagHierarchies { get; set; }
+        
         // Admin authentication
         public DbSet<AdminUser> AdminUsers { get; set; }
         public DbSet<AdminSession> AdminSessions { get; set; }
@@ -264,7 +267,29 @@ namespace JumpChainSearch.Data
                 entity.Property(e => e.RuleType).HasMaxLength(20).IsRequired();
                 entity.Property(e => e.ApprovalSource).HasMaxLength(50).IsRequired();
                 entity.Property(e => e.ApprovedByUserId).HasMaxLength(100);
-                entity.Property(e => e.Notes).HasMaxLength(1000);
+            });
+            
+            // Configure TagHierarchy
+            modelBuilder.Entity<TagHierarchy>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.HasIndex(e => new { e.ParentTagName, e.ChildTagName }).IsUnique();
+                entity.HasIndex(e => e.ParentTagName);
+                entity.HasIndex(e => e.ChildTagName);
+                
+                entity.Property(e => e.ParentTagName).HasMaxLength(200);
+                entity.Property(e => e.ChildTagName).HasMaxLength(200);
+            });
+
+            // Configure TagVote
+            modelBuilder.Entity<TagVote>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.HasIndex(e => e.TagSuggestionId);
+                entity.HasIndex(e => e.TagRemovalRequestId);
+                entity.HasIndex(e => e.UserId);
+                
+                entity.Property(e => e.UserId).HasMaxLength(100);
 
                 entity.HasOne(d => d.TagSuggestion)
                     .WithMany()

@@ -30,11 +30,18 @@ public static class RedirectEndpoints
         app.MapPost("/remove-sfw-tags", () => Results.Redirect("/api/tags/remove-sfw"));
 
         // Primary search endpoint with tag filtering
-        app.MapGet("/search", async (JumpChainDbContext context, string? q = "", int limit = 50, string? includeTags = "", string? excludeTags = "") =>
+        app.MapGet("/search", async (JumpChainDbContext context, string? q = "", int limit = 50, string? includeTags = "", string? excludeTags = "", int? docId = null) =>
         {
             try
             {
                 var query = context.JumpDocuments.Include(d => d.Tags).Include(d => d.Urls).AsQueryable();
+                
+                // Filter by specific document ID if provided
+                if (docId.HasValue)
+                {
+                    query = query.Where(d => d.Id == docId.Value);
+                }
+                
                 if (!string.IsNullOrWhiteSpace(includeTags))
                 {
                     var requiredTags = includeTags.Split(',', StringSplitOptions.RemoveEmptyEntries)

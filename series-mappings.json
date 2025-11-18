@@ -19,6 +19,9 @@
     "Nasuverse": ["fate/stay night", "fate zero", "nasuverse", "type-moon", "type moon", "fate/"],
     "Elder Scrolls": ["elder scrolls", "skyrim", "morrowind", "tes skyrim", "tes morrowind", "tes oblivion", "tes iv", "tes v"],
     "The Witcher": ["witcher", "geralt", "yennefer", "cirilla"],
-    "Lord of the Rings": ["lord of the rings", "lotr", "middle-earth", "middle earth", "gondor", "shire", "sauron", "celebrimbor"]
+    "Lord of the Rings": ["lord of the rings", "lotr", "middle-earth", "middle earth", "gondor", "shire", "sauron", "celebrimbor"],
+    "Game of Thrones": ["game of thrones", "westeros", "essos", "targaryen", "lannister"],
+    "Final Fantasy": ["final fantasy", "ff vii", "ff viii", "ff ix", "ff x", "ff xii", "ff xiv", "ff xv", "ff xvi"]
+     
   }
 }
