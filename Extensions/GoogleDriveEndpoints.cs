@@ -1300,6 +1300,13 @@ Text Preview: {text?.Substring(0, Math.Min(200, text?.Length ?? 0))}
                 }
                 else
                 {
+                    // Skip folders with empty/null names (API quirk)
+                    if (string.IsNullOrEmpty(folder.folderName))
+                    {
+                        Console.WriteLine($"⚠️ Skipping folder with empty name: {folder.folderId}");
+                        continue;
+                    }
+                    
                     // Create new folder configuration
                     var newFolder = new FolderConfiguration
                     {
