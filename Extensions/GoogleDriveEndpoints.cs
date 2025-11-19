@@ -1274,6 +1274,9 @@ Text Preview: {text?.Substring(0, Math.Min(200, text?.Length ?? 0))}
             
             foreach (var folder in discoveredFolders)
             {
+                // Debug: Log what we're getting from the tuple
+                Console.WriteLine($"📊 Processing folder - ID: {folder.folderId}, Name: '{folder.folderName}', NameIsNull: {folder.folderName == null}, NameLength: {folder.folderName?.Length ?? -1}");
+                
                 if (existingFolderIds.Contains(folder.folderId))
                 {
                     // Update existing folder
@@ -1307,6 +1310,8 @@ Text Preview: {text?.Substring(0, Math.Min(200, text?.Length ?? 0))}
                         continue;
                     }
                     
+                    Console.WriteLine($"🆕 Creating new folder entry - Name: '{folder.folderName}', ResourceKey: '{folder.resourceKey}'");
+                    
                     // Create new folder configuration
                     var newFolder = new FolderConfiguration
                     {
@@ -1314,12 +1319,14 @@ Text Preview: {text?.Substring(0, Math.Min(200, text?.Length ?? 0))}
                         FolderName = folder.folderName,
                         ParentDriveId = drive.Id,
                         ResourceKey = folder.resourceKey,
-                        FolderPath = folder.folderName, // Full path with slashes
+                        FolderPath = folder.folderName ?? string.Empty, // Explicitly handle null with coalescing
                         IsActive = true,
                         IsAutoDiscovered = true,
                         CreatedAt = DateTime.Now,
                         UpdatedAt = DateTime.Now
                     };
+                    
+                    Console.WriteLine($"✅ Created FolderConfiguration: ID={newFolder.FolderId}, Name={newFolder.FolderName}, Path={newFolder.FolderPath ?? "NULL"}");
                     
                     dbContext.FolderConfigurations.Add(newFolder);
                     newCount++;
