@@ -1245,6 +1245,8 @@ Text Preview: {text?.Substring(0, Math.Min(200, text?.Length ?? 0))}
     /// </summary>
     private static async Task<IResult> SaveDiscoveredFolders(string driveName, JumpChainDbContext dbContext, IGoogleDriveService driveService, ILogger<Program> logger)
     {
+        logger.LogInformation("🚀🚀🚀 FOLDER SAVE ENDPOINT CALLED - NEW CODE VERSION a933d86 🚀🚀🚀");
+        
         try
         {
             var drive = await dbContext.DriveConfigurations
