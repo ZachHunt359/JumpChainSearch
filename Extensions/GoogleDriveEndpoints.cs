@@ -1243,7 +1243,7 @@ Text Preview: {text?.Substring(0, Math.Min(200, text?.Length ?? 0))}
     /// <summary>
     /// Save discovered folders to FolderConfigurations table for hierarchical management
     /// </summary>
-    private static async Task<IResult> SaveDiscoveredFolders(string driveName, JumpChainDbContext dbContext, IGoogleDriveService driveService)
+    private static async Task<IResult> SaveDiscoveredFolders(string driveName, JumpChainDbContext dbContext, IGoogleDriveService driveService, ILogger<Program> logger)
     {
         try
         {
@@ -1255,11 +1255,11 @@ Text Preview: {text?.Substring(0, Math.Min(200, text?.Length ?? 0))}
                 return Results.NotFound(new { success = false, error = $"Drive '{driveName}' not found in configuration" });
             }
             
-            Console.WriteLine($"===== SAVING FOLDERS FOR {driveName} =====");
+            logger.LogInformation($"===== SAVING FOLDERS FOR {driveName} =====");
             
             // Discover folders
             var discoveredFolders = await driveService.DiscoverFolderHierarchyAsync(drive.DriveId, drive.ResourceKey);
-            Console.WriteLine($"Discovered {discoveredFolders.Count} folders");
+            logger.LogInformation($"Discovered {discoveredFolders.Count} folders");
             
             // Get existing folders for this drive
             var existingFolders = await dbContext.FolderConfigurations
@@ -1267,7 +1267,7 @@ Text Preview: {text?.Substring(0, Math.Min(200, text?.Length ?? 0))}
                 .ToListAsync();
             var existingFolderIds = existingFolders.Select(f => f.FolderId).ToHashSet();
             
-            Console.WriteLine($"Found {existingFolders.Count} existing folder configurations");
+            logger.LogInformation($"Found {existingFolders.Count} existing folder configurations");
             
             int newCount = 0;
             int updatedCount = 0;
@@ -1275,7 +1275,7 @@ Text Preview: {text?.Substring(0, Math.Min(200, text?.Length ?? 0))}
             foreach (var folder in discoveredFolders)
             {
                 // Debug: Log what we're getting from the tuple
-                Console.WriteLine($"📊 Processing folder - ID: {folder.folderId}, Name: '{folder.folderName}', NameIsNull: {folder.folderName == null}, NameLength: {folder.folderName?.Length ?? -1}");
+                logger.LogInformation($"📊 Processing folder - ID: {folder.folderId}, Name: '{folder.folderName}', NameIsNull: {folder.folderName == null}, NameLength: {folder.folderName?.Length ?? -1}");
                 
                 if (existingFolderIds.Contains(folder.folderId))
                 {
@@ -1306,11 +1306,11 @@ Text Preview: {text?.Substring(0, Math.Min(200, text?.Length ?? 0))}
                     // Skip folders with empty/null names (API quirk)
                     if (string.IsNullOrEmpty(folder.folderName))
                     {
-                        Console.WriteLine($"⚠️ Skipping folder with empty name: {folder.folderId}");
+                        logger.LogWarning($"⚠️ Skipping folder with empty name: {folder.folderId}");
                         continue;
                     }
                     
-                    Console.WriteLine($"🆕 Creating new folder entry - Name: '{folder.folderName}', ResourceKey: '{folder.resourceKey}'");
+                    logger.LogInformation($"🆕 Creating new folder entry - Name: '{folder.folderName}', ResourceKey: '{folder.resourceKey}'");
                     
                     // Create new folder configuration
                     var newFolder = new FolderConfiguration
@@ -1326,7 +1326,7 @@ Text Preview: {text?.Substring(0, Math.Min(200, text?.Length ?? 0))}
                         UpdatedAt = DateTime.Now
                     };
                     
-                    Console.WriteLine($"✅ Created FolderConfiguration: ID={newFolder.FolderId}, Name={newFolder.FolderName}, Path={newFolder.FolderPath ?? "NULL"}");
+                    logger.LogInformation($"✅ Created FolderConfiguration: ID={newFolder.FolderId}, Name={newFolder.FolderName}, Path={newFolder.FolderPath ?? "NULL"}");
                     
                     dbContext.FolderConfigurations.Add(newFolder);
                     newCount++;
@@ -1335,7 +1335,7 @@ Text Preview: {text?.Substring(0, Math.Min(200, text?.Length ?? 0))}
             
             await dbContext.SaveChangesAsync();
             
-            Console.WriteLine($"✅ Saved: {newCount} new folders, {updatedCount} updated");
+            logger.LogInformation($"✅ Saved: {newCount} new folders, {updatedCount} updated");
             
             return Results.Ok(new
             {
