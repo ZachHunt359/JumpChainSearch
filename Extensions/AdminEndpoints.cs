@@ -2117,6 +2117,12 @@ rm -f drive-scan.pid
 
             foreach (var folder in folders)
             {
+                // Skip folders with null/empty names to prevent database constraint violations
+                if (string.IsNullOrWhiteSpace(folder.folderName))
+                {
+                    continue;
+                }
+
                 var existing = await dbContext.FolderConfigurations
                     .FirstOrDefaultAsync(f => f.FolderId == folder.folderId && f.ParentDriveId == drive.Id);
 
@@ -2128,7 +2134,7 @@ rm -f drive-scan.pid
                         FolderName = folder.folderName,
                         ParentDriveId = drive.Id,
                         ResourceKey = folder.resourceKey,
-                        FolderPath = null,
+                        FolderPath = folder.folderName ?? string.Empty,
                         IsActive = true,
                         IsAutoDiscovered = true,
                         CreatedAt = DateTime.UtcNow,
@@ -2140,7 +2146,7 @@ rm -f drive-scan.pid
                 {
                     existing.FolderName = folder.folderName;
                     existing.ResourceKey = folder.resourceKey;
-                    existing.FolderPath = null;
+                    existing.FolderPath = folder.folderName ?? string.Empty;
                     existing.UpdatedAt = DateTime.UtcNow;
                     updated++;
                 }
