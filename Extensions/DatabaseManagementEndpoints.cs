@@ -13,7 +13,8 @@ public static class DatabaseManagementEndpoints
         group.MapPost("/populate", PopulateDatabase);
         group.MapPost("/populate-simple", PopulateSimple);
         group.MapGet("/analyze-duplicates", AnalyzeDuplicates);
-        group.MapPost("/merge-duplicates/{groupIndex:int?}", MergeDuplicates);
+        group.MapPost("/merge-duplicates", MergeDuplicates);
+        group.MapPost("/merge-duplicates/{groupIndex:int}", MergeDuplicates);
         group.MapPost("/cleanup-urls", CleanupDuplicateUrls);
         group.MapPost("/update-schema", UpdateDatabaseSchema);
         
@@ -49,18 +50,63 @@ public static class DatabaseManagementEndpoints
                     var (documents, method) = await driveService.ScanDriveUnifiedAsync(driveConfig);
                     var documentList = documents.ToList();
                     
-                    // Save to database
+                    // Save to database with automatic deduplication
                     foreach (var doc in documentList)
                     {
-                        // Check if document already exists
+                        // Check if document already exists by GoogleDriveFileId
                         var existing = await context.JumpDocuments
                             .Include(d => d.Tags)
                             .FirstOrDefaultAsync(d => d.GoogleDriveFileId == doc.GoogleDriveFileId);
                         
                         if (existing == null)
                         {
-                            // Add new document - EF will handle the Tags relationship
-                            context.JumpDocuments.Add(doc);
+                            // Check for potential duplicate (same name, size, mime type)
+                            var duplicate = await context.JumpDocuments
+                                .Include(d => d.Tags)
+                                .FirstOrDefaultAsync(d => 
+                                    d.Name.ToLower().Trim() == doc.Name.ToLower().Trim() &&
+                                    d.Size == doc.Size &&
+                                    d.MimeType == doc.MimeType);
+                            
+                            if (duplicate != null)
+                            {
+                                // Found a duplicate - merge this document into the existing one
+                                // Add the new file as an alternate URL
+                                context.DocumentUrls.Add(new DocumentUrl
+                                {
+                                    JumpDocumentId = duplicate.Id,
+                                    GoogleDriveFileId = doc.GoogleDriveFileId,
+                                    SourceDrive = doc.SourceDrive,
+                                    FolderPath = doc.FolderPath,
+                                    WebViewLink = doc.WebViewLink,
+                                    DownloadLink = doc.DownloadLink,
+                                    LastScanned = DateTime.UtcNow
+                                });
+                                
+                                // Merge tags from new document to existing
+                                foreach (var tag in doc.Tags)
+                                {
+                                    var existingTag = duplicate.Tags
+                                        .FirstOrDefault(t => t.TagName == tag.TagName && t.TagCategory == tag.TagCategory);
+                                    
+                                    if (existingTag == null)
+                                    {
+                                        duplicate.Tags.Add(new DocumentTag
+                                        {
+                                            JumpDocumentId = duplicate.Id,
+                                            TagName = tag.TagName,
+                                            TagCategory = tag.TagCategory
+                                        });
+                                    }
+                                }
+                                
+                                duplicate.LastScanned = DateTime.UtcNow;
+                            }
+                            else
+                            {
+                                // No duplicate found - add as new document
+                                context.JumpDocuments.Add(doc);
+                            }
                         }
                         else
                         {
@@ -276,6 +322,7 @@ public static class DatabaseManagementEndpoints
 
     private static async Task<IResult> MergeDuplicates(JumpChainDbContext context, int? groupIndex = null)
     {
+        Console.WriteLine($"[MergeDuplicates] Called with groupIndex: {groupIndex}");
         try
         {
             // Find potential duplicates again (same logic as analyze)
@@ -306,6 +353,10 @@ public static class DatabaseManagementEndpoints
             int totalDocumentsMerged = 0;
             var mergeResults = new List<object>();
 
+            // Get ALL existing DocumentUrls globally to avoid UNIQUE constraint violations
+            var allExistingUrls = await context.DocumentUrls.ToListAsync();
+            var existingGoogleDriveFileIds = allExistingUrls.Select(u => u.GoogleDriveFileId).ToHashSet();
+
             // If specific group index provided, merge only that group
             var groupsToProcess = groupIndex.HasValue && groupIndex.Value < duplicateGroups.Count
                 ? new[] { duplicateGroups[groupIndex.Value] }.ToList()
@@ -323,6 +374,18 @@ public static class DatabaseManagementEndpoints
                 // Add URLs from duplicate documents only (primary document keeps its URL in main properties)
                 foreach (var duplicate in duplicates)
                 {
+                    // Skip if this GoogleDriveFileId already exists in DocumentUrls table
+                    if (existingGoogleDriveFileIds.Contains(duplicate.GoogleDriveFileId))
+                    {
+                        continue;
+                    }
+                    
+                    // Skip if this is the same GoogleDriveFileId as the primary document itself
+                    if (duplicate.GoogleDriveFileId == primaryDocument.GoogleDriveFileId)
+                    {
+                        continue;
+                    }
+
                     urlsToAdd.Add(new DocumentUrl
                     {
                         JumpDocumentId = primaryDocument.Id,
@@ -355,7 +418,10 @@ public static class DatabaseManagementEndpoints
                 }
 
                 // Add all URLs to the primary document
-                context.DocumentUrls.AddRange(urlsToAdd);
+                if (urlsToAdd.Any())
+                {
+                    context.DocumentUrls.AddRange(urlsToAdd);
+                }
 
                 // Remove duplicate documents (this will cascade delete their tags)
                 context.JumpDocuments.RemoveRange(duplicates);

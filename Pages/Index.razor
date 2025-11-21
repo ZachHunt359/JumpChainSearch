@@ -5,6 +5,7 @@
 @inject HttpClient Http
 @inject IJSRuntime JSRuntime
 @inject NavigationManager NavigationManager
+@implements IDisposable
 
 <PageTitle>JumpChain Search</PageTitle>
 
@@ -346,15 +347,24 @@
 <!-- Document Details Modal -->
 @if (selectedDocument != null && showModal)
 {
-    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
-        <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);" @onclick="CloseModal">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable" @onclick:stopPropagation="true">
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title">
                         <i class="fas @GetFileIcon(selectedDocument.MimeType) me-2"></i>
                         @selectedDocument.Name
                     </h5>
-                    <button type="button" class="btn-close" @onclick="CloseModal"></button>
+                    <div class="d-flex align-items-center gap-2">
+                        <button type="button" 
+                                class="btn btn-link text-warning p-0" 
+                                style="font-size: 1.5rem; text-decoration: none;"
+                                @onclick="() => ToggleFavorite(selectedDocument.Id.ToString(), selectedDocument.Name)"
+                                title="@(IsFavorite(selectedDocument.Id.ToString()) ? "Remove from favorites" : "Add to favorites")">
+                            <i class="@(IsFavorite(selectedDocument.Id.ToString()) ? "fas" : "far") fa-star"></i>
+                        </button>
+                        <button type="button" class="btn-close" @onclick="CloseModal"></button>
+                    </div>
                 </div>
                 <div class="modal-body">
                     <div class="row">
@@ -772,6 +782,9 @@
     private SearchResult? selectedDocument = null;
     private bool showModal = false;
     
+    // Favorites cache
+    private HashSet<string> favoritesCache = new HashSet<string>();
+    
     // Model for API response
     public class SearchResult
     {
@@ -997,7 +1010,30 @@
         // Load document count from API (which returns cached singleton value)
         await LoadTotalDocumentCountAsync();
         
+        // Subscribe to navigation changes to handle favorites from URL
+        NavigationManager.LocationChanged += OnLocationChanged;
+        
         // Check for docId query parameter and load that document
+        await CheckAndLoadDocumentFromUrl();
+    }
+    
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            // Setup event listener for NavMenu to open documents
+            var dotNetRef = DotNetObjectReference.Create(this);
+            await JSRuntime.InvokeVoidAsync("setupIndexListener", dotNetRef);
+        }
+    }
+    
+    private void OnLocationChanged(object? sender, LocationChangedEventArgs e)
+    {
+        _ = CheckAndLoadDocumentFromUrl();
+    }
+    
+    private async Task CheckAndLoadDocumentFromUrl()
+    {
         var uri = new Uri(NavigationManager.Uri);
         var queryParams = System.Web.HttpUtility.ParseQueryString(uri.Query);
         var docIdParam = queryParams["docId"];
@@ -1117,6 +1153,8 @@
 
     private async Task LoadDocumentById(int docId)
     {
+        Console.WriteLine($"[DEBUG] LoadDocumentById (SEARCH REPLACEMENT) called with docId={docId}");
+        Console.WriteLine($"[DEBUG] Stack trace: {Environment.StackTrace}");
         try
         {
             isSearching = true;
@@ -1158,6 +1196,36 @@
         {
             isSearching = false;
             StateHasChanged();
+        }
+    }
+
+    private async Task LoadDocumentByIdForModal(int docId)
+    {
+        Console.WriteLine($"[DEBUG] LoadDocumentByIdForModal called with docId={docId}");
+        Console.WriteLine($"[DEBUG] Current searchResults count: {searchResults.Count}");
+        try
+        {
+            var jsonOptions = new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true
+            };
+            
+            var httpResponse = await Http.GetAsync($"/api/search?docId={docId}&limit=1");
+            var jsonContent = await httpResponse.Content.ReadAsStringAsync();
+            var response = JsonSerializer.Deserialize<SearchResponse>(jsonContent, jsonOptions);
+            
+            if (response?.Success == true && response.Results.Any())
+            {
+                // Only open the modal - don't touch search results
+                var document = response.Results.First();
+                Console.WriteLine($"[DEBUG] About to call ShowDocumentDetails for: {document.Name}");
+                await ShowDocumentDetails(document);
+                Console.WriteLine($"[DEBUG] After ShowDocumentDetails, searchResults count: {searchResults.Count}");
+            }
+        }
+        catch (Exception)
+        {
+            // Silently fail - don't disturb search results
         }
     }
 
@@ -1602,8 +1670,11 @@
     {
         selectedDocument = document;
         showModal = true;
+        await LoadFavoritesCache();
         await LoadPendingItemsForDocument(document.Id);
         StateHasChanged();
+        
+        // Do NOT update URL - modal should work independently of URL
     }
 
     private void CloseModal()
@@ -1889,8 +1960,96 @@
         return "Other"; // Default fallback
     }
 
+    private async Task ToggleFavorite(string documentId, string documentName)
+    {
+        try
+        {
+            // Get current favorites from localStorage (use correct key)
+            var favoritesJson = await JSRuntime.InvokeAsync<string>("localStorage.getItem", "jumpchain-favorites");
+            var favorites = string.IsNullOrEmpty(favoritesJson) 
+                ? new List<FavoriteDocument>() 
+                : System.Text.Json.JsonSerializer.Deserialize<List<FavoriteDocument>>(favoritesJson) ?? new List<FavoriteDocument>();
+
+            var existingFavorite = favorites.FirstOrDefault(f => f.Id == documentId);
+            
+            if (existingFavorite != null)
+            {
+                // Remove from favorites
+                favorites.Remove(existingFavorite);
+            }
+            else
+            {
+                // Add to favorites
+                favorites.Add(new FavoriteDocument
+                {
+                    Id = documentId,
+                    Name = documentName,
+                    Url = $"/?docId={documentId}"
+                });
+            }
+
+            // Save back to localStorage first
+            var updatedJson = System.Text.Json.JsonSerializer.Serialize(favorites);
+            await JSRuntime.InvokeVoidAsync("localStorage.setItem", "jumpchain-favorites", updatedJson);
+            
+            // Reload cache from localStorage to ensure consistency
+            await LoadFavoritesCache();
+            
+            // Notify NavMenu to refresh (after we've updated)
+            await JSRuntime.InvokeVoidAsync("eval", "window.dispatchEvent(new CustomEvent('favoritesChanged'))");
+            
+            // Trigger UI update
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error toggling favorite: {ex.Message}");
+        }
+    }
+
+    private async Task LoadFavoritesCache()
+    {
+        try
+        {
+            var favoritesJson = await JSRuntime.InvokeAsync<string>("localStorage.getItem", "jumpchain-favorites");
+            if (!string.IsNullOrEmpty(favoritesJson))
+            {
+                var favorites = System.Text.Json.JsonSerializer.Deserialize<List<FavoriteDocument>>(favoritesJson);
+                favoritesCache = favorites?.Select(f => f.Id).ToHashSet() ?? new HashSet<string>();
+            }
+            else
+            {
+                favoritesCache = new HashSet<string>();
+            }
+        }
+        catch
+        {
+            favoritesCache = new HashSet<string>();
+        }
+    }
+
+    private bool IsFavorite(string documentId)
+    {
+        return favoritesCache.Contains(documentId);
+    }
+
+    private class FavoriteDocument
+    {
+        public string Id { get; set; } = "";
+        public string Name { get; set; } = "";
+        public string Url { get; set; } = "";
+    }
+
+    [JSInvokable]
+    public async Task OpenDocumentFromNav(int docId)
+    {
+        Console.WriteLine($"[DEBUG] OpenDocumentFromNav called with docId={docId}");
+        await LoadDocumentByIdForModal(docId);
+    }
+    
     public void Dispose()
     {
+        NavigationManager.LocationChanged -= OnLocationChanged;
         searchTimer?.Dispose();
     }
 }

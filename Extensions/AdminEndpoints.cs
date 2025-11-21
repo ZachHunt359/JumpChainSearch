@@ -41,6 +41,11 @@ public static class AdminEndpoints
         
         // Text review queue endpoint
         group.MapGet("/text-review/queue", GetTextReviewQueue);
+        
+        // Account management endpoints
+        group.MapPost("/account/change-username", ChangeUsername);
+        group.MapPost("/account/change-password", ChangePassword);
+        group.MapPost("/logout", Logout);
 
         return group;
     }
@@ -383,8 +388,10 @@ public static class AdminEndpoints
     <header>
         <h1>🚀 JumpChain Admin Portal</h1>
         <div class=""header-info"">
-            <span class=""user-info"">Logged in as: <strong>{username}</strong></span>
-            <a href=""/Admin/Logout"" class=""btn btn-secondary"">Logout</a>
+            <span class=""user-info"" onclick=""switchTab('account')"" style=""cursor: pointer;"">Logged in as: <strong>{username}</strong></span>
+            <form method=""post"" action=""/admin/logout"" style=""display: inline;"">
+                <button type=""submit"" class=""btn btn-secondary"">Logout</button>
+            </form>
         </div>
     </header>
     
@@ -588,6 +595,36 @@ public static class AdminEndpoints
             </section>
         </div>
         
+        <!-- Account Management Tab -->
+        <div id=""account"" class=""tab-content"">
+            <section>
+                <h2>👤 Account Management</h2>
+                <div class=""action-grid"">
+                    <div class=""action-card"">
+                        <h3>Change Username</h3>
+                        <p>Update your administrator username.</p>
+                        <form onsubmit=""changeUsername(event)"">
+                            <input type=""text"" id=""new-username"" placeholder=""New Username"" required style=""width: 100%; padding: 0.5rem; margin: 0.5rem 0; border: 1px solid var(--border); border-radius: 4px; background: var(--bg-secondary); color: var(--text-primary);"" />
+                            <input type=""password"" id=""username-current-password"" placeholder=""Current Password"" required style=""width: 100%; padding: 0.5rem; margin: 0.5rem 0; border: 1px solid var(--border); border-radius: 4px; background: var(--bg-secondary); color: var(--text-primary);"" />
+                            <button type=""submit"" class=""btn btn-primary"">Update Username</button>
+                        </form>
+                        <div id=""username-result"" style=""margin-top: 0.5rem; color: var(--text-secondary); font-size: 0.9rem;""></div>
+                    </div>
+                    <div class=""action-card"">
+                        <h3>Change Password</h3>
+                        <p>Update your administrator password.</p>
+                        <form onsubmit=""changePassword(event)"">
+                            <input type=""password"" id=""current-password"" placeholder=""Current Password"" required style=""width: 100%; padding: 0.5rem; margin: 0.5rem 0; border: 1px solid var(--border); border-radius: 4px; background: var(--bg-secondary); color: var(--text-primary);"" />
+                            <input type=""password"" id=""new-password"" placeholder=""New Password (min 8 characters)"" required minlength=""8"" style=""width: 100%; padding: 0.5rem; margin: 0.5rem 0; border: 1px solid var(--border); border-radius: 4px; background: var(--bg-secondary); color: var(--text-primary);"" />
+                            <input type=""password"" id=""confirm-password"" placeholder=""Confirm New Password"" required minlength=""8"" style=""width: 100%; padding: 0.5rem; margin: 0.5rem 0; border: 1px solid var(--border); border-radius: 4px; background: var(--bg-secondary); color: var(--text-primary);"" />
+                            <button type=""submit"" class=""btn btn-primary"">Update Password</button>
+                        </form>
+                        <div id=""password-result"" style=""margin-top: 0.5rem; color: var(--text-secondary); font-size: 0.9rem;""></div>
+                    </div>
+                </div>
+            </section>
+        </div>
+        
         <!-- System Management Tab -->
         <div id=""system"" class=""tab-content"">
             <section>
@@ -605,6 +642,28 @@ public static class AdminEndpoints
                     </div>
                 </div>
                 <div id=""logs"" class=""log-container"" style=""display: none;""></div>
+            </section>
+            
+            <section style=""margin-top: 2rem; border-top: 2px solid var(--border); padding-top: 2rem;"">
+                <h2>🔄 Duplicate Management</h2>
+                <p style=""color: var(--text-secondary); margin-bottom: 1rem;"">
+                    Analyze and merge duplicate documents (same name, size, and file type from different drives).
+                </p>
+                <div class=""action-grid"">
+                    <div class=""action-card"">
+                        <h3>Analyze Duplicates</h3>
+                        <p>Scan database for potential duplicate documents.</p>
+                        <button class=""btn btn-primary"" onclick=""analyzeDuplicates()"">Analyze</button>
+                        <div id=""duplicate-analysis"" style=""margin-top: 1rem;""></div>
+                    </div>
+                    <div class=""action-card"">
+                        <h3>Merge All Duplicates</h3>
+                        <p>Automatically merge all duplicate groups found.</p>
+                        <button class=""btn btn-warning"" onclick=""mergeAllDuplicates()"">Merge All</button>
+                        <div id=""merge-result"" style=""margin-top: 1rem;""></div>
+                    </div>
+                </div>
+                <div id=""duplicate-groups"" style=""margin-top: 1rem;""></div>
             </section>
         </div>
     </main>
@@ -888,6 +947,112 @@ public static class AdminEndpoints
             }}
         }}
         
+        // Duplicate Management Functions
+        async function analyzeDuplicates() {{
+            const container = document.getElementById('duplicate-analysis');
+            const groupsDiv = document.getElementById('duplicate-groups');
+            container.innerHTML = '<div style=""color: var(--text-secondary);"">Analyzing duplicates...</div>';
+            groupsDiv.innerHTML = '';
+            
+            try {{
+                const response = await fetch('/api/database/analyze-duplicates');
+                const data = await response.json();
+                
+                if (data.success) {{
+                    container.innerHTML = `
+                        <div style=""background: var(--bg-secondary); padding: 1rem; border-radius: 4px; margin-top: 0.5rem;"">
+                            <strong>Analysis Results:</strong><br>
+                            📦 Duplicate Groups: ${{data.stats.groupCount}}<br>
+                            📄 Total Duplicates: ${{data.stats.totalDuplicateDocuments}}<br>
+                            🗑️ Can Remove: ${{data.stats.documentsThatCouldBeRemoved}} documents<br>
+                            📊 Largest Group: ${{data.stats.largestDuplicateGroup}} copies
+                        </div>
+                    `;
+                    
+                    if (data.duplicateGroups && data.duplicateGroups.length > 0) {{
+                        const groupsHtml = `
+                            <h3 style=""margin-top: 1rem;"">Top Duplicate Groups (showing first 20):</h3>
+                            ${{data.duplicateGroups.map((group, idx) => `
+                                <div style=""background: var(--bg-secondary); padding: 1rem; margin: 0.5rem 0; border-radius: 4px; border-left: 3px solid var(--accent);"">
+                                    <strong>${{escapeHtml(group.name)}}</strong> 
+                                    (${{group.size ? (group.size / 1024).toFixed(2) : '?'}} KB, ${{group.count}} copies)<br>
+                                    <div style=""font-size: 0.85rem; color: var(--text-secondary); margin-top: 0.5rem;"">
+                                        Sources: ${{group.documents.map(d => d.sourceDrive).join(', ')}}<br>
+                                        <button class=""btn btn-sm btn-warning"" onclick=""mergeSpecificGroup(${{idx}})"" style=""margin-top: 0.5rem; padding: 0.3rem 0.8rem; font-size: 0.85rem;"">
+                                            Merge This Group
+                                        </button>
+                                    </div>
+                                </div>
+                            `).join('')}}
+                        `;
+                        groupsDiv.innerHTML = groupsHtml;
+                    }}
+                }} else {{
+                    container.innerHTML = `<div style=""color: var(--danger);"">Error: ${{data.error}}</div>`;
+                }}
+            }} catch (error) {{
+                container.innerHTML = `<div style=""color: var(--danger);"">Error: ${{error.message}}</div>`;
+            }}
+        }}
+        
+        async function mergeAllDuplicates() {{
+            if (!confirm('This will merge ALL duplicate groups. Continue?')) return;
+            
+            const container = document.getElementById('merge-result');
+            container.innerHTML = '<div style=""color: var(--text-secondary);"">Merging duplicates...</div>';
+            
+            try {{
+                const response = await fetch('/api/database/merge-duplicates', {{
+                    method: 'POST'
+                }});
+                const data = await response.json();
+                
+                if (data.success) {{
+                    container.innerHTML = `
+                        <div style=""background: var(--success); color: white; padding: 1rem; border-radius: 4px; margin-top: 0.5rem;"">
+                            ✅ ${{data.message}}<br>
+                            Merged Groups: ${{data.mergedGroups}}<br>
+                            Documents Consolidated: ${{data.documentsMerged}}
+                        </div>
+                    `;
+                    // Refresh analysis
+                    setTimeout(() => analyzeDuplicates(), 2000);
+                }} else {{
+                    container.innerHTML = `<div style=""color: var(--danger);"">${{data.message || 'Merge failed'}}</div>`;
+                }}
+            }} catch (error) {{
+                container.innerHTML = `<div style=""color: var(--danger);"">Error: ${{error.message}}</div>`;
+            }}
+        }}
+        
+        async function mergeSpecificGroup(groupIndex) {{
+            if (!confirm(`Merge duplicate group #${{groupIndex + 1}}?`)) return;
+            
+            const groupsDiv = document.getElementById('duplicate-groups');
+            
+            try {{
+                const response = await fetch(`/api/database/merge-duplicates/${{groupIndex}}`, {{
+                    method: 'POST'
+                }});
+                const data = await response.json();
+                
+                if (data.success) {{
+                    alert(`✅ ${{data.message}}`);
+                    analyzeDuplicates(); // Refresh
+                }} else {{
+                    alert(`❌ Error: ${{data.message || 'Merge failed'}}`);
+                }}
+            }} catch (error) {{
+                alert(`❌ Error: ${{error.message}}`);
+            }}
+        }}
+        
+        function escapeHtml(text) {{
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }}
+        
         // Text Review Queue Functions
         async function loadReviewQueue() {{
             const container = document.getElementById('review-queue');
@@ -1053,7 +1218,10 @@ public static class AdminEndpoints
                     ? `/api/voting/admin/approve-suggestion/${{id}}?categoryOverride=${{encodeURIComponent(selectedCategory)}}`
                     : `/api/voting/admin/approve-suggestion/${{id}}`;
                     
-                const response = await fetch(url, {{ method: 'POST' }});
+                const response = await fetch(url, {{ 
+                    method: 'POST',
+                    credentials: 'same-origin'
+                }});
                 const data = await response.json();
                 if (data.success) {{
                     alert('✓ Tag suggestion approved!');
@@ -1068,7 +1236,15 @@ public static class AdminEndpoints
         
         async function rejectSuggestion(id) {{
             try {{
-                const response = await fetch(`/api/voting/admin/reject-suggestion/${{id}}`, {{ method: 'POST' }});
+                const response = await fetch(`/api/voting/admin/reject-suggestion/${{id}}`, {{ 
+                    method: 'POST',
+                    credentials: 'same-origin'
+                }});
+                if (!response.ok) {{
+                    const text = await response.text();
+                    alert('Error: ' + (text || 'Failed to reject suggestion'));
+                    return;
+                }}
                 const data = await response.json();
                 if (data.success) {{
                     alert('✓ Tag suggestion rejected');
@@ -1083,7 +1259,10 @@ public static class AdminEndpoints
         
         async function approveRemoval(id) {{
             try {{
-                const response = await fetch(`/api/voting/admin/approve-removal/${{id}}`, {{ method: 'POST' }});
+                const response = await fetch(`/api/voting/admin/approve-removal/${{id}}`, {{ 
+                    method: 'POST',
+                    credentials: 'same-origin'
+                }});
                 const data = await response.json();
                 if (data.success) {{
                     alert('✓ Tag removal approved');
@@ -1098,7 +1277,15 @@ public static class AdminEndpoints
         
         async function rejectRemoval(id) {{
             try {{
-                const response = await fetch(`/api/voting/admin/reject-removal/${{id}}`, {{ method: 'POST' }});
+                const response = await fetch(`/api/voting/admin/reject-removal/${{id}}`, {{ 
+                    method: 'POST',
+                    credentials: 'same-origin'
+                }});
+                if (!response.ok) {{
+                    const text = await response.text();
+                    alert('Error: ' + (text || 'Failed to reject removal'));
+                    return;
+                }}
                 const data = await response.json();
                 if (data.success) {{
                     alert('✓ Tag kept (removal rejected)');
@@ -1482,6 +1669,97 @@ public static class AdminEndpoints
             }} catch (error) {{
                 statusDiv.style.color = 'var(--danger)';
                 statusDiv.innerHTML = `✗ Error: ${{error.message}}`;
+            }}
+        }}
+        
+        // Account Management Functions
+        async function changeUsername(event) {{
+            event.preventDefault();
+            
+            const newUsername = document.getElementById('new-username').value;
+            const currentPassword = document.getElementById('username-current-password').value;
+            const resultDiv = document.getElementById('username-result');
+            
+            if (!newUsername || !currentPassword) {{
+                resultDiv.innerHTML = '<span style=""color: var(--danger);"">Please fill in all fields</span>';
+                return;
+            }}
+            
+            resultDiv.innerHTML = '<span style=""color: var(--text-secondary);"">Updating username...</span>';
+            
+            try {{
+                const response = await fetch('/admin/account/change-username', {{
+                    method: 'POST',
+                    headers: {{ 'Content-Type': 'application/json' }},
+                    body: JSON.stringify({{
+                        newUsername: newUsername,
+                        currentPassword: currentPassword
+                    }})
+                }});
+                
+                const data = await response.json();
+                
+                if (data.success) {{
+                    resultDiv.innerHTML = '<span style=""color: var(--success);"">✓ Username updated successfully!</span>';
+                    document.getElementById('new-username').value = '';
+                    document.getElementById('username-current-password').value = '';
+                }} else {{
+                    resultDiv.innerHTML = `<span style=""color: var(--danger);"">✗ ${{data.message || 'Failed to update username'}}</span>`;
+                }}
+            }} catch (error) {{
+                resultDiv.innerHTML = `<span style=""color: var(--danger);"">✗ Error: ${{error.message}}</span>`;
+            }}
+        }}
+        
+        async function changePassword(event) {{
+            event.preventDefault();
+            
+            const currentPassword = document.getElementById('current-password').value;
+            const newPassword = document.getElementById('new-password').value;
+            const confirmPassword = document.getElementById('confirm-password').value;
+            const resultDiv = document.getElementById('password-result');
+            
+            if (!currentPassword || !newPassword || !confirmPassword) {{
+                resultDiv.innerHTML = '<span style=""color: var(--danger);"">Please fill in all fields</span>';
+                return;
+            }}
+            
+            if (newPassword !== confirmPassword) {{
+                resultDiv.innerHTML = '<span style=""color: var(--danger);"">New passwords do not match</span>';
+                return;
+            }}
+            
+            if (newPassword.length < 8) {{
+                resultDiv.innerHTML = '<span style=""color: var(--danger);"">Password must be at least 8 characters</span>';
+                return;
+            }}
+            
+            resultDiv.innerHTML = '<span style=""color: var(--text-secondary);"">Updating password...</span>';
+            
+            try {{
+                const response = await fetch('/admin/account/change-password', {{
+                    method: 'POST',
+                    headers: {{ 'Content-Type': 'application/json' }},
+                    body: JSON.stringify({{
+                        currentPassword: currentPassword,
+                        newPassword: newPassword
+                    }})
+                }});
+                
+                const data = await response.json();
+                
+                if (data.success) {{
+                    resultDiv.innerHTML = '<span style=""color: var(--success);"">✓ Password updated successfully! You will be logged out...</span>';
+                    document.getElementById('current-password').value = '';
+                    document.getElementById('new-password').value = '';
+                    document.getElementById('confirm-password').value = '';
+                    // Redirect to login after 2 seconds
+                    setTimeout(() => {{ window.location.href = '/admin/login'; }}, 2000);
+                }} else {{
+                    resultDiv.innerHTML = `<span style=""color: var(--danger);"">✗ ${{data.message || 'Failed to update password'}}</span>`;
+                }}
+            }} catch (error) {{
+                resultDiv.innerHTML = `<span style=""color: var(--danger);"">✗ Error: ${{error.message}}</span>`;
             }}
         }}
         
@@ -2686,4 +2964,85 @@ rm -f drive-scan.pid
         await context.Response.WriteAsync(html);
         return Results.Empty;
     }
+    
+    // Account Management Endpoints
+    
+    private static async Task<IResult> ChangeUsername(HttpContext context, AdminAuthService authService, JumpChainDbContext dbContext)
+    {
+        var (valid, user) = await ValidateSession(context, authService);
+        if (!valid) return Results.Json(new { success = false, message = "Unauthorized" });
+        
+        var request = await context.Request.ReadFromJsonAsync<ChangeUsernameRequest>();
+        if (request == null) return Results.Json(new { success = false, message = "Invalid request" });
+        
+        // Verify current password
+        var admin = await dbContext.AdminUsers.FirstOrDefaultAsync(a => a.Username == user!.Username);
+        if (admin == null) return Results.Json(new { success = false, message = "Admin user not found" });
+        
+        if (!authService.VerifyPassword(request.CurrentPassword, admin.PasswordHash, admin.Salt))
+        {
+            return Results.Json(new { success = false, message = "Current password is incorrect" });
+        }
+        
+        // Check if new username already exists
+        var existingUser = await dbContext.AdminUsers.FirstOrDefaultAsync(a => a.Username == request.NewUsername);
+        if (existingUser != null && existingUser.Id != admin.Id)
+        {
+            return Results.Json(new { success = false, message = "Username already exists" });
+        }
+        
+        // Update username
+        admin.Username = request.NewUsername;
+        await dbContext.SaveChangesAsync();
+        
+        return Results.Json(new { success = true, message = "Username updated successfully" });
+    }
+    
+    private static async Task<IResult> ChangePassword(HttpContext context, AdminAuthService authService, JumpChainDbContext dbContext)
+    {
+        var (valid, user) = await ValidateSession(context, authService);
+        if (!valid) return Results.Json(new { success = false, message = "Unauthorized" });
+        
+        var request = await context.Request.ReadFromJsonAsync<ChangePasswordRequest>();
+        if (request == null) return Results.Json(new { success = false, message = "Invalid request" });
+        
+        if (request.NewPassword.Length < 8)
+        {
+            return Results.Json(new { success = false, message = "Password must be at least 8 characters" });
+        }
+        
+        // Use existing ChangePasswordAsync which handles verification, hashing, and session invalidation
+        var success = await authService.ChangePasswordAsync(user!.Username, request.CurrentPassword, request.NewPassword);
+        
+        if (!success)
+        {
+            return Results.Json(new { success = false, message = "Current password is incorrect" });
+        }
+        
+        return Results.Json(new { success = true, message = "Password updated successfully" });
+    }
+    
+    private static async Task<IResult> Logout(HttpContext context, AdminAuthService authService)
+    {
+        // Get session token from cookie (correct cookie name is "admin_session")
+        if (context.Request.Cookies.TryGetValue("admin_session", out var sessionToken))
+        {
+            await authService.LogoutAsync(sessionToken);
+        }
+        
+        // Delete the cookie with options that match how it was created
+        context.Response.Cookies.Delete("admin_session", new CookieOptions
+        {
+            HttpOnly = true,
+            Secure = context.Request.IsHttps,
+            SameSite = SameSiteMode.Strict,
+            Path = "/"
+        });
+        
+        return Results.Redirect("/Admin/Login");
+    }
+    
+    // Request models
+    private record ChangeUsernameRequest(string NewUsername, string CurrentPassword);
+    private record ChangePasswordRequest(string CurrentPassword, string NewPassword);
 }

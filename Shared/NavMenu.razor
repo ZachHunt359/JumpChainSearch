@@ -14,61 +14,253 @@
     <nav class="flex-column">
         @if (!collapseNavMenu)
         {
-            <div class="nav-section-header">
-                <span class="text-muted small">NAVIGATION</span>
+           
+
+            <!-- Navigation Section -->
+            <div class="nav-section-header collapsible" @onclick="@(() => ToggleSection("navigation"))">
+                <span class="text-muted small">
+                    <span class="oi oi-chevron-@(sectionStates["navigation"] ? "down" : "right")" aria-hidden="true"></span>
+                    NAVIGATION
+                </span>
             </div>
-            <div class="nav-item px-3">
-                <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
-                    <span class="oi oi-home" aria-hidden="true"></span> 
-                    <span class="nav-text">Search</span>
-                </NavLink>
-            </div>
-            <div class="nav-section-header">
-                <span class="text-muted small">APPEARANCE</span>
-            </div>
-            <div class="nav-item px-3">
-                <div class="theme-selector">
-                    <label class="nav-text small text-muted">Theme</label>
-                    <select class="form-select form-select-sm" @onchange="OnThemeChanged" value="@selectedTheme">
-                        <option value="material">Material Dark</option>
-                        <option value="gruvbox">Gruvbox Dark</option>
-                        <option value="nord">Nord Dark</option>
-                        <option value="onedark">One Dark</option>
-                        <option value="dracula">Dracula</option>
-                    </select>
+            @if (sectionStates["navigation"])
+            {
+                <div class="nav-section-content">
+                    <div class="nav-item px-3">
+                        <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
+                            <span class="oi oi-home" aria-hidden="true"></span> 
+                            <span class="nav-text">Search</span>
+                        </NavLink>
+                    </div>
                 </div>
+            }
+
+            <!-- Appearance Section -->
+            <div class="nav-section-header collapsible" @onclick="@(() => ToggleSection("appearance"))">
+                <span class="text-muted small">
+                    <span class="oi oi-chevron-@(sectionStates["appearance"] ? "down" : "right")" aria-hidden="true"></span>
+                    APPEARANCE
+                </span>
             </div>
-            <div class="nav-section-header">
-                <span class="text-muted small">TOOLS</span>
+            @if (sectionStates["appearance"])
+            {
+                <div class="nav-section-content">
+                    <div class="nav-item px-3">
+                        <div class="theme-selector">
+                            <label class="nav-text small text-muted">Theme</label>
+                            <select class="form-select form-select-sm" @onchange="OnThemeChanged" value="@selectedTheme">
+                                <option value="material">Material Dark</option>
+                                <option value="gruvbox">Gruvbox Dark</option>
+                                <option value="nord">Nord Dark</option>
+                                <option value="onedark">One Dark</option>
+                                <option value="dracula">Dracula</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            }
+
+            <!-- Tools Section -->
+            <div class="nav-section-header collapsible" @onclick="@(() => ToggleSection("tools"))">
+                <span class="text-muted small">
+                    <span class="oi oi-chevron-@(sectionStates["tools"] ? "down" : "right")" aria-hidden="true"></span>
+                    TOOLS
+                </span>
             </div>
-            
-            <!-- Interactive UI Tools -->
-            <div class="nav-item px-3">
-                <a class="nav-link" href="/api/browser/ui" target="_blank">
-                    <span class="oi oi-book" aria-hidden="true"></span> 
-                    <span class="nav-text">Text Browser</span>
-                </a>
+            @if (sectionStates["tools"])
+            {
+                <div class="nav-section-content">
+                    <div class="nav-item px-3">
+                        <a class="nav-link" href="/api/browser/ui" target="_blank">
+                            <span class="oi oi-book" aria-hidden="true"></span> 
+                            <span class="nav-text">Text Browser</span>
+                        </a>
+                    </div>
+                    <div class="nav-item px-3">
+                        <a class="nav-link" href="/admin" target="_blank">
+                            <span class="oi oi-cog" aria-hidden="true"></span> 
+                            <span class="nav-text">Admin Portal</span>
+                        </a>
+                    </div>
+                </div>
+            }
+             <!-- Favorites Section -->
+            <div class="nav-section-header collapsible" @onclick="@(() => ToggleSection("favorites"))">
+                <span class="text-muted small">
+                    <span class="oi oi-chevron-@(sectionStates["favorites"] ? "down" : "right")" aria-hidden="true"></span>
+                    FAVORITES
+                    @if (favoriteDocuments.Any())
+                    {
+                        <span class="badge bg-primary ms-2" style="font-size: 0.7rem;">@favoriteDocuments.Count</span>
+                    }
+                </span>
             </div>
-            <div class="nav-item px-3">
-                <a class="nav-link" href="/admin" target="_blank">
-                    <span class="oi oi-cog" aria-hidden="true"></span> 
-                    <span class="nav-text">Admin Portal</span>
-                </a>
-            </div>
+            @if (sectionStates["favorites"])
+            {
+                <div class="nav-section-content">
+                    @if (favoriteDocuments.Any())
+                    {
+                        @for (int i = 0; i < favoriteDocuments.Count; i++)
+                        {
+                            var index = i;
+                            var fav = favoriteDocuments[i];
+                            <div class="nav-item px-2">
+                                <button class="favorite-item" 
+                                        draggable="true"
+                                        @ondragstart="@(() => OnDragStart(index))"
+                                        @ondragover:preventDefault
+                                        @ondrop="@(() => OnDrop(index))"
+                                        @onclick="@(() => NavigateToDocument(fav.Id))"
+                                        title="@fav.Name">
+                                    <span class="favorite-name">@fav.Name</span>
+                                </button>
+                            </div>
+                        }
+                    }
+                    else
+                    {
+                        <div class="nav-item px-3">
+                            <div class="text-muted small px-2">No favorites yet</div>
+                        </div>
+                    }
+                </div>
+            }
         }
     </nav>
 </div>
 
 @using Microsoft.JSInterop
 @inject IJSRuntime JSRuntime
+@inject NavigationManager NavigationManager
+@implements IDisposable
 
 @code {
     [Parameter] public EventCallback<bool> OnToggle { get; set; }
     
     private bool collapseNavMenu = true; // Start collapsed by default
     private string selectedTheme = "material";
+    private DotNetObjectReference<NavMenu>? dotNetRef;
+    
+    // Track collapse state of each section (false = collapsed by default)
+    private Dictionary<string, bool> sectionStates = new Dictionary<string, bool>
+    {
+        { "favorites", false },
+        { "navigation", false },
+        { "appearance", false },
+        { "tools", false }
+    };
+    
+    private List<FavoriteDocument> favoriteDocuments = new List<FavoriteDocument>();
+    private int? draggedIndex = null;
 
     private string? NavMenuCssClass => collapseNavMenu ? "collapsed" : "expanded";
+    
+    private void ToggleSection(string sectionName)
+    {
+        if (sectionStates.ContainsKey(sectionName))
+        {
+            sectionStates[sectionName] = !sectionStates[sectionName];
+        }
+    }
+    
+    public async Task AddFavorite(string id, string name, string url)
+    {
+        if (!favoriteDocuments.Any(f => f.Id == id))
+        {
+            favoriteDocuments.Add(new FavoriteDocument { Id = id, Name = name, Url = url });
+            await SaveFavorites();
+            StateHasChanged();
+        }
+    }
+    
+    public async Task RemoveFavorite(string id)
+    {
+        favoriteDocuments.RemoveAll(f => f.Id == id);
+        await SaveFavorites();
+        StateHasChanged();
+    }
+    
+    public bool IsFavorite(string id)
+    {
+        return favoriteDocuments.Any(f => f.Id == id);
+    }
+    
+    private void OnDragStart(int index)
+    {
+        draggedIndex = index;
+    }
+    
+    private async Task OnDrop(int targetIndex)
+    {
+        if (draggedIndex.HasValue && draggedIndex.Value != targetIndex)
+        {
+            var draggedItem = favoriteDocuments[draggedIndex.Value];
+            favoriteDocuments.RemoveAt(draggedIndex.Value);
+            favoriteDocuments.Insert(targetIndex, draggedItem);
+            await SaveFavorites();
+            StateHasChanged();
+        }
+        draggedIndex = null;
+    }
+    
+    private async Task OnFavoriteClick(string documentId)
+    {
+        // Dispatch event to Index page to open the modal
+        await JSRuntime.InvokeVoidAsync("eval", $"window.dispatchEvent(new CustomEvent('openDocument', {{ detail: '{documentId}' }}))");
+    }
+    
+    [JSInvokable]
+    public async Task RefreshFavorites()
+    {
+        await LoadFavorites();
+        StateHasChanged();
+    }
+    
+    private async Task NavigateToDocument(string documentId)
+    {
+        // Dispatch custom event to open modal without changing URL or search results
+        await JSRuntime.InvokeVoidAsync("openDocumentModal", documentId);
+    }
+    
+    private async Task LoadFavorites()
+    {
+        try
+        {
+            var json = await JSRuntime.InvokeAsync<string>("localStorage.getItem", "jumpchain-favorites");
+            if (!string.IsNullOrEmpty(json))
+            {
+                var favorites = System.Text.Json.JsonSerializer.Deserialize<List<FavoriteDocument>>(json);
+                if (favorites != null)
+                {
+                    favoriteDocuments = favorites;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading favorites: {ex.Message}");
+        }
+    }
+    
+    private async Task SaveFavorites()
+    {
+        try
+        {
+            var json = System.Text.Json.JsonSerializer.Serialize(favoriteDocuments);
+            await JSRuntime.InvokeVoidAsync("localStorage.setItem", "jumpchain-favorites", json);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error saving favorites: {ex.Message}");
+        }
+    }
+    
+    private class FavoriteDocument
+    {
+        public string Id { get; set; } = string.Empty;
+        public string Name { get; set; } = string.Empty;
+        public string Url { get; set; } = string.Empty;
+    }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -91,7 +283,20 @@
                 selectedTheme = "material";
                 await ApplyTheme(selectedTheme);
             }
+            
+            // Load favorites
+            await LoadFavorites();
+            StateHasChanged();
+            
+            // Store a reference to this component for refreshing favorites
+            dotNetRef = DotNetObjectReference.Create(this);
+            await JSRuntime.InvokeVoidAsync("setupNavMenuListener", dotNetRef);
         }
+    }
+    
+    public void Dispose()
+    {
+        dotNetRef?.Dispose();
     }
 
     private async Task ToggleNavMenu()

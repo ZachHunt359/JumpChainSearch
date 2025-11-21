@@ -18,6 +18,8 @@
 </head>
 <body>
     <component type="typeof(App)" render-mode="ServerPrerendered" />
+    
+    <script src="js/interop.js"></script>
 
     <div id="blazor-error-ui">
         <environment include="Staging,Production">
@@ -85,7 +87,7 @@
             }
             
             function startMonitoring() {
-                console.log('Starting reconnection monitoring');
+                console.log('Starting reconnection monitoring - Blazor will handle reconnection');
                 if (checkInterval) {
                     clearInterval(checkInterval);
                 }
@@ -100,38 +102,30 @@
                 reconnectTitle.textContent = 'Connection Lost';
                 reconnectMessage.textContent = 'Attempting to reconnect...';
                 updateProgress(0);
-                // Start polling the server for availability
-                pollAbort = new AbortController();
+                
+                // Let Blazor handle reconnection - just update the UI
+                // Don't force reload - this preserves client state
                 pollInterval = setInterval(() => {
                     attemptCount++;
                     reconnectTitle.textContent = 'Reconnecting...';
-                    reconnectMessage.textContent = `Attempt ${attemptCount} of 8`;
-                    updateProgress(attemptCount);
-                    fetch('/health', { method: 'GET', cache: 'no-store', signal: pollAbort.signal })
-                        .then(resp => {
-                            if (resp.ok) {
-                                console.log('Server available, reloading now');
-                                stopMonitoring();
-                                window.location.reload();
-                            }
-                        })
-                        .catch(() => {});
-                    if (attemptCount >= 8) {
+                    reconnectMessage.textContent = `Attempt ${attemptCount}`;
+                    updateProgress(Math.min(attemptCount, 8));
+                    
+                    // Only reload as last resort after many attempts (60 seconds)
+                    if (attemptCount >= 20) {
                         clearInterval(pollInterval);
                         pollInterval = null;
                         reconnectTitle.textContent = 'Reconnection Failed';
-                        reconnectMessage.textContent = 'Unable to reconnect. Reloading in 3 seconds...';
+                        reconnectMessage.textContent = 'Please refresh the page manually';
                         updateProgress(8);
-                        reconnectTimerId = setTimeout(() => {
-                            console.log('Auto-reloading page');
-                            window.location.reload();
-                        }, 3000);
+                        // Show manual reload button instead of forcing it
+                        reconnectMessage.innerHTML = 'Please <a href="javascript:location.reload()" style="color: #007bff; text-decoration: underline;">refresh the page</a>';
                     }
                 }, 3000);
             }
             
             function stopMonitoring() {
-                console.log('Stopping reconnection monitoring');
+                console.log('Connection restored - hiding reconnect UI');
                 if (checkInterval) {
                     clearInterval(checkInterval);
                     checkInterval = null;
@@ -149,11 +143,41 @@
                     reconnectTimerId = null;
                 }
                 attemptCount = 0;
-                showReconnectUI(false);
+                reconnectTitle.textContent = 'Connected';
+                reconnectMessage.textContent = 'Connection restored successfully';
+                updateProgress(8);
+                
+                // Hide UI after brief success message
+                setTimeout(() => {
+                    showReconnectUI(false);
+                }, 1000);
             }
             
-            // On disconnect, start monitoring. On reconnect, stop monitoring.
-            // Use Blazor's circuit error UI as the trigger for starting monitoring.
+            // Listen to Blazor's built-in reconnection events
+            Blazor.start().then(() => {
+                console.log('Blazor started successfully');
+                
+                // Override default reconnection display to use our custom UI
+                const reconnectDisplay = {
+                    show: () => startMonitoring(),
+                    hide: () => stopMonitoring(),
+                    failed: () => {
+                        reconnectTitle.textContent = 'Connection Failed';
+                        reconnectMessage.innerHTML = 'Unable to reconnect. Please <a href="javascript:location.reload()" style="color: #007bff; text-decoration: underline;">refresh the page</a>';
+                    },
+                    rejected: () => {
+                        reconnectTitle.textContent = 'Connection Rejected';
+                        reconnectMessage.innerHTML = 'Server rejected connection. Please <a href="javascript:location.reload()" style="color: #007bff; text-decoration: underline;">refresh the page</a>';
+                    }
+                };
+                
+                // Set custom reconnection display
+                if (Blazor.defaultReconnectionHandler) {
+                    Blazor.defaultReconnectionHandler._reconnectCallback = reconnectDisplay;
+                }
+            });
+            
+            // Also listen for these legacy events as fallback
             window.addEventListener('blazor:connection-lost', startMonitoring);
             window.addEventListener('blazor:connection-restored', stopMonitoring);
             // Fallback: also start monitoring on WebSocket disconnect error

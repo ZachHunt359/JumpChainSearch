@@ -81,13 +81,6 @@ namespace JumpChainSearch.Models
         
         public DateTime LastScanned { get; set; }
         
-        // Additional properties for URL management
-        public string Url { get; set; } = string.Empty;
-        
-        public bool IsDownloadUrl { get; set; }
-        
-        public bool IsPublicUrl { get; set; }
-        
         // Navigation properties
         public virtual JumpDocument JumpDocument { get; set; } = null!;
     }

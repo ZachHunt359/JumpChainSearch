@@ -219,6 +219,17 @@ public class AdminAuthService
             HashAlgorithmName.SHA256);
         return pbkdf2.GetBytes(HashSize);
     }
+    
+    /// <summary>
+    /// Verify a password against stored hash (public helper for endpoints)
+    /// </summary>
+    public bool VerifyPassword(string password, string storedHashBase64, string saltBase64)
+    {
+        var salt = Convert.FromBase64String(saltBase64);
+        var hash = HashPassword(password, salt);
+        var storedHash = Convert.FromBase64String(storedHashBase64);
+        return hash.SequenceEqual(storedHash);
+    }
 
     private static string GenerateSessionToken()
     {

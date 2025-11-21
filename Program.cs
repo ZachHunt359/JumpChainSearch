@@ -148,6 +148,9 @@ app.MapGroup("/api/google-drive").MapGoogleDriveEndpoints();
 // Map Tag Management API endpoints
 app.MapGroup("/api/tags").MapTagManagementEndpoints();
 
+// Map Database Management API endpoints (admin-only operations)
+app.MapGroup("/api/database").MapDatabaseManagementEndpoints();
+
 // Tag management redirects
 app.MapGet("/debug-tag-inconsistencies", () => Results.Redirect("/api/tags/debug-inconsistencies"));
 app.MapPost("/fix-tag-inconsistencies", () => Results.Redirect("/api/tags/fix-inconsistencies"));

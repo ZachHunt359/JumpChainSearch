@@ -83,8 +83,42 @@
     margin-top: 0.5rem;
 }
 
+.nav-section-header.collapsible {
+    cursor: pointer;
+    user-select: none;
+    transition: background-color 0.15s ease;
+    padding: 0.75rem 1rem;
+    margin: 0;
+    border-radius: 4px;
+}
+
+.nav-section-header.collapsible:hover {
+    background-color: var(--bg-tertiary);
+}
+
+.nav-section-header.collapsible .oi {
+    font-size: 0.7rem;
+    margin-right: 0.5rem;
+    transition: transform 0.2s ease;
+}
+
 .nav-section-header:first-child {
     margin-top: 0;
+}
+
+.nav-section-content {
+    animation: slideDown 0.2s ease;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-5px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
 .nav-subsection-header {
@@ -162,6 +196,44 @@
 .theme-selector .form-select option {
     background-color: var(--bg-tertiary);
     color: var(--text-secondary);
+}
+
+/* Favorites styling */
+.favorite-item {
+    width: 100%;
+    display: block;
+    text-align: left;
+    padding: 0.65rem 0.85rem;
+    margin: 0.25rem 0;
+    border-radius: 8px;
+    transition: all 0.2s ease;
+    background-color: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    cursor: grab;
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.favorite-item:active {
+    cursor: grabbing;
+}
+
+.favorite-item:hover {
+    background-color: var(--bg-secondary);
+    border-color: var(--accent-primary);
+    box-shadow: 0 2px 4px var(--shadow-color);
+    transform: translateX(2px);
+    color: var(--accent-primary);
+}
+
+.favorite-name {
+    display: block;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .oi {

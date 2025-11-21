@@ -356,51 +356,55 @@ public static class TagVotingEndpoints
                 .Where(s => s.Status == "Pending")
                 .Include(s => s.JumpDocument)
                 .Include(s => s.Votes)
-                .Select(s => new {
-                    s.Id,
-                    s.JumpDocumentId,
-                    DocumentName = s.JumpDocument.Name,
-                    GoogleDriveLink = s.JumpDocument.WebViewLink,
-                    s.TagName,
-                    s.TagCategory,
-                    s.SuggestedByUserId,
-                    s.CreatedAt,
-                    VoteCount = s.Votes.Count,
-                    FavorVotes = s.Votes.Where(v => v.IsInFavor).Sum(v => v.Weight),
-                    AgainstVotes = s.Votes.Where(v => !v.IsInFavor).Sum(v => v.Weight),
-                    AgreementPercentage = s.Votes.Sum(v => v.Weight) > 0 ? 
-                        s.Votes.Where(v => v.IsInFavor).Sum(v => v.Weight) / s.Votes.Sum(v => v.Weight) * 100 : 0
-                })
-                .OrderByDescending(s => s.VoteCount)
                 .ToListAsync();
+
+            var suggestionDtos = suggestions.Select(s => new {
+                s.Id,
+                s.JumpDocumentId,
+                DocumentName = s.JumpDocument.Name,
+                GoogleDriveLink = s.JumpDocument.WebViewLink,
+                s.TagName,
+                s.TagCategory,
+                s.SuggestedByUserId,
+                s.CreatedAt,
+                VoteCount = s.Votes.Count,
+                FavorVotes = s.Votes.Where(v => v.IsInFavor).Sum(v => v.Weight),
+                AgainstVotes = s.Votes.Where(v => !v.IsInFavor).Sum(v => v.Weight),
+                AgreementPercentage = s.Votes.Sum(v => v.Weight) > 0 ? 
+                    s.Votes.Where(v => v.IsInFavor).Sum(v => v.Weight) / s.Votes.Sum(v => v.Weight) * 100 : 0
+            })
+            .OrderByDescending(s => s.VoteCount)
+            .ToList();
 
             var removalRequests = await dbContext.TagRemovalRequests
                 .Where(r => r.Status == "Pending")
                 .Include(r => r.JumpDocument)
                 .Include(r => r.Votes)
-                .Select(r => new {
-                    r.Id,
-                    r.JumpDocumentId,
-                    DocumentName = r.JumpDocument.Name,
-                    GoogleDriveLink = r.JumpDocument.WebViewLink,
-                    r.TagName,
-                    r.TagCategory,
-                    r.RequestedByUserId,
-                    r.CreatedAt,
-                    VoteCount = r.Votes.Count,
-                    FavorVotes = r.Votes.Where(v => v.IsInFavor).Sum(v => v.Weight),
-                    AgainstVotes = r.Votes.Where(v => !v.IsInFavor).Sum(v => v.Weight),
-                    AgreementPercentage = r.Votes.Sum(v => v.Weight) > 0 ? 
-                        r.Votes.Where(v => v.IsInFavor).Sum(v => v.Weight) / r.Votes.Sum(v => v.Weight) * 100 : 0
-                })
-                .OrderByDescending(r => r.VoteCount)
                 .ToListAsync();
+
+            var removalDtos = removalRequests.Select(r => new {
+                r.Id,
+                r.JumpDocumentId,
+                DocumentName = r.JumpDocument.Name,
+                GoogleDriveLink = r.JumpDocument.WebViewLink,
+                r.TagName,
+                r.TagCategory,
+                r.RequestedByUserId,
+                r.CreatedAt,
+                VoteCount = r.Votes.Count,
+                FavorVotes = r.Votes.Where(v => v.IsInFavor).Sum(v => v.Weight),
+                AgainstVotes = r.Votes.Where(v => !v.IsInFavor).Sum(v => v.Weight),
+                AgreementPercentage = r.Votes.Sum(v => v.Weight) > 0 ? 
+                    r.Votes.Where(v => v.IsInFavor).Sum(v => v.Weight) / r.Votes.Sum(v => v.Weight) * 100 : 0
+            })
+            .OrderByDescending(r => r.VoteCount)
+            .ToList();
 
             return Results.Ok(new { 
                 success = true, 
-                pendingSuggestions = suggestions, 
-                pendingRemovalRequests = removalRequests,
-                totalPending = suggestions.Count + removalRequests.Count
+                pendingSuggestions = suggestionDtos, 
+                pendingRemovalRequests = removalDtos,
+                totalPending = suggestionDtos.Count + removalDtos.Count
             });
         }
         catch (Exception ex)
@@ -571,7 +575,7 @@ public static class TagVotingEndpoints
         }
     }
 
-    private static async Task<IResult> RejectTagSuggestion(HttpContext httpContext, JumpChainDbContext context, AdminAuthService authService, int id, AdminActionRequest? request)
+    private static async Task<IResult> RejectTagSuggestion(HttpContext httpContext, JumpChainDbContext context, AdminAuthService authService, int id)
     {
         var (valid, user) = await ValidateSession(httpContext, authService);
         if (!valid)
@@ -584,7 +588,7 @@ public static class TagVotingEndpoints
                 return Results.NotFound(new { success = false, message = "Suggestion not found" });
 
             suggestion.Status = "Rejected";
-            suggestion.RejectionReason = request?.Reason;
+            suggestion.RejectionReason = null;
 
             // Remove user overrides for this tag
             var overrides = await context.UserTagOverrides
@@ -681,7 +685,7 @@ public static class TagVotingEndpoints
         }
     }
 
-    private static async Task<IResult> RejectTagRemoval(HttpContext httpContext, JumpChainDbContext context, AdminAuthService authService, int id, AdminActionRequest? request)
+    private static async Task<IResult> RejectTagRemoval(HttpContext httpContext, JumpChainDbContext context, AdminAuthService authService, int id)
     {
         var (valid, user) = await ValidateSession(httpContext, authService);
         if (!valid)
@@ -694,7 +698,7 @@ public static class TagVotingEndpoints
                 return Results.NotFound(new { success = false, message = "Removal request not found" });
 
             removalRequest.Status = "Rejected";
-            removalRequest.RejectionReason = request?.Reason;
+            removalRequest.RejectionReason = null;
 
             // Remove user overrides for this tag (tag stays on document)
             var overrides = await context.UserTagOverrides

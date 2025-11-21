@@ -4,7 +4,7 @@
 
 <div class="page">
     <div class="sidebar @(sidebarExpanded ? "expanded" : "collapsed")" id="sidebar">
-        <NavMenu OnToggle="HandleSidebarToggle" />
+        <NavMenu @ref="navMenu" OnToggle="HandleSidebarToggle" />
     </div>
 
     <main>
@@ -22,6 +22,7 @@
 
 @code {
     private bool sidebarExpanded = false; // Start collapsed
+    private NavMenu? navMenu;
 
     private void HandleSidebarToggle(bool expanded)
     {

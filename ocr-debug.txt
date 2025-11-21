@@ -1,0 +1,1231 @@
+[11/19/2025 11:05:02 AM] Starting OCR for 1H-qzrQRCuB20b8n1Kz4ggHY7wjdKDuff using PublicAPI
+[11/19/2025 11:05:03 AM] Downloaded 1307096 bytes
+[11/19/2025 11:05:04 AM] Inside ExtractTextFromPdfWithOCR
+[11/19/2025 11:05:04 AM] Checking tessdata at: C:\Users\khayy\source\repos\JumpChainSearch\tessdata
+[11/19/2025 11:05:04 AM] Tessdata directory EXISTS
+[11/19/2025 11:05:04 AM] Initializing TesseractEngine
+[11/19/2025 11:05:04 AM] TesseractEngine initialized OK
+[11/19/2025 11:05:04 AM] About to read PDF with ImageMagick
+[11/19/2025 11:05:17 AM] ImageMagick loaded 3 pages
+[11/19/2025 11:06:01 AM] OCR returned 5565 chars, quality: 0.82
+[11/19/2025 11:06:04 AM] Starting OCR for 1-JldmtvXXId1HbQH_lLXhID0LLLg_9S6 using PublicAPI
+[11/19/2025 11:06:05 AM] Downloaded 5263772 bytes
+[11/19/2025 11:06:05 AM] Inside ExtractTextFromPdfWithOCR
+[11/19/2025 11:06:05 AM] Checking tessdata at: C:\Users\khayy\source\repos\JumpChainSearch\tessdata
+[11/19/2025 11:06:05 AM] Tessdata directory EXISTS
+[11/19/2025 11:06:05 AM] Initializing TesseractEngine
+[11/19/2025 11:06:05 AM] TesseractEngine initialized OK
+[11/19/2025 11:06:05 AM] About to read PDF with ImageMagick
+[11/19/2025 11:06:40 AM] ImageMagick loaded 7 pages
+[11/19/2025 11:07:47 AM] OCR returned 2027 chars, quality: 0.70
+[11/19/2025 11:07:55 AM] Starting OCR for 1P7U4xQ3wYJ5Ij-dwPlRPVOZM3lO6Zk_M using PublicAPI
+[11/19/2025 11:07:57 AM] Downloaded 3370830 bytes
+[11/19/2025 11:07:57 AM] Inside ExtractTextFromPdfWithOCR
+[11/19/2025 11:07:57 AM] Checking tessdata at: C:\Users\khayy\source\repos\JumpChainSearch\tessdata
+[11/19/2025 11:07:57 AM] Tessdata directory EXISTS
+[11/19/2025 11:07:57 AM] Initializing TesseractEngine
+[11/19/2025 11:07:57 AM] TesseractEngine initialized OK
+[11/19/2025 11:07:57 AM] About to read PDF with ImageMagick
+[11/19/2025 11:08:28 AM] ImageMagick loaded 7 pages
+[11/19/2025 11:09:52 AM] OCR returned 19667 chars, quality: 0.76
+[11/19/2025 11:09:56 AM] Starting OCR for 1C0JMHyOtSdW8NugPZRFrko0oc_rkYoN- using PublicAPI
+[11/19/2025 11:09:58 AM] Downloaded 3307689 bytes
+[11/19/2025 11:09:58 AM] Inside ExtractTextFromPdfWithOCR
+[11/19/2025 11:09:58 AM] Checking tessdata at: C:\Users\khayy\source\repos\JumpChainSearch\tessdata
+[11/19/2025 11:09:58 AM] Tessdata directory EXISTS
+[11/19/2025 11:09:58 AM] Initializing TesseractEngine
+[11/19/2025 11:09:59 AM] TesseractEngine initialized OK
+[11/19/2025 11:09:59 AM] About to read PDF with ImageMagick
+[11/19/2025 11:10:29 AM] ImageMagick loaded 7 pages
+[11/19/2025 11:11:55 AM] OCR returned 19780 chars, quality: 0.77
+[11/19/2025 11:11:59 AM] Starting OCR for 1N65_yQrDwkbmQNMNBdmF62_CAbvnfLIN using PublicAPI
+[11/19/2025 11:12:01 AM] Downloaded 2003994 bytes
+[11/19/2025 11:12:01 AM] Inside ExtractTextFromPdfWithOCR
+[11/19/2025 11:12:01 AM] Checking tessdata at: C:\Users\khayy\source\repos\JumpChainSearch\tessdata
+[11/19/2025 11:12:01 AM] Tessdata directory EXISTS
+[11/19/2025 11:12:01 AM] Initializing TesseractEngine
+[11/19/2025 11:12:01 AM] TesseractEngine initialized OK
+[11/19/2025 11:12:01 AM] About to read PDF with ImageMagick
+[11/19/2025 11:12:14 AM] ImageMagick loaded 3 pages
+[11/19/2025 11:12:44 AM] OCR returned 3750 chars, quality: 0.77
+[11/19/2025 11:12:49 AM] Starting OCR for 175hP7X2pC7qES8yAwT50m55Xqv-OzYWv using PublicAPI
+[11/19/2025 11:12:52 AM] Downloaded 3636707 bytes
+[11/19/2025 11:12:52 AM] Inside ExtractTextFromPdfWithOCR
+[11/19/2025 11:12:52 AM] Checking tessdata at: C:\Users\khayy\source\repos\JumpChainSearch\tessdata
+[11/19/2025 11:12:52 AM] Tessdata directory EXISTS
+[11/19/2025 11:12:52 AM] Initializing TesseractEngine
+[11/19/2025 11:12:52 AM] TesseractEngine initialized OK
+[11/19/2025 11:12:52 AM] About to read PDF with ImageMagick
+[11/19/2025 11:13:32 AM] ImageMagick loaded 9 pages
+[11/19/2025 11:15:15 AM] OCR returned 637 chars, quality: 0.72
+[11/19/2025 11:15:19 AM] Starting OCR for 1PcG88pzKQ1_X2u2e2rMkGeoSJvVcPfCp using PublicAPI
+[11/19/2025 11:15:21 AM] Downloaded 3877274 bytes
+[11/19/2025 11:15:21 AM] Inside ExtractTextFromPdfWithOCR
+[11/19/2025 11:15:21 AM] Checking tessdata at: C:\Users\khayy\source\repos\JumpChainSearch\tessdata
+[11/19/2025 11:15:21 AM] Tessdata directory EXISTS
+[11/19/2025 11:15:21 AM] Initializing TesseractEngine
+[11/19/2025 11:15:21 AM] TesseractEngine initialized OK
+[11/19/2025 11:15:21 AM] About to read PDF with ImageMagick
+[11/19/2025 11:16:01 AM] ImageMagick loaded 9 pages
+[11/19/2025 11:18:19 AM] OCR returned 16612 chars, quality: 0.65
+[11/19/2025 11:18:34 AM] Starting OCR for 1ywWDuU25hDHa10G_aVyOS3ZaQHRgTGiL using PublicAPI
+[11/19/2025 11:18:40 AM] Downloaded 0 bytes
+[11/19/2025 11:18:40 AM] Inside ExtractTextFromPdfWithOCR
+[11/19/2025 11:18:40 AM] Checking tessdata at: C:\Users\khayy\source\repos\JumpChainSearch\tessdata
+[11/19/2025 11:18:40 AM] Tessdata directory EXISTS
+[11/19/2025 11:18:40 AM] Initializing TesseractEngine
+[11/19/2025 11:18:41 AM] TesseractEngine initialized OK
+[11/19/2025 11:18:41 AM] About to read PDF with ImageMagick
+[11/19/2025 11:18:41 AM] ImageMagick Read FAILED: Value cannot be empty. (Parameter 'stream')
+[11/19/2025 11:18:41 AM] OCR returned 0 chars, quality: 0.00
+[11/19/2025 11:18:41 AM] OCR returned empty/null
+[11/19/2025 11:18:46 AM] Starting OCR for 1ywWDuU25hDHa10G_aVyOS3ZaQHRgTGiL using ServiceAccount
+[11/19/2025 11:18:49 AM] Downloaded 4154752 bytes
+[11/19/2025 11:18:49 AM] Inside ExtractTextFromPdfWithOCR
+[11/19/2025 11:18:49 AM] Checking tessdata at: C:\Users\khayy\source\repos\JumpChainSearch\tessdata
+[11/19/2025 11:18:49 AM] Tessdata directory EXISTS
+[11/19/2025 11:18:49 AM] Initializing TesseractEngine
+[11/19/2025 11:18:49 AM] TesseractEngine initialized OK
+[11/19/2025 11:18:49 AM] About to read PDF with ImageMagick
+[11/19/2025 11:19:23 AM] ImageMagick loaded 8 pages
+[11/19/2025 11:21:16 AM] OCR returned 15490 chars, quality: 0.64
+[11/19/2025 11:21:33 AM] Starting OCR for 12eYSOgcxpw-gX1vm1SxmYSTxS80AcGCA using PublicAPI
+[11/19/2025 11:21:40 AM] Downloaded 0 bytes
+[11/19/2025 11:21:40 AM] Inside ExtractTextFromPdfWithOCR
+[11/19/2025 11:21:40 AM] Checking tessdata at: C:\Users\khayy\source\repos\JumpChainSearch\tessdata
+[11/19/2025 11:21:40 AM] Tessdata directory EXISTS
+[11/19/2025 11:21:40 AM] Initializing TesseractEngine
+[11/19/2025 11:21:40 AM] TesseractEngine initialized OK
+[11/19/2025 11:21:40 AM] About to read PDF with ImageMagick
+[11/19/2025 11:21:40 AM] ImageMagick Read FAILED: Value cannot be empty. (Parameter 'stream')
+[11/19/2025 11:21:40 AM] OCR returned 0 chars, quality: 0.00
+[11/19/2025 11:21:40 AM] OCR returned empty/null
+[11/19/2025 11:21:45 AM] Starting OCR for 12eYSOgcxpw-gX1vm1SxmYSTxS80AcGCA using ServiceAccount
+[11/19/2025 11:21:48 AM] Downloaded 3061707 bytes
+[11/19/2025 11:21:48 AM] Inside ExtractTextFromPdfWithOCR
+[11/19/2025 11:21:48 AM] Checking tessdata at: C:\Users\khayy\source\repos\JumpChainSearch\tessdata
+[11/19/2025 11:21:48 AM] Tessdata directory EXISTS
+[11/19/2025 11:21:48 AM] Initializing TesseractEngine
+[11/19/2025 11:21:48 AM] TesseractEngine initialized OK
+[11/19/2025 11:21:48 AM] About to read PDF with ImageMagick
+[11/19/2025 11:22:22 AM] ImageMagick loaded 8 pages
+[11/19/2025 11:23:24 AM] OCR returned 2823 chars, quality: 0.80
+[11/19/2025 11:23:39 AM] Starting OCR for 1MyHf9Ro2dxVLevQ7y4fwtAprOhzntmc2 using PublicAPI
+[11/19/2025 11:23:48 AM] Downloaded 0 bytes
+[11/19/2025 11:23:48 AM] Inside ExtractTextFromPdfWithOCR
+[11/19/2025 11:23:48 AM] Checking tessdata at: C:\Users\khayy\source\repos\JumpChainSearch\tessdata
+[11/19/2025 11:23:48 AM] Tessdata directory EXISTS
+[11/19/2025 11:23:48 AM] Initializing TesseractEngine
+[11/19/2025 11:23:48 AM] TesseractEngine initialized OK
+[11/19/2025 11:23:48 AM] About to read PDF with ImageMagick
+[11/19/2025 11:23:48 AM] ImageMagick Read FAILED: Value cannot be empty. (Parameter 'stream')
+[11/19/2025 11:23:48 AM] OCR returned 0 chars, quality: 0.00
+[11/19/2025 11:23:48 AM] OCR returned empty/null
+[11/19/2025 11:23:52 AM] Starting OCR for 1MyHf9Ro2dxVLevQ7y4fwtAprOhzntmc2 using ServiceAccount
+[11/19/2025 11:23:55 AM] Downloaded 6187215 bytes
+[11/19/2025 11:23:55 AM] Inside ExtractTextFromPdfWithOCR
+[11/19/2025 11:23:55 AM] Checking tessdata at: C:\Users\khayy\source\repos\JumpChainSearch\tessdata
+[11/19/2025 11:23:55 AM] Tessdata directory EXISTS
+[11/19/2025 11:23:55 AM] Initializing TesseractEngine
+[11/19/2025 11:23:55 AM] TesseractEngine initialized OK
+[11/19/2025 11:23:55 AM] About to read PDF with ImageMagick
+[11/19/2025 11:25:30 AM] ImageMagick loaded 20 pages
+[11/19/2025 11:28:58 AM] OCR returned 0 chars, quality: 0.00
+[11/19/2025 11:28:58 AM] OCR returned empty/null
+[11/19/2025 11:29:21 AM] Starting OCR for 1LUZTJO7sPy9QFR_4IBbchJZTpnbci1ib using PublicAPI
+[11/19/2025 11:29:28 AM] Downloaded 0 bytes
+[11/19/2025 11:29:28 AM] Inside ExtractTextFromPdfWithOCR
+[11/19/2025 11:29:28 AM] Checking tessdata at: C:\Users\khayy\source\repos\JumpChainSearch\tessdata
+[11/19/2025 11:29:28 AM] Tessdata directory EXISTS
+[11/19/2025 11:29:28 AM] Initializing TesseractEngine
+[11/19/2025 11:29:28 AM] TesseractEngine initialized OK
+[11/19/2025 11:29:28 AM] About to read PDF with ImageMagick
+[11/19/2025 11:29:28 AM] ImageMagick Read FAILED: Value cannot be empty. (Parameter 'stream')
+[11/19/2025 11:29:28 AM] OCR returned 0 chars, quality: 0.00
+[11/19/2025 11:29:28 AM] OCR returned empty/null
+[11/19/2025 11:29:54 AM] Starting OCR for 1jyfeLk4g-glE1uoK8QFg5LunjKpQFbAo using PublicAPI
+[11/19/2025 11:30:04 AM] Downloaded 0 bytes
+[11/19/2025 11:30:04 AM] Inside ExtractTextFromPdfWithOCR
+[11/19/2025 11:30:04 AM] Checking tessdata at: C:\Users\khayy\source\repos\JumpChainSearch\tessdata
+[11/19/2025 11:30:04 AM] Tessdata directory EXISTS
+[11/19/2025 11:30:04 AM] Initializing TesseractEngine
+[11/19/2025 11:30:04 AM] TesseractEngine initialized OK
+[11/19/2025 11:30:04 AM] About to read PDF with ImageMagick
+[11/19/2025 11:30:04 AM] ImageMagick Read FAILED: Value cannot be empty. (Parameter 'stream')
+[11/19/2025 11:30:04 AM] OCR returned 0 chars, quality: 0.00
+[11/19/2025 11:30:04 AM] OCR returned empty/null
+[11/19/2025 11:30:25 AM] Starting OCR for 1F_0ufQqsMIsbVX8mT4HoexJ_VCVhtbHr using PublicAPI
+[11/19/2025 11:30:35 AM] Downloaded 0 bytes
+[11/19/2025 11:30:35 AM] Inside ExtractTextFromPdfWithOCR
+[11/19/2025 11:30:35 AM] Checking tessdata at: C:\Users\khayy\source\repos\JumpChainSearch\tessdata
+[11/19/2025 11:30:35 AM] Tessdata directory EXISTS
+[11/19/2025 11:30:35 AM] Initializing TesseractEngine
+[11/19/2025 11:30:35 AM] TesseractEngine initialized OK
+[11/19/2025 11:30:35 AM] About to read PDF with ImageMagick
+[11/19/2025 11:30:35 AM] ImageMagick Read FAILED: Value cannot be empty. (Parameter 'stream')
+[11/19/2025 11:30:35 AM] OCR returned 0 chars, quality: 0.00
+[11/19/2025 11:30:35 AM] OCR returned empty/null
+[11/19/2025 11:30:52 AM] Starting OCR for 1i2Cy1-RwWtq-nZeHgRuIKdHr-euuYTqM using PublicAPI
+[11/19/2025 11:31:00 AM] Downloaded 0 bytes
+[11/19/2025 11:31:00 AM] Inside ExtractTextFromPdfWithOCR
+[11/19/2025 11:31:00 AM] Checking tessdata at: C:\Users\khayy\source\repos\JumpChainSearch\tessdata
+[11/19/2025 11:31:00 AM] Tessdata directory EXISTS
+[11/19/2025 11:31:00 AM] Initializing TesseractEngine
+[11/19/2025 11:31:00 AM] TesseractEngine initialized OK
+[11/19/2025 11:31:00 AM] About to read PDF with ImageMagick
+[11/19/2025 11:31:00 AM] ImageMagick Read FAILED: Value cannot be empty. (Parameter 'stream')
+[11/19/2025 11:31:00 AM] OCR returned 0 chars, quality: 0.00
+[11/19/2025 11:31:00 AM] OCR returned empty/null
+[11/19/2025 11:31:15 AM] Starting OCR for 1QcPyitGadt67aT9BcbIrqPnrZegRO2RS using PublicAPI
+[11/19/2025 11:31:20 AM] Downloaded 0 bytes
+[11/19/2025 11:31:20 AM] Inside ExtractTextFromPdfWithOCR
+[11/19/2025 11:31:20 AM] Checking tessdata at: C:\Users\khayy\source\repos\JumpChainSearch\tessdata
+[11/19/2025 11:31:20 AM] Tessdata directory EXISTS
+[11/19/2025 11:31:20 AM] Initializing TesseractEngine
+[11/19/2025 11:31:20 AM] TesseractEngine initialized OK
+[11/19/2025 11:31:20 AM] About to read PDF with ImageMagick
+[11/19/2025 11:31:20 AM] ImageMagick Read FAILED: Value cannot be empty. (Parameter 'stream')
+[11/19/2025 11:31:20 AM] OCR returned 0 chars, quality: 0.00
+[11/19/2025 11:31:20 AM] OCR returned empty/null
+[11/19/2025 11:31:35 AM] Starting OCR for 1QAixHZr8wSrMqUmH7ZS457ymhlNvd8XM using PublicAPI
+[11/19/2025 11:31:40 AM] Downloaded 0 bytes
+[11/19/2025 11:31:40 AM] Inside ExtractTextFromPdfWithOCR
+[11/19/2025 11:31:40 AM] Checking tessdata at: C:\Users\khayy\source\repos\JumpChainSearch\tessdata
+[11/19/2025 11:31:40 AM] Tessdata directory EXISTS
+[11/19/2025 11:31:40 AM] Initializing TesseractEngine
+[11/19/2025 11:31:40 AM] TesseractEngine initialized OK
+[11/19/2025 11:31:40 AM] About to read PDF with ImageMagick
+[11/19/2025 11:31:40 AM] ImageMagick Read FAILED: Value cannot be empty. (Parameter 'stream')
+[11/19/2025 11:31:40 AM] OCR returned 0 chars, quality: 0.00
+[11/19/2025 11:31:40 AM] OCR returned empty/null
+[11/19/2025 11:31:57 AM] Starting OCR for 1z3B5NPyIyaFe4x9mZP-01fgofPrxZvKj using PublicAPI
+[11/19/2025 11:32:02 AM] Downloaded 0 bytes
+[11/19/2025 11:32:02 AM] Inside ExtractTextFromPdfWithOCR
+[11/19/2025 11:32:02 AM] Checking tessdata at: C:\Users\khayy\source\repos\JumpChainSearch\tessdata
+[11/19/2025 11:32:02 AM] Tessdata directory EXISTS
+[11/19/2025 11:32:02 AM] Initializing TesseractEngine
+[11/19/2025 11:32:02 AM] TesseractEngine initialized OK
+[11/19/2025 11:32:02 AM] About to read PDF with ImageMagick
+[11/19/2025 11:32:02 AM] ImageMagick Read FAILED: Value cannot be empty. (Parameter 'stream')
+[11/19/2025 11:32:02 AM] OCR returned 0 chars, quality: 0.00
+[11/19/2025 11:32:02 AM] OCR returned empty/null
+[11/19/2025 11:32:19 AM] Starting OCR for 1044NQ5SIPXqjQ1dVg3gBQKu-e9Yiwv-z using PublicAPI
+[11/19/2025 11:32:25 AM] Downloaded 0 bytes
+[11/19/2025 11:32:25 AM] Inside ExtractTextFromPdfWithOCR
+[11/19/2025 11:32:25 AM] Checking tessdata at: C:\Users\khayy\source\repos\JumpChainSearch\tessdata
+[11/19/2025 11:32:25 AM] Tessdata directory EXISTS
+[11/19/2025 11:32:25 AM] Initializing TesseractEngine
+[11/19/2025 11:32:26 AM] TesseractEngine initialized OK
+[11/19/2025 11:32:26 AM] About to read PDF with ImageMagick
+[11/19/2025 11:32:26 AM] ImageMagick Read FAILED: Value cannot be empty. (Parameter 'stream')
+[11/19/2025 11:32:26 AM] OCR returned 0 chars, quality: 0.00
+[11/19/2025 11:32:26 AM] OCR returned empty/null
+[11/19/2025 11:32:42 AM] Starting OCR for 12BrMDAiIsuWVbh86ZbmweGetnIQmVMJL using PublicAPI
+[11/19/2025 11:32:49 AM] Downloaded 0 bytes
+[11/19/2025 11:32:49 AM] Inside ExtractTextFromPdfWithOCR
+[11/19/2025 11:32:49 AM] Checking tessdata at: C:\Users\khayy\source\repos\JumpChainSearch\tessdata
+[11/19/2025 11:32:49 AM] Tessdata directory EXISTS
+[11/19/2025 11:32:49 AM] Initializing TesseractEngine
+[11/19/2025 11:32:49 AM] TesseractEngine initialized OK
+[11/19/2025 11:32:49 AM] About to read PDF with ImageMagick
+[11/19/2025 11:32:49 AM] ImageMagick Read FAILED: Value cannot be empty. (Parameter 'stream')
+[11/19/2025 11:32:49 AM] OCR returned 0 chars, quality: 0.00
+[11/19/2025 11:32:49 AM] OCR returned empty/null
+[11/19/2025 11:33:03 AM] Starting OCR for 1SSWutaAZt4LZsG-LFHWMv0EkEZor4sEr using PublicAPI
+[11/19/2025 11:33:13 AM] Downloaded 0 bytes
+[11/19/2025 11:33:13 AM] Inside ExtractTextFromPdfWithOCR
+[11/19/2025 11:33:13 AM] Checking tessdata at: C:\Users\khayy\source\repos\JumpChainSearch\tessdata
+[11/19/2025 11:33:13 AM] Tessdata directory EXISTS
+[11/19/2025 11:33:13 AM] Initializing TesseractEngine
+[11/19/2025 11:33:13 AM] TesseractEngine initialized OK
+[11/19/2025 11:33:13 AM] About to read PDF with ImageMagick
+[11/19/2025 11:33:13 AM] ImageMagick Read FAILED: Value cannot be empty. (Parameter 'stream')
+[11/19/2025 11:33:13 AM] OCR returned 0 chars, quality: 0.00
+[11/19/2025 11:33:13 AM] OCR returned empty/null
+[11/19/2025 11:33:32 AM] Starting OCR for 1SG6I5lotvuAFemDWalDgMubo_wjMNNOl using PublicAPI
+[11/19/2025 11:33:41 AM] Downloaded 0 bytes
+[11/19/2025 11:33:41 AM] Inside ExtractTextFromPdfWithOCR
+[11/19/2025 11:33:41 AM] Checking tessdata at: C:\Users\khayy\source\repos\JumpChainSearch\tessdata
+[11/19/2025 11:33:41 AM] Tessdata directory EXISTS
+[11/19/2025 11:33:41 AM] Initializing TesseractEngine
+[11/19/2025 11:33:41 AM] TesseractEngine initialized OK
+[11/19/2025 11:33:41 AM] About to read PDF with ImageMagick
+[11/19/2025 11:33:41 AM] ImageMagick Read FAILED: Value cannot be empty. (Parameter 'stream')
+[11/19/2025 11:33:41 AM] OCR returned 0 chars, quality: 0.00
+[11/19/2025 11:33:41 AM] OCR returned empty/null
+[11/19/2025 11:33:56 AM] Starting OCR for 1lqSe_OOVqDdufRYNpCe9IE0kVcuk_3k_ using PublicAPI
+[11/19/2025 11:34:02 AM] Downloaded 0 bytes
+[11/19/2025 11:34:02 AM] Inside ExtractTextFromPdfWithOCR
+[11/19/2025 11:34:02 AM] Checking tessdata at: C:\Users\khayy\source\repos\JumpChainSearch\tessdata
+[11/19/2025 11:34:02 AM] Tessdata directory EXISTS
+[11/19/2025 11:34:02 AM] Initializing TesseractEngine
+[11/19/2025 11:34:02 AM] TesseractEngine initialized OK
+[11/19/2025 11:34:02 AM] About to read PDF with ImageMagick
+[11/19/2025 11:34:02 AM] ImageMagick Read FAILED: Value cannot be empty. (Parameter 'stream')
+[11/19/2025 11:34:02 AM] OCR returned 0 chars, quality: 0.00
+[11/19/2025 11:34:02 AM] OCR returned empty/null
+[11/19/2025 11:34:20 AM] Starting OCR for 1c9YDnMEk6ZDF4TpJ9gx9vksvF0OCqSui using PublicAPI
+[11/19/2025 11:34:26 AM] Downloaded 0 bytes
+[11/19/2025 11:34:26 AM] Inside ExtractTextFromPdfWithOCR
+[11/19/2025 11:34:26 AM] Checking tessdata at: C:\Users\khayy\source\repos\JumpChainSearch\tessdata
+[11/19/2025 11:34:26 AM] Tessdata directory EXISTS
+[11/19/2025 11:34:26 AM] Initializing TesseractEngine
+[11/19/2025 11:34:27 AM] TesseractEngine initialized OK
+[11/19/2025 11:34:27 AM] About to read PDF with ImageMagick
+[11/19/2025 11:34:27 AM] ImageMagick Read FAILED: Value cannot be empty. (Parameter 'stream')
+[11/19/2025 11:34:27 AM] OCR returned 0 chars, quality: 0.00
+[11/19/2025 11:34:27 AM] OCR returned empty/null
+[11/19/2025 11:34:44 AM] Starting OCR for 1t1eX2fjvSosRQBt-zqWIRlr5u12lq441 using PublicAPI
+[11/19/2025 11:34:52 AM] Downloaded 0 bytes
+[11/19/2025 11:34:52 AM] Inside ExtractTextFromPdfWithOCR
+[11/19/2025 11:34:52 AM] Checking tessdata at: C:\Users\khayy\source\repos\JumpChainSearch\tessdata
+[11/19/2025 11:34:52 AM] Tessdata directory EXISTS
+[11/19/2025 11:34:52 AM] Initializing TesseractEngine
+[11/19/2025 11:34:52 AM] TesseractEngine initialized OK
+[11/19/2025 11:34:52 AM] About to read PDF with ImageMagick
+[11/19/2025 11:34:52 AM] ImageMagick Read FAILED: Value cannot be empty. (Parameter 'stream')
+[11/19/2025 11:34:52 AM] OCR returned 0 chars, quality: 0.00
+[11/19/2025 11:34:52 AM] OCR returned empty/null
+[11/19/2025 11:35:11 AM] Starting OCR for 10jSYPKAGZ1vUT_s-OO3yVX8bU_n8qdvm using PublicAPI
+[11/19/2025 11:35:20 AM] Downloaded 0 bytes
+[11/19/2025 11:35:20 AM] Inside ExtractTextFromPdfWithOCR
+[11/19/2025 11:35:20 AM] Checking tessdata at: C:\Users\khayy\source\repos\JumpChainSearch\tessdata
+[11/19/2025 11:35:20 AM] Tessdata directory EXISTS
+[11/19/2025 11:35:20 AM] Initializing TesseractEngine
+[11/19/2025 11:35:20 AM] TesseractEngine initialized OK
+[11/19/2025 11:35:20 AM] About to read PDF with ImageMagick
+[11/19/2025 11:35:20 AM] ImageMagick Read FAILED: Value cannot be empty. (Parameter 'stream')
+[11/19/2025 11:35:20 AM] OCR returned 0 chars, quality: 0.00
+[11/19/2025 11:35:20 AM] OCR returned empty/null
+[11/19/2025 11:35:37 AM] Starting OCR for 1p-WqAMJZyvpuyVEvrZSNUFBwBpdWM7jV using PublicAPI
+[11/19/2025 11:35:43 AM] Downloaded 0 bytes
+[11/19/2025 11:35:43 AM] Inside ExtractTextFromPdfWithOCR
+[11/19/2025 11:35:43 AM] Checking tessdata at: C:\Users\khayy\source\repos\JumpChainSearch\tessdata
+[11/19/2025 11:35:43 AM] Tessdata directory EXISTS
+[11/19/2025 11:35:43 AM] Initializing TesseractEngine
+[11/19/2025 11:35:43 AM] TesseractEngine initialized OK
+[11/19/2025 11:35:43 AM] About to read PDF with ImageMagick
+[11/19/2025 11:35:43 AM] ImageMagick Read FAILED: Value cannot be empty. (Parameter 'stream')
+[11/19/2025 11:35:43 AM] OCR returned 0 chars, quality: 0.00
+[11/19/2025 11:35:43 AM] OCR returned empty/null
+[11/19/2025 11:35:58 AM] Starting OCR for 1oCc1Gi8rVNtLmZn8Pjz4NTMMIMi8M7jv using PublicAPI
+[11/19/2025 11:36:03 AM] Downloaded 0 bytes
+[11/19/2025 11:36:03 AM] Inside ExtractTextFromPdfWithOCR
+[11/19/2025 11:36:03 AM] Checking tessdata at: C:\Users\khayy\source\repos\JumpChainSearch\tessdata
+[11/19/2025 11:36:03 AM] Tessdata directory EXISTS
+[11/19/2025 11:36:03 AM] Initializing TesseractEngine
+[11/19/2025 11:36:03 AM] TesseractEngine initialized OK
+[11/19/2025 11:36:03 AM] About to read PDF with ImageMagick
+[11/19/2025 11:36:03 AM] ImageMagick Read FAILED: Value cannot be empty. (Parameter 'stream')
+[11/19/2025 11:36:03 AM] OCR returned 0 chars, quality: 0.00
+[11/19/2025 11:36:03 AM] OCR returned empty/null
+[11/19/2025 11:36:08 AM] Starting OCR for 1oCc1Gi8rVNtLmZn8Pjz4NTMMIMi8M7jv using ServiceAccount
+[11/19/2025 11:36:11 AM] Downloaded 3504188 bytes
+[11/19/2025 11:36:11 AM] Inside ExtractTextFromPdfWithOCR
+[11/19/2025 11:36:11 AM] Checking tessdata at: C:\Users\khayy\source\repos\JumpChainSearch\tessdata
+[11/19/2025 11:36:11 AM] Tessdata directory EXISTS
+[11/19/2025 11:36:11 AM] Initializing TesseractEngine
+[11/19/2025 11:36:11 AM] TesseractEngine initialized OK
+[11/19/2025 11:36:11 AM] About to read PDF with ImageMagick
+[11/19/2025 11:36:16 AM] ImageMagick loaded 5 pages
+[11/19/2025 11:36:34 AM] OCR returned 10453 chars, quality: 0.85
+[11/19/2025 11:36:50 AM] Starting OCR for 1pY5IAygxLXDqdDMmO5Xx8AVWpkrPpFXh using PublicAPI
+[11/19/2025 11:36:57 AM] Downloaded 0 bytes
+[11/19/2025 11:36:57 AM] Inside ExtractTextFromPdfWithOCR
+[11/19/2025 11:36:57 AM] Checking tessdata at: C:\Users\khayy\source\repos\JumpChainSearch\tessdata
+[11/19/2025 11:36:57 AM] Tessdata directory EXISTS
+[11/19/2025 11:36:57 AM] Initializing TesseractEngine
+[11/19/2025 11:36:57 AM] TesseractEngine initialized OK
+[11/19/2025 11:36:57 AM] About to read PDF with ImageMagick
+[11/19/2025 11:36:57 AM] ImageMagick Read FAILED: Value cannot be empty. (Parameter 'stream')
+[11/19/2025 11:36:57 AM] OCR returned 0 chars, quality: 0.00
+[11/19/2025 11:36:57 AM] OCR returned empty/null
+[11/19/2025 11:37:18 AM] Starting OCR for 1tk_OuasxHJXD3oRLyaG1RaA_C4OAHKDs using PublicAPI
+[11/19/2025 11:37:26 AM] Downloaded 0 bytes
+[11/19/2025 11:37:26 AM] Inside ExtractTextFromPdfWithOCR
+[11/19/2025 11:37:26 AM] Checking tessdata at: C:\Users\khayy\source\repos\JumpChainSearch\tessdata
+[11/19/2025 11:37:26 AM] Tessdata directory EXISTS
+[11/19/2025 11:37:26 AM] Initializing TesseractEngine
+[11/19/2025 11:37:26 AM] TesseractEngine initialized OK
+[11/19/2025 11:37:26 AM] About to read PDF with ImageMagick
+[11/19/2025 11:37:26 AM] ImageMagick Read FAILED: Value cannot be empty. (Parameter 'stream')
+[11/19/2025 11:37:26 AM] OCR returned 0 chars, quality: 0.00
+[11/19/2025 11:37:26 AM] OCR returned empty/null
+[11/19/2025 11:37:42 AM] Starting OCR for 1wswn3re5WEwJEjz5WjXJfp42sHetBxWd using PublicAPI
+[11/19/2025 11:37:52 AM] Downloaded 0 bytes
+[11/19/2025 11:37:52 AM] Inside ExtractTextFromPdfWithOCR
+[11/19/2025 11:37:52 AM] Checking tessdata at: C:\Users\khayy\source\repos\JumpChainSearch\tessdata
+[11/19/2025 11:37:52 AM] Tessdata directory EXISTS
+[11/19/2025 11:37:52 AM] Initializing TesseractEngine
+[11/19/2025 11:37:52 AM] TesseractEngine initialized OK
+[11/19/2025 11:37:52 AM] About to read PDF with ImageMagick
+[11/19/2025 11:37:52 AM] ImageMagick Read FAILED: Value cannot be empty. (Parameter 'stream')
+[11/19/2025 11:37:52 AM] OCR returned 0 chars, quality: 0.00
+[11/19/2025 11:37:52 AM] OCR returned empty/null
+[11/19/2025 11:38:09 AM] Starting OCR for 1XfyZFkjq8-Wck2cj1vO5QezL-TsTcbJF using PublicAPI
+[11/19/2025 11:38:14 AM] Downloaded 0 bytes
+[11/19/2025 11:38:14 AM] Inside ExtractTextFromPdfWithOCR
+[11/19/2025 11:38:14 AM] Checking tessdata at: C:\Users\khayy\source\repos\JumpChainSearch\tessdata
+[11/19/2025 11:38:14 AM] Tessdata directory EXISTS
+[11/19/2025 11:38:14 AM] Initializing TesseractEngine
+[11/19/2025 11:38:14 AM] TesseractEngine initialized OK
+[11/19/2025 11:38:14 AM] About to read PDF with ImageMagick
+[11/19/2025 11:38:14 AM] ImageMagick Read FAILED: Value cannot be empty. (Parameter 'stream')
+[11/19/2025 11:38:14 AM] OCR returned 0 chars, quality: 0.00
+[11/19/2025 11:38:14 AM] OCR returned empty/null
+[11/19/2025 11:38:35 AM] Starting OCR for 1iIGFrX5NvN4ozdSAWEiY3azgrPphg3qd using PublicAPI
+[11/19/2025 11:38:41 AM] Downloaded 0 bytes
+[11/19/2025 11:38:41 AM] Inside ExtractTextFromPdfWithOCR
+[11/19/2025 11:38:41 AM] Checking tessdata at: C:\Users\khayy\source\repos\JumpChainSearch\tessdata
+[11/19/2025 11:38:41 AM] Tessdata directory EXISTS
+[11/19/2025 11:38:41 AM] Initializing TesseractEngine
+[11/19/2025 11:38:41 AM] TesseractEngine initialized OK
+[11/19/2025 11:38:41 AM] About to read PDF with ImageMagick
+[11/19/2025 11:38:41 AM] ImageMagick Read FAILED: Value cannot be empty. (Parameter 'stream')
+[11/19/2025 11:38:41 AM] OCR returned 0 chars, quality: 0.00
+[11/19/2025 11:38:41 AM] OCR returned empty/null
+[11/19/2025 11:38:59 AM] Starting OCR for 1r4RQupJuP3dPDz2epnZwbFcm-Ry5AZ_S using PublicAPI
+[11/19/2025 11:39:04 AM] Downloaded 0 bytes
+[11/19/2025 11:39:04 AM] Inside ExtractTextFromPdfWithOCR
+[11/19/2025 11:39:04 AM] Checking tessdata at: C:\Users\khayy\source\repos\JumpChainSearch\tessdata
+[11/19/2025 11:39:04 AM] Tessdata directory EXISTS
+[11/19/2025 11:39:04 AM] Initializing TesseractEngine
+[11/19/2025 11:39:04 AM] TesseractEngine initialized OK
+[11/19/2025 11:39:04 AM] About to read PDF with ImageMagick
+[11/19/2025 11:39:04 AM] ImageMagick Read FAILED: Value cannot be empty. (Parameter 'stream')
+[11/19/2025 11:39:04 AM] OCR returned 0 chars, quality: 0.00
+[11/19/2025 11:39:04 AM] OCR returned empty/null
+[11/19/2025 11:39:23 AM] Starting OCR for 1hy1zcLNsJNZClKcPN4WKyCqZmN4LKuNr using PublicAPI
+[11/19/2025 11:39:30 AM] Downloaded 0 bytes
+[11/19/2025 11:39:30 AM] Inside ExtractTextFromPdfWithOCR
+[11/19/2025 11:39:30 AM] Checking tessdata at: C:\Users\khayy\source\repos\JumpChainSearch\tessdata
+[11/19/2025 11:39:30 AM] Tessdata directory EXISTS
+[11/19/2025 11:39:30 AM] Initializing TesseractEngine
+[11/19/2025 11:39:30 AM] TesseractEngine initialized OK
+[11/19/2025 11:39:30 AM] About to read PDF with ImageMagick
+[11/19/2025 11:39:30 AM] ImageMagick Read FAILED: Value cannot be empty. (Parameter 'stream')
+[11/19/2025 11:39:30 AM] OCR returned 0 chars, quality: 0.00
+[11/19/2025 11:39:30 AM] OCR returned empty/null
+[11/19/2025 11:39:48 AM] Starting OCR for 1thpk1bCmHJ0djDZScvDRpASif8nRh-kH using PublicAPI
+[11/19/2025 11:39:54 AM] Downloaded 0 bytes
+[11/19/2025 11:39:54 AM] Inside ExtractTextFromPdfWithOCR
+[11/19/2025 11:39:54 AM] Checking tessdata at: C:\Users\khayy\source\repos\JumpChainSearch\tessdata
+[11/19/2025 11:39:54 AM] Tessdata directory EXISTS
+[11/19/2025 11:39:54 AM] Initializing TesseractEngine
+[11/19/2025 11:39:55 AM] TesseractEngine initialized OK
+[11/19/2025 11:39:55 AM] About to read PDF with ImageMagick
+[11/19/2025 11:39:55 AM] ImageMagick Read FAILED: Value cannot be empty. (Parameter 'stream')
+[11/19/2025 11:39:55 AM] OCR returned 0 chars, quality: 0.00
+[11/19/2025 11:39:55 AM] OCR returned empty/null
+[11/19/2025 11:40:09 AM] Starting OCR for 1lR0Qye-bdGYKvxyyIU_ijqgof2EspzxM using PublicAPI
+[11/19/2025 11:40:15 AM] Downloaded 0 bytes
+[11/19/2025 11:40:15 AM] Inside ExtractTextFromPdfWithOCR
+[11/19/2025 11:40:15 AM] Checking tessdata at: C:\Users\khayy\source\repos\JumpChainSearch\tessdata
+[11/19/2025 11:40:15 AM] Tessdata directory EXISTS
+[11/19/2025 11:40:15 AM] Initializing TesseractEngine
+[11/19/2025 11:40:15 AM] TesseractEngine initialized OK
+[11/19/2025 11:40:15 AM] About to read PDF with ImageMagick
+[11/19/2025 11:40:15 AM] ImageMagick Read FAILED: Value cannot be empty. (Parameter 'stream')
+[11/19/2025 11:40:15 AM] OCR returned 0 chars, quality: 0.00
+[11/19/2025 11:40:15 AM] OCR returned empty/null
+[11/19/2025 11:40:36 AM] Starting OCR for 1JfrPsyL9F8Ikrs7CCyFU9zMooKye_mO1 using PublicAPI
+[11/19/2025 11:40:43 AM] Downloaded 0 bytes
+[11/19/2025 11:40:43 AM] Inside ExtractTextFromPdfWithOCR
+[11/19/2025 11:40:43 AM] Checking tessdata at: C:\Users\khayy\source\repos\JumpChainSearch\tessdata
+[11/19/2025 11:40:43 AM] Tessdata directory EXISTS
+[11/19/2025 11:40:43 AM] Initializing TesseractEngine
+[11/19/2025 11:40:43 AM] TesseractEngine initialized OK
+[11/19/2025 11:40:43 AM] About to read PDF with ImageMagick
+[11/19/2025 11:40:43 AM] ImageMagick Read FAILED: Value cannot be empty. (Parameter 'stream')
+[11/19/2025 11:40:43 AM] OCR returned 0 chars, quality: 0.00
+[11/19/2025 11:40:43 AM] OCR returned empty/null
+[11/19/2025 11:41:00 AM] Starting OCR for 1sJXOz3lYaL2SayeAPRVqJ3L2UD0x__xd using PublicAPI
+[11/19/2025 11:41:10 AM] Downloaded 0 bytes
+[11/19/2025 11:41:10 AM] Inside ExtractTextFromPdfWithOCR
+[11/19/2025 11:41:10 AM] Checking tessdata at: C:\Users\khayy\source\repos\JumpChainSearch\tessdata
+[11/19/2025 11:41:10 AM] Tessdata directory EXISTS
+[11/19/2025 11:41:10 AM] Initializing TesseractEngine
+[11/19/2025 11:41:10 AM] TesseractEngine initialized OK
+[11/19/2025 11:41:10 AM] About to read PDF with ImageMagick
+[11/19/2025 11:41:10 AM] ImageMagick Read FAILED: Value cannot be empty. (Parameter 'stream')
+[11/19/2025 11:41:10 AM] OCR returned 0 chars, quality: 0.00
+[11/19/2025 11:41:10 AM] OCR returned empty/null
+[11/19/2025 11:41:26 AM] Starting OCR for 1-mPrWx03hTfpvWoJN7t5i8GJFvd2lNzk using PublicAPI
+[11/19/2025 11:41:34 AM] Downloaded 0 bytes
+[11/19/2025 11:41:34 AM] Inside ExtractTextFromPdfWithOCR
+[11/19/2025 11:41:34 AM] Checking tessdata at: C:\Users\khayy\source\repos\JumpChainSearch\tessdata
+[11/19/2025 11:41:34 AM] Tessdata directory EXISTS
+[11/19/2025 11:41:34 AM] Initializing TesseractEngine
+[11/19/2025 11:41:34 AM] TesseractEngine initialized OK
+[11/19/2025 11:41:34 AM] About to read PDF with ImageMagick
+[11/19/2025 11:41:34 AM] ImageMagick Read FAILED: Value cannot be empty. (Parameter 'stream')
+[11/19/2025 11:41:34 AM] OCR returned 0 chars, quality: 0.00
+[11/19/2025 11:41:34 AM] OCR returned empty/null
+[11/19/2025 11:41:47 AM] Starting OCR for 1L6BTHIrXIBETEVepM1--XHcfTGO-h7Dc using PublicAPI
+[11/19/2025 11:41:53 AM] Downloaded 0 bytes
+[11/19/2025 11:41:53 AM] Inside ExtractTextFromPdfWithOCR
+[11/19/2025 11:41:53 AM] Checking tessdata at: C:\Users\khayy\source\repos\JumpChainSearch\tessdata
+[11/19/2025 11:41:53 AM] Tessdata directory EXISTS
+[11/19/2025 11:41:53 AM] Initializing TesseractEngine
+[11/19/2025 11:41:53 AM] TesseractEngine initialized OK
+[11/19/2025 11:41:53 AM] About to read PDF with ImageMagick
+[11/19/2025 11:41:53 AM] ImageMagick Read FAILED: Value cannot be empty. (Parameter 'stream')
+[11/19/2025 11:41:53 AM] OCR returned 0 chars, quality: 0.00
+[11/19/2025 11:41:53 AM] OCR returned empty/null
+[11/19/2025 11:42:08 AM] Starting OCR for 1AIK0XoXWjTv0oqwv1jP3CNyCyS3J9NF2 using PublicAPI
+[11/19/2025 11:42:16 AM] Downloaded 0 bytes
+[11/19/2025 11:42:16 AM] Inside ExtractTextFromPdfWithOCR
+[11/19/2025 11:42:16 AM] Checking tessdata at: C:\Users\khayy\source\repos\JumpChainSearch\tessdata
+[11/19/2025 11:42:16 AM] Tessdata directory EXISTS
+[11/19/2025 11:42:16 AM] Initializing TesseractEngine
+[11/19/2025 11:42:16 AM] TesseractEngine initialized OK
+[11/19/2025 11:42:16 AM] About to read PDF with ImageMagick
+[11/19/2025 11:42:16 AM] ImageMagick Read FAILED: Value cannot be empty. (Parameter 'stream')
+[11/19/2025 11:42:16 AM] OCR returned 0 chars, quality: 0.00
+[11/19/2025 11:42:16 AM] OCR returned empty/null
+[11/19/2025 11:42:32 AM] Starting OCR for 1VpvdP4eqAT6kMctc3cpN6R6E9uOvwEFM using PublicAPI
+[11/19/2025 11:42:38 AM] Downloaded 0 bytes
+[11/19/2025 11:42:38 AM] Inside ExtractTextFromPdfWithOCR
+[11/19/2025 11:42:38 AM] Checking tessdata at: C:\Users\khayy\source\repos\JumpChainSearch\tessdata
+[11/19/2025 11:42:38 AM] Tessdata directory EXISTS
+[11/19/2025 11:42:38 AM] Initializing TesseractEngine
+[11/19/2025 11:42:38 AM] TesseractEngine initialized OK
+[11/19/2025 11:42:38 AM] About to read PDF with ImageMagick
+[11/19/2025 11:42:38 AM] ImageMagick Read FAILED: Value cannot be empty. (Parameter 'stream')
+[11/19/2025 11:42:38 AM] OCR returned 0 chars, quality: 0.00
+[11/19/2025 11:42:38 AM] OCR returned empty/null
+[11/19/2025 11:42:58 AM] Starting OCR for 1BSI6-s7aP33g5_-mxM1McH-zP8pEgMbX using PublicAPI
+[11/19/2025 11:43:04 AM] Downloaded 0 bytes
+[11/19/2025 11:43:04 AM] Inside ExtractTextFromPdfWithOCR
+[11/19/2025 11:43:04 AM] Checking tessdata at: C:\Users\khayy\source\repos\JumpChainSearch\tessdata
+[11/19/2025 11:43:04 AM] Tessdata directory EXISTS
+[11/19/2025 11:43:04 AM] Initializing TesseractEngine
+[11/19/2025 11:43:04 AM] TesseractEngine initialized OK
+[11/19/2025 11:43:04 AM] About to read PDF with ImageMagick
+[11/19/2025 11:43:04 AM] ImageMagick Read FAILED: Value cannot be empty. (Parameter 'stream')
+[11/19/2025 11:43:04 AM] OCR returned 0 chars, quality: 0.00
+[11/19/2025 11:43:04 AM] OCR returned empty/null
+[11/19/2025 11:43:21 AM] Starting OCR for 1iWaJt3MSZYLjlGFwq5Fz3IUtNhdnRUhg using PublicAPI
+[11/19/2025 11:43:27 AM] Downloaded 0 bytes
+[11/19/2025 11:43:27 AM] Inside ExtractTextFromPdfWithOCR
+[11/19/2025 11:43:27 AM] Checking tessdata at: C:\Users\khayy\source\repos\JumpChainSearch\tessdata
+[11/19/2025 11:43:27 AM] Tessdata directory EXISTS
+[11/19/2025 11:43:27 AM] Initializing TesseractEngine
+[11/19/2025 11:43:27 AM] TesseractEngine initialized OK
+[11/19/2025 11:43:27 AM] About to read PDF with ImageMagick
+[11/19/2025 11:43:27 AM] ImageMagick Read FAILED: Value cannot be empty. (Parameter 'stream')
+[11/19/2025 11:43:27 AM] OCR returned 0 chars, quality: 0.00
+[11/19/2025 11:43:27 AM] OCR returned empty/null
+[11/19/2025 11:43:45 AM] Starting OCR for 1bs9orNZF8LYH0IrkYsOpyhDR9aA-6hBR using PublicAPI
+[11/19/2025 11:43:53 AM] Downloaded 0 bytes
+[11/19/2025 11:43:53 AM] Inside ExtractTextFromPdfWithOCR
+[11/19/2025 11:43:53 AM] Checking tessdata at: C:\Users\khayy\source\repos\JumpChainSearch\tessdata
+[11/19/2025 11:43:53 AM] Tessdata directory EXISTS
+[11/19/2025 11:43:53 AM] Initializing TesseractEngine
+[11/19/2025 11:43:53 AM] TesseractEngine initialized OK
+[11/19/2025 11:43:53 AM] About to read PDF with ImageMagick
+[11/19/2025 11:43:53 AM] ImageMagick Read FAILED: Value cannot be empty. (Parameter 'stream')
+[11/19/2025 11:43:53 AM] OCR returned 0 chars, quality: 0.00
+[11/19/2025 11:43:53 AM] OCR returned empty/null
+[11/19/2025 11:44:10 AM] Starting OCR for 1mHPs_vgaCcADG6t3Lbx4G4yBA__strNd using PublicAPI
+[11/19/2025 11:44:17 AM] Downloaded 0 bytes
+[11/19/2025 11:44:17 AM] Inside ExtractTextFromPdfWithOCR
+[11/19/2025 11:44:17 AM] Checking tessdata at: C:\Users\khayy\source\repos\JumpChainSearch\tessdata
+[11/19/2025 11:44:17 AM] Tessdata directory EXISTS
+[11/19/2025 11:44:17 AM] Initializing TesseractEngine
+[11/19/2025 11:44:17 AM] TesseractEngine initialized OK
+[11/19/2025 11:44:17 AM] About to read PDF with ImageMagick
+[11/19/2025 11:44:17 AM] ImageMagick Read FAILED: Value cannot be empty. (Parameter 'stream')
+[11/19/2025 11:44:17 AM] OCR returned 0 chars, quality: 0.00
+[11/19/2025 11:44:17 AM] OCR returned empty/null
+[11/19/2025 11:44:34 AM] Starting OCR for 1Sou9TohXRCGQV6Kx5hCAZ2NSYmuZ3JmU using PublicAPI
+[11/19/2025 11:44:43 AM] Downloaded 0 bytes
+[11/19/2025 11:44:43 AM] Inside ExtractTextFromPdfWithOCR
+[11/19/2025 11:44:43 AM] Checking tessdata at: C:\Users\khayy\source\repos\JumpChainSearch\tessdata
+[11/19/2025 11:44:43 AM] Tessdata directory EXISTS
+[11/19/2025 11:44:43 AM] Initializing TesseractEngine
+[11/19/2025 11:44:43 AM] TesseractEngine initialized OK
+[11/19/2025 11:44:43 AM] About to read PDF with ImageMagick
+[11/19/2025 11:44:43 AM] ImageMagick Read FAILED: Value cannot be empty. (Parameter 'stream')
+[11/19/2025 11:44:43 AM] OCR returned 0 chars, quality: 0.00
+[11/19/2025 11:44:43 AM] OCR returned empty/null
+[11/19/2025 11:44:59 AM] Starting OCR for 1feGuF_cC0m4_cwHWBdsdYkrNZWP1XmnV using PublicAPI
+[11/19/2025 11:45:08 AM] Downloaded 0 bytes
+[11/19/2025 11:45:08 AM] Inside ExtractTextFromPdfWithOCR
+[11/19/2025 11:45:08 AM] Checking tessdata at: C:\Users\khayy\source\repos\JumpChainSearch\tessdata
+[11/19/2025 11:45:08 AM] Tessdata directory EXISTS
+[11/19/2025 11:45:08 AM] Initializing TesseractEngine
+[11/19/2025 11:45:08 AM] TesseractEngine initialized OK
+[11/19/2025 11:45:08 AM] About to read PDF with ImageMagick
+[11/19/2025 11:45:08 AM] ImageMagick Read FAILED: Value cannot be empty. (Parameter 'stream')
+[11/19/2025 11:45:08 AM] OCR returned 0 chars, quality: 0.00
+[11/19/2025 11:45:08 AM] OCR returned empty/null
+[11/19/2025 11:45:24 AM] Starting OCR for 1_aUCR3XXugPD4M_l8bB486a-ifk9jwWV using PublicAPI
+[11/19/2025 11:45:32 AM] Downloaded 0 bytes
+[11/19/2025 11:45:32 AM] Inside ExtractTextFromPdfWithOCR
+[11/19/2025 11:45:32 AM] Checking tessdata at: C:\Users\khayy\source\repos\JumpChainSearch\tessdata
+[11/19/2025 11:45:32 AM] Tessdata directory EXISTS
+[11/19/2025 11:45:32 AM] Initializing TesseractEngine
+[11/19/2025 11:45:32 AM] TesseractEngine initialized OK
+[11/19/2025 11:45:32 AM] About to read PDF with ImageMagick
+[11/19/2025 11:45:32 AM] ImageMagick Read FAILED: Value cannot be empty. (Parameter 'stream')
+[11/19/2025 11:45:32 AM] OCR returned 0 chars, quality: 0.00
+[11/19/2025 11:45:32 AM] OCR returned empty/null
+[11/19/2025 11:45:34 AM] Starting OCR for 1_aUCR3XXugPD4M_l8bB486a-ifk9jwWV using ServiceAccount
+[11/19/2025 11:45:35 AM] Downloaded 4852270 bytes
+[11/19/2025 11:45:35 AM] Inside ExtractTextFromPdfWithOCR
+[11/19/2025 11:45:35 AM] Checking tessdata at: C:\Users\khayy\source\repos\JumpChainSearch\tessdata
+[11/19/2025 11:45:35 AM] Tessdata directory EXISTS
+[11/19/2025 11:45:35 AM] Initializing TesseractEngine
+[11/19/2025 11:45:35 AM] TesseractEngine initialized OK
+[11/19/2025 11:45:35 AM] About to read PDF with ImageMagick
+[11/19/2025 11:46:28 AM] ImageMagick loaded 8 pages
+[11/19/2025 11:48:43 AM] OCR returned 24846 chars, quality: 0.84
+[11/19/2025 11:49:01 AM] Starting OCR for 1VEKo5p96CiFw55gbpgXQLi2sHFNJUMk1 using PublicAPI
+[11/19/2025 11:49:08 AM] Downloaded 0 bytes
+[11/19/2025 11:49:08 AM] Inside ExtractTextFromPdfWithOCR
+[11/19/2025 11:49:08 AM] Checking tessdata at: C:\Users\khayy\source\repos\JumpChainSearch\tessdata
+[11/19/2025 11:49:08 AM] Tessdata directory EXISTS
+[11/19/2025 11:49:08 AM] Initializing TesseractEngine
+[11/19/2025 11:49:08 AM] TesseractEngine initialized OK
+[11/19/2025 11:49:08 AM] About to read PDF with ImageMagick
+[11/19/2025 11:49:08 AM] ImageMagick Read FAILED: Value cannot be empty. (Parameter 'stream')
+[11/19/2025 11:49:08 AM] OCR returned 0 chars, quality: 0.00
+[11/19/2025 11:49:08 AM] OCR returned empty/null
+[11/19/2025 11:49:27 AM] Starting OCR for 1uvnEriJIYUOPYZW_tee4ehpz7ULVfCZN using PublicAPI
+[11/19/2025 11:49:37 AM] Downloaded 0 bytes
+[11/19/2025 11:49:37 AM] Inside ExtractTextFromPdfWithOCR
+[11/19/2025 11:49:37 AM] Checking tessdata at: C:\Users\khayy\source\repos\JumpChainSearch\tessdata
+[11/19/2025 11:49:37 AM] Tessdata directory EXISTS
+[11/19/2025 11:49:37 AM] Initializing TesseractEngine
+[11/19/2025 11:49:37 AM] TesseractEngine initialized OK
+[11/19/2025 11:49:37 AM] About to read PDF with ImageMagick
+[11/19/2025 11:49:37 AM] ImageMagick Read FAILED: Value cannot be empty. (Parameter 'stream')
+[11/19/2025 11:49:37 AM] OCR returned 0 chars, quality: 0.00
+[11/19/2025 11:49:37 AM] OCR returned empty/null
+[11/19/2025 11:49:56 AM] Starting OCR for 1iUFRXi_IArAHBZuSjSs31RoIjYaZFFBz using PublicAPI
+[11/19/2025 11:50:03 AM] Downloaded 0 bytes
+[11/19/2025 11:50:03 AM] Inside ExtractTextFromPdfWithOCR
+[11/19/2025 11:50:03 AM] Checking tessdata at: C:\Users\khayy\source\repos\JumpChainSearch\tessdata
+[11/19/2025 11:50:03 AM] Tessdata directory EXISTS
+[11/19/2025 11:50:03 AM] Initializing TesseractEngine
+[11/19/2025 11:50:03 AM] TesseractEngine initialized OK
+[11/19/2025 11:50:03 AM] About to read PDF with ImageMagick
+[11/19/2025 11:50:03 AM] ImageMagick Read FAILED: Value cannot be empty. (Parameter 'stream')
+[11/19/2025 11:50:03 AM] OCR returned 0 chars, quality: 0.00
+[11/19/2025 11:50:03 AM] OCR returned empty/null
+[11/19/2025 11:50:22 AM] Starting OCR for 1f8fdD7tqdi4cpemiYyV5R5KpCtnYxh4Q using PublicAPI
+[11/19/2025 11:50:29 AM] Downloaded 0 bytes
+[11/19/2025 11:50:29 AM] Inside ExtractTextFromPdfWithOCR
+[11/19/2025 11:50:29 AM] Checking tessdata at: C:\Users\khayy\source\repos\JumpChainSearch\tessdata
+[11/19/2025 11:50:29 AM] Tessdata directory EXISTS
+[11/19/2025 11:50:29 AM] Initializing TesseractEngine
+[11/19/2025 11:50:29 AM] TesseractEngine initialized OK
+[11/19/2025 11:50:29 AM] About to read PDF with ImageMagick
+[11/19/2025 11:50:29 AM] ImageMagick Read FAILED: Value cannot be empty. (Parameter 'stream')
+[11/19/2025 11:50:29 AM] OCR returned 0 chars, quality: 0.00
+[11/19/2025 11:50:29 AM] OCR returned empty/null
+[11/19/2025 11:50:49 AM] Starting OCR for 1hxHJpXxfJj9Uvjv2ZfLFuWL5RFEgGQzY using PublicAPI
+[11/19/2025 11:50:54 AM] Downloaded 0 bytes
+[11/19/2025 11:50:54 AM] Inside ExtractTextFromPdfWithOCR
+[11/19/2025 11:50:54 AM] Checking tessdata at: C:\Users\khayy\source\repos\JumpChainSearch\tessdata
+[11/19/2025 11:50:54 AM] Tessdata directory EXISTS
+[11/19/2025 11:50:54 AM] Initializing TesseractEngine
+[11/19/2025 11:50:54 AM] TesseractEngine initialized OK
+[11/19/2025 11:50:54 AM] About to read PDF with ImageMagick
+[11/19/2025 11:50:54 AM] ImageMagick Read FAILED: Value cannot be empty. (Parameter 'stream')
+[11/19/2025 11:50:54 AM] OCR returned 0 chars, quality: 0.00
+[11/19/2025 11:50:54 AM] OCR returned empty/null
+[11/19/2025 11:51:09 AM] Starting OCR for 1Yd2GEH8uDk5Cx-lz-4TEzRhcnNZz8YgD using PublicAPI
+[11/19/2025 11:51:18 AM] Downloaded 0 bytes
+[11/19/2025 11:51:18 AM] Inside ExtractTextFromPdfWithOCR
+[11/19/2025 11:51:18 AM] Checking tessdata at: C:\Users\khayy\source\repos\JumpChainSearch\tessdata
+[11/19/2025 11:51:18 AM] Tessdata directory EXISTS
+[11/19/2025 11:51:18 AM] Initializing TesseractEngine
+[11/19/2025 11:51:19 AM] TesseractEngine initialized OK
+[11/19/2025 11:51:19 AM] About to read PDF with ImageMagick
+[11/19/2025 11:51:19 AM] ImageMagick Read FAILED: Value cannot be empty. (Parameter 'stream')
+[11/19/2025 11:51:19 AM] OCR returned 0 chars, quality: 0.00
+[11/19/2025 11:51:19 AM] OCR returned empty/null
+[11/19/2025 11:51:41 AM] Starting OCR for 1lg7lHknVUYap7ceCdusAk3j-0V4VQDQQ using PublicAPI
+[11/19/2025 11:51:48 AM] Downloaded 0 bytes
+[11/19/2025 11:51:48 AM] Inside ExtractTextFromPdfWithOCR
+[11/19/2025 11:51:48 AM] Checking tessdata at: C:\Users\khayy\source\repos\JumpChainSearch\tessdata
+[11/19/2025 11:51:48 AM] Tessdata directory EXISTS
+[11/19/2025 11:51:48 AM] Initializing TesseractEngine
+[11/19/2025 11:51:48 AM] TesseractEngine initialized OK
+[11/19/2025 11:51:48 AM] About to read PDF with ImageMagick
+[11/19/2025 11:51:48 AM] ImageMagick Read FAILED: Value cannot be empty. (Parameter 'stream')
+[11/19/2025 11:51:48 AM] OCR returned 0 chars, quality: 0.00
+[11/19/2025 11:51:48 AM] OCR returned empty/null
+[11/19/2025 11:52:06 AM] Starting OCR for 1ZorlPZCarp4hSPA0BClwzBkBIUgreUUt using PublicAPI
+[11/19/2025 11:52:14 AM] Downloaded 0 bytes
+[11/19/2025 11:52:14 AM] Inside ExtractTextFromPdfWithOCR
+[11/19/2025 11:52:14 AM] Checking tessdata at: C:\Users\khayy\source\repos\JumpChainSearch\tessdata
+[11/19/2025 11:52:14 AM] Tessdata directory EXISTS
+[11/19/2025 11:52:14 AM] Initializing TesseractEngine
+[11/19/2025 11:52:14 AM] TesseractEngine initialized OK
+[11/19/2025 11:52:14 AM] About to read PDF with ImageMagick
+[11/19/2025 11:52:14 AM] ImageMagick Read FAILED: Value cannot be empty. (Parameter 'stream')
+[11/19/2025 11:52:14 AM] OCR returned 0 chars, quality: 0.00
+[11/19/2025 11:52:14 AM] OCR returned empty/null
+[11/19/2025 11:52:32 AM] Starting OCR for 1kBgqNBC4XlPKMzNRBw89Dab29SDnaURH using PublicAPI
+[11/19/2025 11:52:38 AM] Downloaded 0 bytes
+[11/19/2025 11:52:38 AM] Inside ExtractTextFromPdfWithOCR
+[11/19/2025 11:52:38 AM] Checking tessdata at: C:\Users\khayy\source\repos\JumpChainSearch\tessdata
+[11/19/2025 11:52:38 AM] Tessdata directory EXISTS
+[11/19/2025 11:52:38 AM] Initializing TesseractEngine
+[11/19/2025 11:52:38 AM] TesseractEngine initialized OK
+[11/19/2025 11:52:38 AM] About to read PDF with ImageMagick
+[11/19/2025 11:52:38 AM] ImageMagick Read FAILED: Value cannot be empty. (Parameter 'stream')
+[11/19/2025 11:52:38 AM] OCR returned 0 chars, quality: 0.00
+[11/19/2025 11:52:38 AM] OCR returned empty/null
+[11/19/2025 11:52:55 AM] Starting OCR for 1znzCxdU8r3LhI4r9Iaf_64ytYcS3HIUQ using PublicAPI
+[11/19/2025 11:53:00 AM] Downloaded 0 bytes
+[11/19/2025 11:53:00 AM] Inside ExtractTextFromPdfWithOCR
+[11/19/2025 11:53:00 AM] Checking tessdata at: C:\Users\khayy\source\repos\JumpChainSearch\tessdata
+[11/19/2025 11:53:00 AM] Tessdata directory EXISTS
+[11/19/2025 11:53:00 AM] Initializing TesseractEngine
+[11/19/2025 11:53:00 AM] TesseractEngine initialized OK
+[11/19/2025 11:53:00 AM] About to read PDF with ImageMagick
+[11/19/2025 11:53:00 AM] ImageMagick Read FAILED: Value cannot be empty. (Parameter 'stream')
+[11/19/2025 11:53:00 AM] OCR returned 0 chars, quality: 0.00
+[11/19/2025 11:53:00 AM] OCR returned empty/null
+[11/19/2025 11:53:17 AM] Starting OCR for 1D_qCvEXqKT7jSlXGag8mvjBOyWuQBiT3 using PublicAPI
+[11/19/2025 11:53:26 AM] Downloaded 0 bytes
+[11/19/2025 11:53:26 AM] Inside ExtractTextFromPdfWithOCR
+[11/19/2025 11:53:26 AM] Checking tessdata at: C:\Users\khayy\source\repos\JumpChainSearch\tessdata
+[11/19/2025 11:53:26 AM] Tessdata directory EXISTS
+[11/19/2025 11:53:26 AM] Initializing TesseractEngine
+[11/19/2025 11:53:26 AM] TesseractEngine initialized OK
+[11/19/2025 11:53:26 AM] About to read PDF with ImageMagick
+[11/19/2025 11:53:26 AM] ImageMagick Read FAILED: Value cannot be empty. (Parameter 'stream')
+[11/19/2025 11:53:26 AM] OCR returned 0 chars, quality: 0.00
+[11/19/2025 11:53:26 AM] OCR returned empty/null
+[11/19/2025 11:53:42 AM] Starting OCR for 1vNAG93KKcaQSmC6Id1UKvF6K9_ipnlCC using PublicAPI
+[11/19/2025 11:53:47 AM] Downloaded 0 bytes
+[11/19/2025 11:53:47 AM] Inside ExtractTextFromPdfWithOCR
+[11/19/2025 11:53:47 AM] Checking tessdata at: C:\Users\khayy\source\repos\JumpChainSearch\tessdata
+[11/19/2025 11:53:47 AM] Tessdata directory EXISTS
+[11/19/2025 11:53:47 AM] Initializing TesseractEngine
+[11/19/2025 11:53:47 AM] TesseractEngine initialized OK
+[11/19/2025 11:53:47 AM] About to read PDF with ImageMagick
+[11/19/2025 11:53:47 AM] ImageMagick Read FAILED: Value cannot be empty. (Parameter 'stream')
+[11/19/2025 11:53:47 AM] OCR returned 0 chars, quality: 0.00
+[11/19/2025 11:53:47 AM] OCR returned empty/null
+[11/19/2025 11:54:04 AM] Starting OCR for 1vMuCDPxyrKvf21TTmQoQXlXJCkjFsSrE using PublicAPI
+[11/19/2025 11:54:09 AM] Downloaded 0 bytes
+[11/19/2025 11:54:09 AM] Inside ExtractTextFromPdfWithOCR
+[11/19/2025 11:54:09 AM] Checking tessdata at: C:\Users\khayy\source\repos\JumpChainSearch\tessdata
+[11/19/2025 11:54:09 AM] Tessdata directory EXISTS
+[11/19/2025 11:54:09 AM] Initializing TesseractEngine
+[11/19/2025 11:54:09 AM] TesseractEngine initialized OK
+[11/19/2025 11:54:09 AM] About to read PDF with ImageMagick
+[11/19/2025 11:54:09 AM] ImageMagick Read FAILED: Value cannot be empty. (Parameter 'stream')
+[11/19/2025 11:54:09 AM] OCR returned 0 chars, quality: 0.00
+[11/19/2025 11:54:09 AM] OCR returned empty/null
+[11/19/2025 11:54:25 AM] Starting OCR for 1feG71JllTvDivlagMlAjzQwvVE0I-1AM using PublicAPI
+[11/19/2025 11:54:32 AM] Downloaded 0 bytes
+[11/19/2025 11:54:32 AM] Inside ExtractTextFromPdfWithOCR
+[11/19/2025 11:54:32 AM] Checking tessdata at: C:\Users\khayy\source\repos\JumpChainSearch\tessdata
+[11/19/2025 11:54:32 AM] Tessdata directory EXISTS
+[11/19/2025 11:54:32 AM] Initializing TesseractEngine
+[11/19/2025 11:54:32 AM] TesseractEngine initialized OK
+[11/19/2025 11:54:32 AM] About to read PDF with ImageMagick
+[11/19/2025 11:54:32 AM] ImageMagick Read FAILED: Value cannot be empty. (Parameter 'stream')
+[11/19/2025 11:54:32 AM] OCR returned 0 chars, quality: 0.00
+[11/19/2025 11:54:32 AM] OCR returned empty/null
+[11/19/2025 11:54:51 AM] Starting OCR for 1USdJLlr3pAgdNsJIrf2b82IFK1beL6yC using PublicAPI
+[11/19/2025 11:54:57 AM] Downloaded 0 bytes
+[11/19/2025 11:54:57 AM] Inside ExtractTextFromPdfWithOCR
+[11/19/2025 11:54:57 AM] Checking tessdata at: C:\Users\khayy\source\repos\JumpChainSearch\tessdata
+[11/19/2025 11:54:57 AM] Tessdata directory EXISTS
+[11/19/2025 11:54:57 AM] Initializing TesseractEngine
+[11/19/2025 11:54:57 AM] TesseractEngine initialized OK
+[11/19/2025 11:54:57 AM] About to read PDF with ImageMagick
+[11/19/2025 11:54:57 AM] ImageMagick Read FAILED: Value cannot be empty. (Parameter 'stream')
+[11/19/2025 11:54:57 AM] OCR returned 0 chars, quality: 0.00
+[11/19/2025 11:54:57 AM] OCR returned empty/null
+[11/19/2025 11:55:13 AM] Starting OCR for 16TpUaKW7c6kTd9scvcnCgJK5olOkEd7z using PublicAPI
+[11/19/2025 11:55:23 AM] Downloaded 0 bytes
+[11/19/2025 11:55:23 AM] Inside ExtractTextFromPdfWithOCR
+[11/19/2025 11:55:23 AM] Checking tessdata at: C:\Users\khayy\source\repos\JumpChainSearch\tessdata
+[11/19/2025 11:55:23 AM] Tessdata directory EXISTS
+[11/19/2025 11:55:23 AM] Initializing TesseractEngine
+[11/19/2025 11:55:23 AM] TesseractEngine initialized OK
+[11/19/2025 11:55:23 AM] About to read PDF with ImageMagick
+[11/19/2025 11:55:23 AM] ImageMagick Read FAILED: Value cannot be empty. (Parameter 'stream')
+[11/19/2025 11:55:23 AM] OCR returned 0 chars, quality: 0.00
+[11/19/2025 11:55:23 AM] OCR returned empty/null
+[11/19/2025 11:55:39 AM] Starting OCR for 1v_3UXLPgZWm8zj5PKKSp0klNB-ElZUgs using PublicAPI
+[11/19/2025 11:55:45 AM] Downloaded 0 bytes
+[11/19/2025 11:55:45 AM] Inside ExtractTextFromPdfWithOCR
+[11/19/2025 11:55:45 AM] Checking tessdata at: C:\Users\khayy\source\repos\JumpChainSearch\tessdata
+[11/19/2025 11:55:45 AM] Tessdata directory EXISTS
+[11/19/2025 11:55:45 AM] Initializing TesseractEngine
+[11/19/2025 11:55:45 AM] TesseractEngine initialized OK
+[11/19/2025 11:55:45 AM] About to read PDF with ImageMagick
+[11/19/2025 11:55:45 AM] ImageMagick Read FAILED: Value cannot be empty. (Parameter 'stream')
+[11/19/2025 11:55:45 AM] OCR returned 0 chars, quality: 0.00
+[11/19/2025 11:55:45 AM] OCR returned empty/null
+[11/19/2025 11:56:05 AM] Starting OCR for 1Pdc5r8au1S7J8elPtEjxCPn98H14mnG2 using PublicAPI
+[11/19/2025 11:56:11 AM] Downloaded 0 bytes
+[11/19/2025 11:56:11 AM] Inside ExtractTextFromPdfWithOCR
+[11/19/2025 11:56:11 AM] Checking tessdata at: C:\Users\khayy\source\repos\JumpChainSearch\tessdata
+[11/19/2025 11:56:11 AM] Tessdata directory EXISTS
+[11/19/2025 11:56:11 AM] Initializing TesseractEngine
+[11/19/2025 11:56:11 AM] TesseractEngine initialized OK
+[11/19/2025 11:56:11 AM] About to read PDF with ImageMagick
+[11/19/2025 11:56:11 AM] ImageMagick Read FAILED: Value cannot be empty. (Parameter 'stream')
+[11/19/2025 11:56:11 AM] OCR returned 0 chars, quality: 0.00
+[11/19/2025 11:56:11 AM] OCR returned empty/null
+[11/19/2025 11:56:31 AM] Starting OCR for 1j5JpO-OiW7WiQmOBWSfsbNTqP9BQhHTe using PublicAPI
+[11/19/2025 11:56:38 AM] Downloaded 0 bytes
+[11/19/2025 11:56:38 AM] Inside ExtractTextFromPdfWithOCR
+[11/19/2025 11:56:38 AM] Checking tessdata at: C:\Users\khayy\source\repos\JumpChainSearch\tessdata
+[11/19/2025 11:56:38 AM] Tessdata directory EXISTS
+[11/19/2025 11:56:38 AM] Initializing TesseractEngine
+[11/19/2025 11:56:38 AM] TesseractEngine initialized OK
+[11/19/2025 11:56:38 AM] About to read PDF with ImageMagick
+[11/19/2025 11:56:38 AM] ImageMagick Read FAILED: Value cannot be empty. (Parameter 'stream')
+[11/19/2025 11:56:38 AM] OCR returned 0 chars, quality: 0.00
+[11/19/2025 11:56:38 AM] OCR returned empty/null
+[11/19/2025 11:56:54 AM] Starting OCR for 1TnQdcYQlGd_h-ZsMA2kdcYq-0KOo3PvT using PublicAPI
+[11/19/2025 11:57:03 AM] Downloaded 0 bytes
+[11/19/2025 11:57:03 AM] Inside ExtractTextFromPdfWithOCR
+[11/19/2025 11:57:03 AM] Checking tessdata at: C:\Users\khayy\source\repos\JumpChainSearch\tessdata
+[11/19/2025 11:57:03 AM] Tessdata directory EXISTS
+[11/19/2025 11:57:03 AM] Initializing TesseractEngine
+[11/19/2025 11:57:03 AM] TesseractEngine initialized OK
+[11/19/2025 11:57:03 AM] About to read PDF with ImageMagick
+[11/19/2025 11:57:03 AM] ImageMagick Read FAILED: Value cannot be empty. (Parameter 'stream')
+[11/19/2025 11:57:03 AM] OCR returned 0 chars, quality: 0.00
+[11/19/2025 11:57:03 AM] OCR returned empty/null
+[11/19/2025 11:57:09 AM] Starting OCR for 1TnQdcYQlGd_h-ZsMA2kdcYq-0KOo3PvT using ServiceAccount
+[11/19/2025 11:57:12 AM] Downloaded 19409638 bytes
+[11/19/2025 11:57:12 AM] Inside ExtractTextFromPdfWithOCR
+[11/19/2025 11:57:12 AM] Checking tessdata at: C:\Users\khayy\source\repos\JumpChainSearch\tessdata
+[11/19/2025 11:57:12 AM] Tessdata directory EXISTS
+[11/19/2025 11:57:12 AM] Initializing TesseractEngine
+[11/19/2025 11:57:12 AM] TesseractEngine initialized OK
+[11/19/2025 11:57:12 AM] About to read PDF with ImageMagick
+[11/19/2025 12:02:16 PM] OCR returned 0 chars, quality: 0.00
+[11/19/2025 12:02:20 PM] OCR returned empty/null
+[11/19/2025 12:03:19 PM] Starting OCR for 1eKmOOeeqVq5fnHIrBHPu-7tezqpvofgU using PublicAPI
+[11/19/2025 12:03:26 PM] Downloaded 0 bytes
+[11/19/2025 12:03:26 PM] Inside ExtractTextFromPdfWithOCR
+[11/19/2025 12:03:26 PM] Checking tessdata at: C:\Users\khayy\source\repos\JumpChainSearch\tessdata
+[11/19/2025 12:03:26 PM] Tessdata directory EXISTS
+[11/19/2025 12:03:26 PM] Initializing TesseractEngine
+[11/19/2025 12:03:31 PM] TesseractEngine initialized OK
+[11/19/2025 12:03:31 PM] About to read PDF with ImageMagick
+[11/19/2025 12:03:32 PM] ImageMagick Read FAILED: Value cannot be empty. (Parameter 'stream')
+[11/19/2025 12:03:32 PM] OCR returned 0 chars, quality: 0.00
+[11/19/2025 12:03:32 PM] OCR returned empty/null
+[11/19/2025 12:03:54 PM] ImageMagick loaded 7 pages
+[11/19/2025 12:04:43 PM] Starting OCR for 1Ck06oqtfSCtJrvYhNwi47pP8de3n4Wvo using PublicAPI
+[11/19/2025 12:04:52 PM] Downloaded 0 bytes
+[11/19/2025 12:04:52 PM] Inside ExtractTextFromPdfWithOCR
+[11/19/2025 12:04:52 PM] Checking tessdata at: C:\Users\khayy\source\repos\JumpChainSearch\tessdata
+[11/19/2025 12:04:52 PM] Tessdata directory EXISTS
+[11/19/2025 12:04:52 PM] Initializing TesseractEngine
+[11/19/2025 12:04:59 PM] TesseractEngine initialized OK
+[11/19/2025 12:04:59 PM] About to read PDF with ImageMagick
+[11/19/2025 12:05:00 PM] ImageMagick Read FAILED: Value cannot be empty. (Parameter 'stream')
+[11/19/2025 12:05:00 PM] OCR returned 0 chars, quality: 0.00
+[11/19/2025 12:05:00 PM] OCR returned empty/null
+[11/19/2025 12:05:21 PM] Starting OCR for 1NmtN9jAapAacNikERRkGK7dscV-025AZ using PublicAPI
+[11/19/2025 12:05:27 PM] Downloaded 0 bytes
+[11/19/2025 12:05:28 PM] Inside ExtractTextFromPdfWithOCR
+[11/19/2025 12:05:28 PM] Checking tessdata at: C:\Users\khayy\source\repos\JumpChainSearch\tessdata
+[11/19/2025 12:05:28 PM] Tessdata directory EXISTS
+[11/19/2025 12:05:28 PM] Initializing TesseractEngine
+[11/19/2025 12:05:30 PM] TesseractEngine initialized OK
+[11/19/2025 12:05:31 PM] About to read PDF with ImageMagick
+[11/19/2025 12:05:31 PM] ImageMagick Read FAILED: Value cannot be empty. (Parameter 'stream')
+[11/19/2025 12:05:32 PM] OCR returned 0 chars, quality: 0.00
+[11/19/2025 12:05:32 PM] OCR returned empty/null
+[11/19/2025 12:05:50 PM] Starting OCR for 1pLe8DXsR2UjjdxRaFyrkbfHBp8SToeAF using PublicAPI
+[11/19/2025 12:05:59 PM] Downloaded 0 bytes
+[11/19/2025 12:06:05 PM] Inside ExtractTextFromPdfWithOCR
+[11/19/2025 12:06:05 PM] Checking tessdata at: C:\Users\khayy\source\repos\JumpChainSearch\tessdata
+[11/19/2025 12:06:05 PM] Tessdata directory EXISTS
+[11/19/2025 12:06:05 PM] Initializing TesseractEngine
+[11/19/2025 12:06:06 PM] TesseractEngine initialized OK
+[11/19/2025 12:06:07 PM] About to read PDF with ImageMagick
+[11/19/2025 12:06:07 PM] ImageMagick Read FAILED: Value cannot be empty. (Parameter 'stream')
+[11/19/2025 12:06:07 PM] OCR returned 0 chars, quality: 0.00
+[11/19/2025 12:06:07 PM] OCR returned empty/null
+[11/19/2025 12:06:24 PM] Starting OCR for 1CpahvXznA8pBreFJ6uXloiCJs7wR8jqI using PublicAPI
+[11/19/2025 12:06:35 PM] Downloaded 0 bytes
+[11/19/2025 12:06:35 PM] Inside ExtractTextFromPdfWithOCR
+[11/19/2025 12:06:35 PM] Checking tessdata at: C:\Users\khayy\source\repos\JumpChainSearch\tessdata
+[11/19/2025 12:06:35 PM] Tessdata directory EXISTS
+[11/19/2025 12:06:35 PM] Initializing TesseractEngine
+[11/19/2025 12:06:35 PM] TesseractEngine initialized OK
+[11/19/2025 12:06:35 PM] About to read PDF with ImageMagick
+[11/19/2025 12:06:35 PM] ImageMagick Read FAILED: Value cannot be empty. (Parameter 'stream')
+[11/19/2025 12:06:35 PM] OCR returned 0 chars, quality: 0.00
+[11/19/2025 12:06:35 PM] OCR returned empty/null
+[11/19/2025 12:06:55 PM] Starting OCR for 1bm0CKkce9JUWXSfTV0D2UZtILUMETZ6L using PublicAPI
+[11/19/2025 12:07:03 PM] Downloaded 0 bytes
+[11/19/2025 12:07:03 PM] Inside ExtractTextFromPdfWithOCR
+[11/19/2025 12:07:03 PM] Checking tessdata at: C:\Users\khayy\source\repos\JumpChainSearch\tessdata
+[11/19/2025 12:07:03 PM] Tessdata directory EXISTS
+[11/19/2025 12:07:03 PM] Initializing TesseractEngine
+[11/19/2025 12:07:03 PM] TesseractEngine initialized OK
+[11/19/2025 12:07:03 PM] About to read PDF with ImageMagick
+[11/19/2025 12:07:03 PM] ImageMagick Read FAILED: Value cannot be empty. (Parameter 'stream')
+[11/19/2025 12:07:03 PM] OCR returned 0 chars, quality: 0.00
+[11/19/2025 12:07:03 PM] OCR returned empty/null
+[11/19/2025 12:07:33 PM] Starting OCR for 1RCYp-F8trd3a70dTtEe85D8M-BKnXY9O using PublicAPI
+[11/19/2025 12:07:43 PM] Downloaded 0 bytes
+[11/19/2025 12:07:47 PM] Inside ExtractTextFromPdfWithOCR
+[11/19/2025 12:07:48 PM] Checking tessdata at: C:\Users\khayy\source\repos\JumpChainSearch\tessdata
+[11/19/2025 12:07:51 PM] Tessdata directory EXISTS
+[11/19/2025 12:07:53 PM] Initializing TesseractEngine
+[11/19/2025 12:08:03 PM] TesseractEngine initialized OK
+[11/19/2025 12:08:04 PM] About to read PDF with ImageMagick
+[11/19/2025 12:08:04 PM] ImageMagick Read FAILED: Value cannot be empty. (Parameter 'stream')
+[11/19/2025 12:08:07 PM] OCR returned 0 chars, quality: 0.00
+[11/19/2025 12:08:07 PM] OCR returned empty/null
+[11/19/2025 12:11:15 PM] Starting OCR for 1rxqmT_LltivwqBgGJDiKPSvvR6zp6bs0 using PublicAPI
+[11/19/2025 12:11:25 PM] Downloaded 0 bytes
+[11/19/2025 12:11:29 PM] Inside ExtractTextFromPdfWithOCR
+[11/19/2025 12:11:34 PM] Checking tessdata at: C:\Users\khayy\source\repos\JumpChainSearch\tessdata
+[11/19/2025 12:11:37 PM] Tessdata directory EXISTS
+[11/19/2025 12:11:39 PM] Initializing TesseractEngine
+[11/19/2025 12:11:41 PM] TesseractEngine initialized OK
+[11/19/2025 12:11:43 PM] About to read PDF with ImageMagick
+[11/19/2025 12:11:43 PM] ImageMagick Read FAILED: Value cannot be empty. (Parameter 'stream')
+[11/19/2025 12:11:45 PM] OCR returned 0 chars, quality: 0.00
+[11/19/2025 12:11:45 PM] OCR returned empty/null
+[11/19/2025 12:13:08 PM] Starting OCR for 1pYH9Yg3ADhgRifuWAFho5n_-0zQeskq3 using PublicAPI
+[11/19/2025 12:13:25 PM] Downloaded 0 bytes
+[11/19/2025 12:13:26 PM] Inside ExtractTextFromPdfWithOCR
+[11/19/2025 12:13:26 PM] Checking tessdata at: C:\Users\khayy\source\repos\JumpChainSearch\tessdata
+[11/19/2025 12:13:26 PM] Tessdata directory EXISTS
+[11/19/2025 12:13:26 PM] Initializing TesseractEngine
+[11/19/2025 12:13:28 PM] TesseractEngine initialized OK
+[11/19/2025 12:13:30 PM] About to read PDF with ImageMagick
+[11/19/2025 12:13:31 PM] ImageMagick Read FAILED: Value cannot be empty. (Parameter 'stream')
+[11/19/2025 12:13:31 PM] OCR returned 0 chars, quality: 0.00
+[11/19/2025 12:13:33 PM] OCR returned empty/null
+[11/19/2025 12:15:23 PM] Starting OCR for 1XJMMkLbtgI2VMAAD0Dii-w5auMuPxnzi using PublicAPI
+[11/19/2025 12:15:34 PM] Downloaded 0 bytes
+[11/19/2025 12:15:40 PM] Inside ExtractTextFromPdfWithOCR
+[11/19/2025 12:15:43 PM] Checking tessdata at: C:\Users\khayy\source\repos\JumpChainSearch\tessdata
+[11/19/2025 12:15:56 PM] Tessdata directory EXISTS
+[11/19/2025 12:15:57 PM] Initializing TesseractEngine
+[11/19/2025 12:16:04 PM] TesseractEngine initialized OK
+[11/19/2025 12:16:07 PM] About to read PDF with ImageMagick
+[11/19/2025 12:16:14 PM] ImageMagick Read FAILED: Value cannot be empty. (Parameter 'stream')
+[11/19/2025 12:16:26 PM] OCR returned 0 chars, quality: 0.00
+[11/19/2025 12:16:30 PM] OCR returned empty/null
+[11/19/2025 12:17:13 PM] Starting OCR for 1hePcmDM6tXcGgoPKp-yRXfnVOhIpTgMj using PublicAPI
+[11/19/2025 12:17:21 PM] Downloaded 0 bytes
+[11/19/2025 12:17:22 PM] Inside ExtractTextFromPdfWithOCR
+[11/19/2025 12:17:26 PM] Checking tessdata at: C:\Users\khayy\source\repos\JumpChainSearch\tessdata
+[11/19/2025 12:17:28 PM] Tessdata directory EXISTS
+[11/19/2025 12:17:28 PM] Initializing TesseractEngine
+[11/19/2025 12:17:28 PM] TesseractEngine initialized OK
+[11/19/2025 12:17:29 PM] About to read PDF with ImageMagick
+[11/19/2025 12:17:32 PM] ImageMagick Read FAILED: Value cannot be empty. (Parameter 'stream')
+[11/19/2025 12:17:33 PM] OCR returned 0 chars, quality: 0.00
+[11/19/2025 12:17:35 PM] OCR returned empty/null
+[11/19/2025 12:18:12 PM] Starting OCR for 1sNVGa9M0nR5_GBX7bT1YnStMSIbYmCm9 using PublicAPI
+[11/19/2025 12:18:32 PM] Downloaded 0 bytes
+[11/19/2025 12:18:33 PM] Inside ExtractTextFromPdfWithOCR
+[11/19/2025 12:18:36 PM] Checking tessdata at: C:\Users\khayy\source\repos\JumpChainSearch\tessdata
+[11/19/2025 12:18:40 PM] Tessdata directory EXISTS
+[11/19/2025 12:18:43 PM] Initializing TesseractEngine
+[11/19/2025 12:18:49 PM] TesseractEngine initialized OK
+[11/19/2025 12:18:52 PM] About to read PDF with ImageMagick
+[11/19/2025 12:18:53 PM] ImageMagick Read FAILED: Value cannot be empty. (Parameter 'stream')
+[11/19/2025 12:18:57 PM] OCR returned 0 chars, quality: 0.00
+[11/19/2025 12:19:01 PM] OCR returned empty/null
+[11/19/2025 12:20:01 PM] Starting OCR for 1ulnnxGUE13y3isK7FYQL_GEHsmgWlIYP using PublicAPI
+[11/19/2025 12:20:11 PM] Downloaded 0 bytes
+[11/19/2025 12:20:11 PM] Inside ExtractTextFromPdfWithOCR
+[11/19/2025 12:20:12 PM] Checking tessdata at: C:\Users\khayy\source\repos\JumpChainSearch\tessdata
+[11/19/2025 12:20:13 PM] Tessdata directory EXISTS
+[11/19/2025 12:20:13 PM] Initializing TesseractEngine
+[11/19/2025 12:20:14 PM] TesseractEngine initialized OK
+[11/19/2025 12:20:19 PM] About to read PDF with ImageMagick
+[11/19/2025 12:20:21 PM] ImageMagick Read FAILED: Value cannot be empty. (Parameter 'stream')
+[11/19/2025 12:20:22 PM] OCR returned 0 chars, quality: 0.00
+[11/19/2025 12:20:22 PM] OCR returned empty/null
+[11/19/2025 12:20:51 PM] Starting OCR for 1_DuifHTpptizAR2AhEOQqalNADEIo0Nt using PublicAPI
+[11/19/2025 12:21:04 PM] Downloaded 0 bytes
+[11/19/2025 12:21:09 PM] Inside ExtractTextFromPdfWithOCR
+[11/19/2025 12:21:18 PM] Checking tessdata at: C:\Users\khayy\source\repos\JumpChainSearch\tessdata
+[11/19/2025 12:21:21 PM] Tessdata directory EXISTS
+[11/19/2025 12:21:22 PM] Initializing TesseractEngine
+[11/19/2025 12:21:29 PM] TesseractEngine initialized OK
+[11/19/2025 12:21:31 PM] About to read PDF with ImageMagick
+[11/19/2025 12:21:34 PM] ImageMagick Read FAILED: Value cannot be empty. (Parameter 'stream')
+[11/19/2025 12:21:37 PM] OCR returned 0 chars, quality: 0.00
+[11/19/2025 12:21:38 PM] OCR returned empty/null
+[11/19/2025 12:22:16 PM] Starting OCR for 11ZaFC68ePjtdHlD5N1leqjz5j3ExB2kz using PublicAPI
+[11/19/2025 12:22:25 PM] Downloaded 0 bytes
+[11/19/2025 12:22:26 PM] Inside ExtractTextFromPdfWithOCR
+[11/19/2025 12:22:26 PM] Checking tessdata at: C:\Users\khayy\source\repos\JumpChainSearch\tessdata
+[11/19/2025 12:22:26 PM] Tessdata directory EXISTS
+[11/19/2025 12:22:26 PM] Initializing TesseractEngine
+[11/19/2025 12:22:27 PM] TesseractEngine initialized OK
+[11/19/2025 12:22:27 PM] About to read PDF with ImageMagick
+[11/19/2025 12:22:27 PM] ImageMagick Read FAILED: Value cannot be empty. (Parameter 'stream')
+[11/19/2025 12:22:27 PM] OCR returned 0 chars, quality: 0.00
+[11/19/2025 12:22:27 PM] OCR returned empty/null
+[11/19/2025 12:22:56 PM] Starting OCR for 1T7DApAdGpu7VGy_xIIcfO8dmGaAKoKIS using PublicAPI
+[11/19/2025 12:23:05 PM] Downloaded 0 bytes
+[11/19/2025 12:23:06 PM] Inside ExtractTextFromPdfWithOCR
+[11/19/2025 12:23:06 PM] Checking tessdata at: C:\Users\khayy\source\repos\JumpChainSearch\tessdata
+[11/19/2025 12:23:06 PM] Tessdata directory EXISTS
+[11/19/2025 12:23:06 PM] Initializing TesseractEngine
+[11/19/2025 12:23:06 PM] TesseractEngine initialized OK
+[11/19/2025 12:23:06 PM] About to read PDF with ImageMagick
+[11/19/2025 12:23:06 PM] ImageMagick Read FAILED: Value cannot be empty. (Parameter 'stream')
+[11/19/2025 12:23:06 PM] OCR returned 0 chars, quality: 0.00
+[11/19/2025 12:23:06 PM] OCR returned empty/null
+[11/19/2025 12:23:25 PM] Starting OCR for 1NeXmaXo7VsqZIM1732GZMMwgbtoHCFSK using PublicAPI
+[11/19/2025 12:23:34 PM] Downloaded 0 bytes
+[11/19/2025 12:23:34 PM] Inside ExtractTextFromPdfWithOCR
+[11/19/2025 12:23:34 PM] Checking tessdata at: C:\Users\khayy\source\repos\JumpChainSearch\tessdata
+[11/19/2025 12:23:34 PM] Tessdata directory EXISTS
+[11/19/2025 12:23:34 PM] Initializing TesseractEngine
+[11/19/2025 12:23:34 PM] TesseractEngine initialized OK
+[11/19/2025 12:23:34 PM] About to read PDF with ImageMagick
+[11/19/2025 12:23:34 PM] ImageMagick Read FAILED: Value cannot be empty. (Parameter 'stream')
+[11/19/2025 12:23:34 PM] OCR returned 0 chars, quality: 0.00
+[11/19/2025 12:23:34 PM] OCR returned empty/null
+[11/19/2025 12:24:02 PM] Starting OCR for 1y5zymMgWmDoGoRRUReCEJmqz7vm0Tghn using PublicAPI
+[11/19/2025 12:24:07 PM] Downloaded 0 bytes
+[11/19/2025 12:24:07 PM] Inside ExtractTextFromPdfWithOCR
+[11/19/2025 12:24:07 PM] Checking tessdata at: C:\Users\khayy\source\repos\JumpChainSearch\tessdata
+[11/19/2025 12:24:07 PM] Tessdata directory EXISTS
+[11/19/2025 12:24:07 PM] Initializing TesseractEngine
+[11/19/2025 12:24:07 PM] TesseractEngine initialized OK
+[11/19/2025 12:24:07 PM] About to read PDF with ImageMagick
+[11/19/2025 12:24:07 PM] ImageMagick Read FAILED: Value cannot be empty. (Parameter 'stream')
+[11/19/2025 12:24:07 PM] OCR returned 0 chars, quality: 0.00
+[11/19/2025 12:24:07 PM] OCR returned empty/null
+[11/19/2025 12:24:25 PM] Starting OCR for 1qFnNeFTChLSVVhC8m-P5dCqVFxwmmBiV using PublicAPI
+[11/19/2025 12:24:34 PM] Downloaded 0 bytes
+[11/19/2025 12:24:34 PM] Inside ExtractTextFromPdfWithOCR
+[11/19/2025 12:24:34 PM] Checking tessdata at: C:\Users\khayy\source\repos\JumpChainSearch\tessdata
+[11/19/2025 12:24:34 PM] Tessdata directory EXISTS
+[11/19/2025 12:24:34 PM] Initializing TesseractEngine
+[11/19/2025 12:24:34 PM] TesseractEngine initialized OK
+[11/19/2025 12:24:34 PM] About to read PDF with ImageMagick
+[11/19/2025 12:24:34 PM] ImageMagick Read FAILED: Value cannot be empty. (Parameter 'stream')
+[11/19/2025 12:24:34 PM] OCR returned 0 chars, quality: 0.00
+[11/19/2025 12:24:34 PM] OCR returned empty/null
+[11/19/2025 12:24:54 PM] Starting OCR for 1Ba92RskxGrrAVLfK4KJeOSY4O5RgGa2p using PublicAPI
+[11/19/2025 12:25:03 PM] Downloaded 0 bytes
+[11/19/2025 12:25:03 PM] Inside ExtractTextFromPdfWithOCR
+[11/19/2025 12:25:03 PM] Checking tessdata at: C:\Users\khayy\source\repos\JumpChainSearch\tessdata
+[11/19/2025 12:25:03 PM] Tessdata directory EXISTS
+[11/19/2025 12:25:03 PM] Initializing TesseractEngine
+[11/19/2025 12:25:03 PM] TesseractEngine initialized OK
+[11/19/2025 12:25:03 PM] About to read PDF with ImageMagick
+[11/19/2025 12:25:03 PM] ImageMagick Read FAILED: Value cannot be empty. (Parameter 'stream')
+[11/19/2025 12:25:03 PM] OCR returned 0 chars, quality: 0.00
+[11/19/2025 12:25:03 PM] OCR returned empty/null
+[11/19/2025 12:25:20 PM] Starting OCR for 1QNPsINbp6BnL16QDmy3AZuwuXAqlv3-3 using PublicAPI
+[11/19/2025 12:25:27 PM] Downloaded 0 bytes
+[11/19/2025 12:25:27 PM] Inside ExtractTextFromPdfWithOCR
+[11/19/2025 12:25:27 PM] Checking tessdata at: C:\Users\khayy\source\repos\JumpChainSearch\tessdata
+[11/19/2025 12:25:27 PM] Tessdata directory EXISTS
+[11/19/2025 12:25:27 PM] Initializing TesseractEngine
+[11/19/2025 12:25:27 PM] TesseractEngine initialized OK
+[11/19/2025 12:25:27 PM] About to read PDF with ImageMagick
+[11/19/2025 12:25:27 PM] ImageMagick Read FAILED: Value cannot be empty. (Parameter 'stream')
+[11/19/2025 12:25:27 PM] OCR returned 0 chars, quality: 0.00
+[11/19/2025 12:25:27 PM] OCR returned empty/null
+[11/19/2025 12:25:46 PM] Starting OCR for 1YXw549JxB7vuLLXQGIPruRfhSh_yeq6j using PublicAPI
+[11/19/2025 12:25:52 PM] Downloaded 0 bytes
+[11/19/2025 12:25:52 PM] Inside ExtractTextFromPdfWithOCR
+[11/19/2025 12:25:52 PM] Checking tessdata at: C:\Users\khayy\source\repos\JumpChainSearch\tessdata
+[11/19/2025 12:25:52 PM] Tessdata directory EXISTS
+[11/19/2025 12:25:52 PM] Initializing TesseractEngine
+[11/19/2025 12:25:52 PM] TesseractEngine initialized OK
+[11/19/2025 12:25:52 PM] About to read PDF with ImageMagick
+[11/19/2025 12:25:52 PM] ImageMagick Read FAILED: Value cannot be empty. (Parameter 'stream')
+[11/19/2025 12:25:52 PM] OCR returned 0 chars, quality: 0.00
+[11/19/2025 12:25:52 PM] OCR returned empty/null
+[11/19/2025 12:26:09 PM] Starting OCR for 1o5iSn6hMmZE5FdwyljNkXfD5rNTN3IZ0 using PublicAPI
+[11/19/2025 12:26:18 PM] Downloaded 0 bytes
+[11/19/2025 12:26:18 PM] Inside ExtractTextFromPdfWithOCR
+[11/19/2025 12:26:18 PM] Checking tessdata at: C:\Users\khayy\source\repos\JumpChainSearch\tessdata
+[11/19/2025 12:26:18 PM] Tessdata directory EXISTS
+[11/19/2025 12:26:18 PM] Initializing TesseractEngine
+[11/19/2025 12:26:18 PM] TesseractEngine initialized OK
+[11/19/2025 12:26:18 PM] About to read PDF with ImageMagick
+[11/19/2025 12:26:18 PM] ImageMagick Read FAILED: Value cannot be empty. (Parameter 'stream')
+[11/19/2025 12:26:18 PM] OCR returned 0 chars, quality: 0.00
+[11/19/2025 12:26:18 PM] OCR returned empty/null
+[11/19/2025 12:26:33 PM] Starting OCR for 1pbAk2BPjit77PjOEKuO24DDAkmShGEHp using PublicAPI
+[11/19/2025 12:26:41 PM] Downloaded 0 bytes
+[11/19/2025 12:26:41 PM] Inside ExtractTextFromPdfWithOCR
+[11/19/2025 12:26:41 PM] Checking tessdata at: C:\Users\khayy\source\repos\JumpChainSearch\tessdata
+[11/19/2025 12:26:41 PM] Tessdata directory EXISTS
+[11/19/2025 12:26:41 PM] Initializing TesseractEngine
+[11/19/2025 12:26:41 PM] TesseractEngine initialized OK
+[11/19/2025 12:26:41 PM] About to read PDF with ImageMagick
+[11/19/2025 12:26:41 PM] ImageMagick Read FAILED: Value cannot be empty. (Parameter 'stream')
+[11/19/2025 12:26:41 PM] OCR returned 0 chars, quality: 0.00
+[11/19/2025 12:26:41 PM] OCR returned empty/null
+[11/19/2025 12:26:59 PM] Starting OCR for 1xtqnlrhjsEajkS7jmzkMOmVCtORuSF-x using PublicAPI
+[11/19/2025 12:27:08 PM] Downloaded 0 bytes
+[11/19/2025 12:27:08 PM] Inside ExtractTextFromPdfWithOCR
+[11/19/2025 12:27:08 PM] Checking tessdata at: C:\Users\khayy\source\repos\JumpChainSearch\tessdata
+[11/19/2025 12:27:08 PM] Tessdata directory EXISTS
+[11/19/2025 12:27:08 PM] Initializing TesseractEngine
+[11/19/2025 12:27:08 PM] TesseractEngine initialized OK
+[11/19/2025 12:27:08 PM] About to read PDF with ImageMagick
+[11/19/2025 12:27:08 PM] ImageMagick Read FAILED: Value cannot be empty. (Parameter 'stream')
+[11/19/2025 12:27:08 PM] OCR returned 0 chars, quality: 0.00
+[11/19/2025 12:27:08 PM] OCR returned empty/null
+[11/19/2025 12:27:24 PM] Starting OCR for 12YIrjcacl2P4mhAZapIQ1x77Z3SVzYAf using PublicAPI
+[11/19/2025 12:27:33 PM] Downloaded 0 bytes
+[11/19/2025 12:27:33 PM] Inside ExtractTextFromPdfWithOCR
+[11/19/2025 12:27:33 PM] Checking tessdata at: C:\Users\khayy\source\repos\JumpChainSearch\tessdata
+[11/19/2025 12:27:33 PM] Tessdata directory EXISTS
+[11/19/2025 12:27:33 PM] Initializing TesseractEngine
+[11/19/2025 12:27:33 PM] TesseractEngine initialized OK
+[11/19/2025 12:27:33 PM] About to read PDF with ImageMagick
+[11/19/2025 12:27:33 PM] ImageMagick Read FAILED: Value cannot be empty. (Parameter 'stream')
+[11/19/2025 12:27:33 PM] OCR returned 0 chars, quality: 0.00
+[11/19/2025 12:27:33 PM] OCR returned empty/null
+[11/19/2025 12:27:49 PM] Starting OCR for 1Z53x-B1vNopXStF_DSS9knIzyCtMBHai using PublicAPI
+[11/19/2025 12:27:55 PM] Downloaded 0 bytes
+[11/19/2025 12:27:55 PM] Inside ExtractTextFromPdfWithOCR
+[11/19/2025 12:27:55 PM] Checking tessdata at: C:\Users\khayy\source\repos\JumpChainSearch\tessdata
+[11/19/2025 12:27:55 PM] Tessdata directory EXISTS
+[11/19/2025 12:27:55 PM] Initializing TesseractEngine
+[11/19/2025 12:27:55 PM] TesseractEngine initialized OK
+[11/19/2025 12:27:55 PM] About to read PDF with ImageMagick
+[11/19/2025 12:27:55 PM] ImageMagick Read FAILED: Value cannot be empty. (Parameter 'stream')
+[11/19/2025 12:27:55 PM] OCR returned 0 chars, quality: 0.00
+[11/19/2025 12:27:55 PM] OCR returned empty/null
+[11/19/2025 12:28:13 PM] Starting OCR for 11EHmQN_95JGrD4dSlv_qGytIgeNQVTkG using PublicAPI
+[11/19/2025 12:28:19 PM] Downloaded 0 bytes
+[11/19/2025 12:28:19 PM] Inside ExtractTextFromPdfWithOCR
+[11/19/2025 12:28:19 PM] Checking tessdata at: C:\Users\khayy\source\repos\JumpChainSearch\tessdata
+[11/19/2025 12:28:19 PM] Tessdata directory EXISTS
+[11/19/2025 12:28:19 PM] Initializing TesseractEngine
+[11/19/2025 12:28:20 PM] TesseractEngine initialized OK
+[11/19/2025 12:28:20 PM] About to read PDF with ImageMagick
+[11/19/2025 12:28:20 PM] ImageMagick Read FAILED: Value cannot be empty. (Parameter 'stream')
+[11/19/2025 12:28:20 PM] OCR returned 0 chars, quality: 0.00
+[11/19/2025 12:28:20 PM] OCR returned empty/null
+[11/19/2025 12:28:33 PM] Starting OCR for 1_kYNQpZuM-jMIVa-TajWK5onT58SxNs9 using PublicAPI
+[11/19/2025 12:28:39 PM] Downloaded 0 bytes
+[11/19/2025 12:28:39 PM] Inside ExtractTextFromPdfWithOCR
+[11/19/2025 12:28:39 PM] Checking tessdata at: C:\Users\khayy\source\repos\JumpChainSearch\tessdata
+[11/19/2025 12:28:39 PM] Tessdata directory EXISTS
+[11/19/2025 12:28:39 PM] Initializing TesseractEngine
+[11/19/2025 12:28:39 PM] TesseractEngine initialized OK
+[11/19/2025 12:28:39 PM] About to read PDF with ImageMagick
+[11/19/2025 12:28:39 PM] ImageMagick Read FAILED: Value cannot be empty. (Parameter 'stream')
+[11/19/2025 12:28:39 PM] OCR returned 0 chars, quality: 0.00
+[11/19/2025 12:28:39 PM] OCR returned empty/null
+[11/19/2025 12:28:55 PM] Starting OCR for 1AUc9mMmFrdzxGIUdnffs9qP3Rz7-7rrf using PublicAPI
+[11/19/2025 12:29:02 PM] Downloaded 0 bytes
+[11/19/2025 12:29:02 PM] Inside ExtractTextFromPdfWithOCR
+[11/19/2025 12:29:02 PM] Checking tessdata at: C:\Users\khayy\source\repos\JumpChainSearch\tessdata
+[11/19/2025 12:29:02 PM] Tessdata directory EXISTS
+[11/19/2025 12:29:02 PM] Initializing TesseractEngine
+[11/19/2025 12:29:02 PM] TesseractEngine initialized OK
+[11/19/2025 12:29:02 PM] About to read PDF with ImageMagick
+[11/19/2025 12:29:02 PM] ImageMagick Read FAILED: Value cannot be empty. (Parameter 'stream')
+[11/19/2025 12:29:02 PM] OCR returned 0 chars, quality: 0.00
+[11/19/2025 12:29:02 PM] OCR returned empty/null
+[11/19/2025 12:29:21 PM] Starting OCR for 1mVi9HhJH6rW0YdM_VNW2_aX5Pj0RDWKZ using PublicAPI
+[11/19/2025 12:29:26 PM] Downloaded 0 bytes
+[11/19/2025 12:29:26 PM] Inside ExtractTextFromPdfWithOCR
+[11/19/2025 12:29:26 PM] Checking tessdata at: C:\Users\khayy\source\repos\JumpChainSearch\tessdata
+[11/19/2025 12:29:26 PM] Tessdata directory EXISTS
+[11/19/2025 12:29:26 PM] Initializing TesseractEngine
+[11/19/2025 12:29:26 PM] TesseractEngine initialized OK
+[11/19/2025 12:29:26 PM] About to read PDF with ImageMagick
+[11/19/2025 12:29:26 PM] ImageMagick Read FAILED: Value cannot be empty. (Parameter 'stream')
+[11/19/2025 12:29:26 PM] OCR returned 0 chars, quality: 0.00
+[11/19/2025 12:29:26 PM] OCR returned empty/null
+[11/19/2025 12:29:40 PM] Starting OCR for 1X08U6LgabY0AdVdj-RnDXzjumfD-xY44 using PublicAPI
+[11/19/2025 12:29:47 PM] Downloaded 0 bytes
+[11/19/2025 12:29:47 PM] Inside ExtractTextFromPdfWithOCR
+[11/19/2025 12:29:48 PM] Checking tessdata at: C:\Users\khayy\source\repos\JumpChainSearch\tessdata
+[11/19/2025 12:29:48 PM] Tessdata directory EXISTS
+[11/19/2025 12:29:48 PM] Initializing TesseractEngine
+[11/19/2025 12:29:48 PM] TesseractEngine initialized OK
+[11/19/2025 12:29:48 PM] About to read PDF with ImageMagick
+[11/19/2025 12:29:48 PM] ImageMagick Read FAILED: Value cannot be empty. (Parameter 'stream')
+[11/19/2025 12:29:48 PM] OCR returned 0 chars, quality: 0.00
+[11/19/2025 12:29:48 PM] OCR returned empty/null
+[11/19/2025 12:29:49 PM] Starting OCR for 1X08U6LgabY0AdVdj-RnDXzjumfD-xY44 using ServiceAccount
+[11/19/2025 12:29:50 PM] Downloaded 371783 bytes
+[11/19/2025 12:29:50 PM] Inside ExtractTextFromPdfWithOCR
+[11/19/2025 12:29:50 PM] Checking tessdata at: C:\Users\khayy\source\repos\JumpChainSearch\tessdata
+[11/19/2025 12:29:50 PM] Tessdata directory EXISTS
+[11/19/2025 12:29:50 PM] Initializing TesseractEngine
+[11/19/2025 12:29:50 PM] TesseractEngine initialized OK
+[11/19/2025 12:29:50 PM] About to read PDF with ImageMagick
+[11/19/2025 12:29:57 PM] ImageMagick loaded 12 pages
+[11/19/2025 12:30:13 PM] OCR returned 2810 chars, quality: 0.76
+[11/19/2025 12:30:28 PM] Starting OCR for 1nPVG49Z_w6Ljec8sucHegNZMxUrDmEpu using PublicAPI
+[11/19/2025 12:30:36 PM] Downloaded 0 bytes
+[11/19/2025 12:30:36 PM] Inside ExtractTextFromPdfWithOCR
+[11/19/2025 12:30:36 PM] Checking tessdata at: C:\Users\khayy\source\repos\JumpChainSearch\tessdata
+[11/19/2025 12:30:36 PM] Tessdata directory EXISTS
+[11/19/2025 12:30:36 PM] Initializing TesseractEngine
+[11/19/2025 12:30:36 PM] TesseractEngine initialized OK
+[11/19/2025 12:30:36 PM] About to read PDF with ImageMagick
+[11/19/2025 12:30:36 PM] ImageMagick Read FAILED: Value cannot be empty. (Parameter 'stream')
+[11/19/2025 12:30:36 PM] OCR returned 0 chars, quality: 0.00
+[11/19/2025 12:30:36 PM] OCR returned empty/null
+[11/19/2025 12:30:59 PM] Starting OCR for 1giB6e77XHtFAWdZRupsmbEGV6YM8Yvl2 using PublicAPI
+[11/19/2025 12:31:07 PM] Downloaded 0 bytes
+[11/19/2025 12:31:07 PM] Inside ExtractTextFromPdfWithOCR
+[11/19/2025 12:31:07 PM] Checking tessdata at: C:\Users\khayy\source\repos\JumpChainSearch\tessdata
+[11/19/2025 12:31:07 PM] Tessdata directory EXISTS
+[11/19/2025 12:31:07 PM] Initializing TesseractEngine
+[11/19/2025 12:31:07 PM] TesseractEngine initialized OK
+[11/19/2025 12:31:07 PM] About to read PDF with ImageMagick
+[11/19/2025 12:31:07 PM] ImageMagick Read FAILED: Value cannot be empty. (Parameter 'stream')
+[11/19/2025 12:31:07 PM] OCR returned 0 chars, quality: 0.00
+[11/19/2025 12:31:07 PM] OCR returned empty/null
+[11/19/2025 12:31:21 PM] Starting OCR for 1d7SLsakOmRUBZ0wjIgjIJtyRHU1uiwGu using PublicAPI
+[11/19/2025 12:31:27 PM] Downloaded 0 bytes
+[11/19/2025 12:31:27 PM] Inside ExtractTextFromPdfWithOCR
+[11/19/2025 12:31:27 PM] Checking tessdata at: C:\Users\khayy\source\repos\JumpChainSearch\tessdata
+[11/19/2025 12:31:27 PM] Tessdata directory EXISTS
+[11/19/2025 12:31:27 PM] Initializing TesseractEngine
+[11/19/2025 12:31:27 PM] TesseractEngine initialized OK
+[11/19/2025 12:31:27 PM] About to read PDF with ImageMagick
+[11/19/2025 12:31:27 PM] ImageMagick Read FAILED: Value cannot be empty. (Parameter 'stream')
+[11/19/2025 12:31:27 PM] OCR returned 0 chars, quality: 0.00
+[11/19/2025 12:31:27 PM] OCR returned empty/null
+[11/19/2025 12:31:47 PM] Starting OCR for 1sp_4-wGwYbOFoUE4ljFd4dlqGNREyG90 using PublicAPI
+[11/19/2025 12:31:53 PM] Downloaded 0 bytes
+[11/19/2025 12:31:53 PM] Inside ExtractTextFromPdfWithOCR
+[11/19/2025 12:31:53 PM] Checking tessdata at: C:\Users\khayy\source\repos\JumpChainSearch\tessdata
+[11/19/2025 12:31:53 PM] Tessdata directory EXISTS
+[11/19/2025 12:31:53 PM] Initializing TesseractEngine
+[11/19/2025 12:31:53 PM] TesseractEngine initialized OK
+[11/19/2025 12:31:53 PM] About to read PDF with ImageMagick
+[11/19/2025 12:31:53 PM] ImageMagick Read FAILED: Value cannot be empty. (Parameter 'stream')
+[11/19/2025 12:31:53 PM] OCR returned 0 chars, quality: 0.00
+[11/19/2025 12:31:53 PM] OCR returned empty/null
+[11/19/2025 12:36:27 PM] Starting OCR for 1apduVN8njUHY5rxcY3D3nvFCkUziziD_ using PublicAPI
+[11/19/2025 12:36:36 PM] Downloaded 0 bytes
+[11/19/2025 12:36:36 PM] Inside ExtractTextFromPdfWithOCR
+[11/19/2025 12:36:36 PM] Checking tessdata at: C:\Users\khayy\source\repos\JumpChainSearch\tessdata
+[11/19/2025 12:36:36 PM] Tessdata directory EXISTS
+[11/19/2025 12:36:36 PM] Initializing TesseractEngine
+[11/19/2025 12:36:36 PM] TesseractEngine initialized OK
+[11/19/2025 12:36:36 PM] About to read PDF with ImageMagick
+[11/19/2025 12:36:36 PM] ImageMagick Read FAILED: Value cannot be empty. (Parameter 'stream')
+[11/19/2025 12:36:36 PM] OCR returned 0 chars, quality: 0.00
+[11/19/2025 12:36:36 PM] OCR returned empty/null
