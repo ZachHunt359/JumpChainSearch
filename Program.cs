@@ -321,6 +321,22 @@ app.MapGet("/debug-format-analysis/{documentId:int}", (int documentId) =>
 app.MapGet("/debug-document-text/{documentId:int}", (int documentId) => 
     Results.Redirect($"/api/purchasables/debug/text/{documentId}"));
 
+// Diagnostic endpoint to check SFW mode detection
+app.MapGet("/api/debug/sfw-status", (HttpContext httpContext, SfwModeService sfwMode) =>
+{
+    var host = httpContext.Request.Host.Host;
+    var headers = httpContext.Request.Headers
+        .ToDictionary(h => h.Key, h => h.Value.ToString());
+    
+    return Results.Ok(new
+    {
+        host = host,
+        isSfwMode = sfwMode.IsSfwMode,
+        headers = headers,
+        detectedDomain = host.Contains("jumpchainsearch.net") || host.Contains("jumpchainsearch.org")
+    });
+});
+
 // Map Razor Pages (for admin login, etc.)
 app.MapRazorPages();
 
