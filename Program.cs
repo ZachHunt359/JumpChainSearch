@@ -69,6 +69,10 @@ builder.Services.AddScoped<SfwModeService>(sp =>
     bool isSfwMode = host.Contains("jumpchainsearch.net", StringComparison.OrdinalIgnoreCase) ||
                      host.Contains("jumpchainsearch.org", StringComparison.OrdinalIgnoreCase);
     
+    // Diagnostic logging
+    var logger = sp.GetRequiredService<ILogger<Program>>();
+    logger.LogInformation($"SFW Mode Detection - Host: '{host}', IsSfwMode: {isSfwMode}");
+    
     return new SfwModeService(isSfwMode);
 });
 
