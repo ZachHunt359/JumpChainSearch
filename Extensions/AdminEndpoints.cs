@@ -42,6 +42,13 @@ public static class AdminEndpoints
         // Text review queue endpoint
         group.MapGet("/text-review/queue", GetTextReviewQueue);
         
+        // System management endpoints
+        group.MapGet("/system/cache-ttl", GetCacheTTL);
+        group.MapPost("/system/cache-ttl", UpdateCacheTTL);
+        group.MapGet("/system/scan-schedule", GetScanSchedule);
+        group.MapPost("/system/scan-schedule", UpdateScanSchedule);
+        group.MapPost("/system/scan-schedule/set-next", SetNextScheduledScan);
+        
         // Account management endpoints
         group.MapPost("/account/change-username", ChangeUsername);
         group.MapPost("/account/change-password", ChangePassword);
@@ -645,6 +652,87 @@ public static class AdminEndpoints
             </section>
             
             <section style=""margin-top: 2rem; border-top: 2px solid var(--border); padding-top: 2rem;"">
+                <h2>💾 Cache Management</h2>
+                <p style=""color: var(--text-secondary); margin-bottom: 1rem;"">
+                    Configure how long search results are cached to balance performance and freshness.
+                </p>
+                <div class=""action-card"">
+                    <h3>Search Cache TTL</h3>
+                    <div style=""display: flex; gap: 1rem; align-items: center; margin-top: 1rem;"">
+                        <label style=""font-weight: 500;"">Cache Duration (minutes):</label>
+                        <input type=""number"" id=""cache-ttl"" value=""5"" min=""1"" max=""60"" 
+                               style=""width: 80px; padding: 0.5rem; border: 1px solid var(--border); border-radius: 4px; background: var(--bg);"" />
+                        <button class=""btn btn-primary"" onclick=""updateCacheTTL()"">Update Cache TTL</button>
+                        <span id=""cache-ttl-status"" style=""color: var(--text-secondary); font-size: 0.9rem;""></span>
+                    </div>
+                    <div style=""margin-top: 1rem; padding: 1rem; background: var(--card-bg); border: 1px solid var(--border); border-radius: 4px;"">
+                        <p style=""margin: 0; font-size: 0.85rem; color: var(--text-secondary);"">
+                            <strong>Current Setting:</strong> <span id=""current-cache-ttl"">Loading...</span> minutes<br>
+                            <strong>Recommended:</strong> 5-10 minutes for most use cases<br>
+                            <strong>Note:</strong> Lower values provide fresher results but may impact performance
+                        </p>
+                    </div>
+                </div>
+            </section>
+            
+            <section style=""margin-top: 2rem; border-top: 2px solid var(--border); padding-top: 2rem;"">
+                <h2>🔄 Automatic Scan Scheduling</h2>
+                <p style=""color: var(--text-secondary); margin-bottom: 1rem;"">
+                    Schedule automatic scans at regular intervals. When enabled, scans run continuously at the specified frequency.
+                </p>
+                <div class=""action-grid"">
+                    <div class=""action-card"">
+                        <h3>Schedule Settings</h3>
+                        <div style=""margin-top: 1rem;"">
+                            <label style=""display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1.5rem;"">
+                                <input type=""checkbox"" id=""scan-enabled"" onchange=""toggleScanScheduling(this.checked)"" 
+                                       style=""width: 20px; height: 20px;"" />
+                                <span style=""font-weight: 500;"">Enable Automatic Scanning</span>
+                            </label>
+                            <div id=""scan-schedule-config"" style=""display: none;"">
+                                <label style=""display: block; margin-bottom: 0.5rem; font-weight: 500;"">Scan Frequency:</label>
+                                <select id=""scan-interval"" style=""width: 100%; padding: 0.5rem; border: 1px solid var(--border); border-radius: 4px; background: var(--bg); margin-bottom: 1.5rem;"">
+                                    <option value=""1"">Every hour</option>
+                                    <option value=""6"">Every 6 hours</option>
+                                    <option value=""12"">Every 12 hours</option>
+                                    <option value=""24"" selected>Daily (every 24 hours)</option>
+                                    <option value=""48"">Every 2 days</option>
+                                    <option value=""168"">Weekly (every 7 days)</option>
+                                </select>
+                                <button class=""btn btn-primary"" onclick=""updateScanSchedule()"" style=""width: 100%; margin-bottom: 1rem;"">Save Schedule</button>
+                                <button class=""btn btn-secondary"" onclick=""scheduleNextScanNow()"" style=""width: 100%;"">Schedule Next Scan Now</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class=""action-card"">
+                        <h3>Schedule Status</h3>
+                        <div style=""margin-top: 1rem; padding: 1.25rem; background: var(--card-bg); border: 1px solid var(--border); border-radius: 4px;"">
+                            <div style=""display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1rem;"">
+                                <div style=""width: 12px; height: 12px; border-radius: 50%;"" id=""schedule-indicator""></div>
+                                <strong style=""font-size: 1rem;"">Status:</strong>
+                                <span id=""scan-schedule-status"" style=""font-size: 1rem;"">Loading...</span>
+                            </div>
+                            <div style=""border-top: 1px solid var(--border); padding-top: 1rem; margin-top: 1rem;"">
+                                <p style=""margin: 0 0 0.75rem 0; font-size: 0.9rem; color: var(--text-secondary);"">
+                                    <strong>Frequency:</strong> <span id=""scan-frequency"">-</span>
+                                </p>
+                                <p style=""margin: 0 0 0.75rem 0; font-size: 0.9rem; color: var(--text-secondary);"">
+                                    <strong>Last Scan:</strong> <span id=""last-scan-time"">Loading...</span>
+                                </p>
+                                <p style=""margin: 0; font-size: 1rem;"">
+                                    <strong style=""color: var(--accent);"">Next Scan:</strong> 
+                                    <span id=""next-scan-time"" style=""font-weight: 500;"">-</span>
+                                </p>
+                            </div>
+                        </div>
+                        <button class=""btn btn-success"" onclick=""triggerManualScan()"" style=""margin-top: 1rem; width: 100%;"">
+                            🚀 Run Manual Scan Now
+                        </button>
+                    </div>
+                </div>
+            </section>
+            
+            <section style=""margin-top: 2rem; border-top: 2px solid var(--border); padding-top: 2rem;"">
                 <h2>🔄 Duplicate Management</h2>
                 <p style=""color: var(--text-secondary); margin-bottom: 1rem;"">
                     Analyze and merge duplicate documents (same name, size, and file type from different drives).
@@ -702,6 +790,9 @@ public static class AdminEndpoints
                 loadPendingTags();
             }} else if (tabName === 'drives') {{
                 loadDriveList();
+            }} else if (tabName === 'system') {{
+                loadCacheSettings();
+                loadScanSchedule();
             }}
         }}
         
@@ -944,6 +1035,196 @@ public static class AdminEndpoints
                 logsDiv.innerHTML = data.logs || 'No logs available';
             }} catch (e) {{
                 logsDiv.innerHTML = 'Error loading logs: ' + e.message;
+            }}
+        }}
+        
+        // Cache Management Functions
+        async function loadCacheSettings() {{
+            try {{
+                const resp = await fetch('/admin/system/cache-ttl');
+                const data = await resp.json();
+                document.getElementById('cache-ttl').value = data.minutes;
+                document.getElementById('current-cache-ttl').textContent = data.minutes;
+            }} catch (e) {{
+                console.error('Error loading cache settings:', e);
+            }}
+        }}
+        
+        async function updateCacheTTL() {{
+            const minutes = parseInt(document.getElementById('cache-ttl').value);
+            const statusSpan = document.getElementById('cache-ttl-status');
+            
+            if (minutes < 1 || minutes > 60) {{
+                statusSpan.textContent = 'Invalid value (1-60 minutes)';
+                statusSpan.style.color = 'var(--danger)';
+                return;
+            }}
+            
+            try {{
+                const resp = await fetch(`/admin/system/cache-ttl?minutes=${{minutes}}`, {{
+                    method: 'POST'
+                }});
+                
+                if (resp.ok) {{
+                    statusSpan.textContent = '✓ Cache TTL updated successfully';
+                    statusSpan.style.color = 'var(--success)';
+                    document.getElementById('current-cache-ttl').textContent = minutes;
+                    setTimeout(() => statusSpan.textContent = '', 3000);
+                }} else {{
+                    statusSpan.textContent = '✗ Failed to update cache TTL';
+                    statusSpan.style.color = 'var(--danger)';
+                }}
+            }} catch (e) {{
+                statusSpan.textContent = '✗ Error: ' + e.message;
+                statusSpan.style.color = 'var(--danger)';
+            }}
+        }}
+        
+        // Scan Scheduling Functions
+        async function loadScanSchedule() {{
+            try {{
+                const resp = await fetch('/admin/system/scan-schedule');
+                const data = await resp.json();
+                
+                // Update UI controls
+                document.getElementById('scan-enabled').checked = data.enabled;
+                document.getElementById('scan-interval').value = data.intervalHours;
+                document.getElementById('scan-schedule-config').style.display = data.enabled ? 'block' : 'none';
+                
+                // Update status indicator
+                const indicator = document.getElementById('schedule-indicator');
+                const statusSpan = document.getElementById('scan-schedule-status');
+                
+                if (data.enabled) {{
+                    indicator.style.background = 'var(--success)';
+                    indicator.style.boxShadow = '0 0 8px var(--success)';
+                    statusSpan.textContent = 'Active';
+                    statusSpan.style.color = 'var(--success)';
+                }} else {{
+                    indicator.style.background = 'var(--text-secondary)';
+                    indicator.style.boxShadow = 'none';
+                    statusSpan.textContent = 'Disabled';
+                    statusSpan.style.color = 'var(--text-secondary)';
+                }}
+                
+                // Update frequency display
+                const freqSpan = document.getElementById('scan-frequency');
+                if (data.intervalHours === 1) {{
+                    freqSpan.textContent = 'Every hour';
+                }} else if (data.intervalHours === 6) {{
+                    freqSpan.textContent = 'Every 6 hours';
+                }} else if (data.intervalHours === 12) {{
+                    freqSpan.textContent = 'Every 12 hours';
+                }} else if (data.intervalHours === 24) {{
+                    freqSpan.textContent = 'Daily';
+                }} else if (data.intervalHours === 48) {{
+                    freqSpan.textContent = 'Every 2 days';
+                }} else if (data.intervalHours === 168) {{
+                    freqSpan.textContent = 'Weekly';
+                }} else {{
+                    freqSpan.textContent = `Every ${{data.intervalHours}} hours`;
+                }}
+                
+                // Update last scan time
+                if (data.lastScanTime) {{
+                    const lastScan = new Date(data.lastScanTime);
+                    document.getElementById('last-scan-time').textContent = lastScan.toLocaleString();
+                }} else {{
+                    document.getElementById('last-scan-time').textContent = 'Never';
+                }}
+                
+                // Update next scheduled scan with FIXED time (not recalculated)
+                const nextScanSpan = document.getElementById('next-scan-time');
+                if (data.enabled && data.nextScheduledScan) {{
+                    const nextScan = new Date(data.nextScheduledScan);
+                    const now = new Date();
+                    const diff = nextScan - now;
+                    
+                    if (diff > 0) {{
+                        const hours = Math.floor(diff / 3600000);
+                        const minutes = Math.floor((diff % 3600000) / 60000);
+                        nextScanSpan.textContent = `${{nextScan.toLocaleString()}} (in ${{hours}}h ${{minutes}}m)`;
+                        nextScanSpan.style.color = 'var(--accent)';
+                    }} else {{
+                        nextScanSpan.textContent = `${{nextScan.toLocaleString()}} (overdue)`;
+                        nextScanSpan.style.color = 'var(--warning)';
+                    }}
+                }} else if (data.enabled) {{
+                    nextScanSpan.textContent = 'Not scheduled yet - click ""Schedule Next Scan Now""';
+                    nextScanSpan.style.color = 'var(--warning)';
+                }} else {{
+                    nextScanSpan.textContent = 'Disabled';
+                    nextScanSpan.style.color = 'var(--text-secondary)';
+                }}
+            }} catch (e) {{
+                console.error('Error loading scan schedule:', e);
+            }}
+        }}
+        
+        function toggleScanScheduling(enabled) {{
+            document.getElementById('scan-schedule-config').style.display = enabled ? 'block' : 'none';
+            if (!enabled) {{
+                updateScanSchedule();
+            }}
+        }}
+        
+        async function updateScanSchedule() {{
+            const enabled = document.getElementById('scan-enabled').checked;
+            const intervalHours = parseInt(document.getElementById('scan-interval').value);
+            
+            try {{
+                const resp = await fetch('/admin/system/scan-schedule', {{
+                    method: 'POST',
+                    headers: {{ 'Content-Type': 'application/json' }},
+                    body: JSON.stringify({{ enabled, intervalHours }})
+                }});
+                
+                if (resp.ok) {{
+                    alert('Scan schedule updated successfully');
+                    await loadScanSchedule();
+                }} else {{
+                    alert('Failed to update scan schedule');
+                }}
+            }} catch (e) {{
+                alert('Error: ' + e.message);
+            }}
+        }}
+        
+        async function scheduleNextScanNow() {{
+            if (!confirm('Schedule the next scan to run immediately?')) return;
+            
+            try {{
+                const resp = await fetch('/admin/system/scan-schedule/set-next', {{
+                    method: 'POST'
+                }});
+                
+                if (resp.ok) {{
+                    alert('Next scan scheduled successfully');
+                    await loadScanSchedule();
+                }} else {{
+                    alert('Failed to schedule next scan');
+                }}
+            }} catch (e) {{
+                alert('Error: ' + e.message);
+            }}
+        }}
+        
+        async function triggerManualScan() {{
+            if (!confirm('Start manual scan of all configured drives?')) return;
+            
+            try {{
+                const resp = await fetch('/admin/drives/scan', {{
+                    method: 'POST'
+                }});
+                
+                if (resp.ok) {{
+                    alert('Manual scan started successfully');
+                    await loadScanSchedule();
+                }} else {{
+                    alert('Failed to start manual scan');
+                }}
+            }} catch (e) {{
+                alert('Error: ' + e.message);
             }}
         }}
         
@@ -2058,7 +2339,7 @@ sudo systemctl restart jumpchain
         }
     }
 
-    private static async Task<IResult> StartDriveScan(HttpContext context, JumpChainDbContext dbContext, AdminAuthService authService)
+    private static async Task<IResult> StartDriveScan(HttpContext context, JumpChainDbContext dbContext, AdminAuthService authService, IConfiguration configuration)
     {
         var (valid, user) = await ValidateSession(context, authService);
         if (!valid)
@@ -2066,6 +2347,9 @@ sudo systemctl restart jumpchain
 
         try
         {
+            // Update last scan time in configuration
+            await UpdateLastScanTime(DateTime.UtcNow);
+            
             // Check if scan is already running
             var scanPidFile = "drive-scan.pid";
             if (File.Exists(scanPidFile))
@@ -2965,6 +3249,286 @@ rm -f drive-scan.pid
         return Results.Empty;
     }
     
+    // System Management Endpoints
+    
+    private static async Task<IResult> GetCacheTTL(HttpContext context, IConfiguration configuration, AdminAuthService authService)
+    {
+        var (valid, _) = await ValidateSession(context, authService);
+        if (!valid) return Results.Unauthorized();
+        
+        var minutes = configuration.GetValue<int>("CacheSettings:SearchCacheDurationMinutes", 5);
+        return Results.Ok(new { minutes });
+    }
+    
+    private static async Task<IResult> UpdateCacheTTL(HttpContext context, IConfiguration configuration, AdminAuthService authService, int minutes)
+    {
+        var (valid, _) = await ValidateSession(context, authService);
+        if (!valid) return Results.Unauthorized();
+        
+        if (minutes < 1 || minutes > 60)
+            return Results.BadRequest(new { success = false, message = "Minutes must be between 1 and 60" });
+        
+        try
+        {
+            // Update runtime cache duration
+            SearchEndpointsOptimized.SetCacheDuration(minutes);
+            
+            // Update appsettings file for persistence
+            var appsettingsPath = Path.Combine(Directory.GetCurrentDirectory(), "appsettings.json");
+            var json = await File.ReadAllTextAsync(appsettingsPath);
+            var jsonDoc = System.Text.Json.JsonDocument.Parse(json);
+            
+            using var stream = new MemoryStream();
+            using var writer = new System.Text.Json.Utf8JsonWriter(stream, new System.Text.Json.JsonWriterOptions { Indented = true });
+            
+            writer.WriteStartObject();
+            foreach (var property in jsonDoc.RootElement.EnumerateObject())
+            {
+                if (property.Name == "CacheSettings")
+                {
+                    writer.WriteStartObject("CacheSettings");
+                    writer.WriteNumber("SearchCacheDurationMinutes", minutes);
+                    writer.WriteNumber("TagCacheDurationMinutes", 
+                        property.Value.TryGetProperty("TagCacheDurationMinutes", out var tagMinutes) 
+                            ? tagMinutes.GetInt32() 
+                            : 10);
+                    writer.WriteEndObject();
+                }
+                else
+                {
+                    property.WriteTo(writer);
+                }
+            }
+            writer.WriteEndObject();
+            await writer.FlushAsync();
+            
+            await File.WriteAllBytesAsync(appsettingsPath, stream.ToArray());
+            
+            return Results.Ok(new { success = true, minutes });
+        }
+        catch (Exception ex)
+        {
+            return Results.Ok(new { success = false, message = ex.Message });
+        }
+    }
+    
+    private static async Task<IResult> GetScanSchedule(HttpContext context, IConfiguration configuration, AdminAuthService authService)
+    {
+        var (valid, _) = await ValidateSession(context, authService);
+        if (!valid) return Results.Unauthorized();
+        
+        var enabled = configuration.GetValue<bool>("ScanScheduling:Enabled", false);
+        var intervalHours = configuration.GetValue<int>("ScanScheduling:IntervalHours", 24);
+        var lastScanTimeStr = configuration.GetValue<string>("ScanScheduling:LastScanTime");
+        var nextScanTimeStr = configuration.GetValue<string>("ScanScheduling:NextScheduledScan");
+        
+        DateTime? lastScanTime = null;
+        if (!string.IsNullOrEmpty(lastScanTimeStr) && DateTime.TryParse(lastScanTimeStr, out var parsedLast))
+        {
+            lastScanTime = parsedLast;
+        }
+        
+        DateTime? nextScheduledScan = null;
+        if (!string.IsNullOrEmpty(nextScanTimeStr) && DateTime.TryParse(nextScanTimeStr, out var parsedNext))
+        {
+            nextScheduledScan = parsedNext;
+        }
+        
+        return Results.Ok(new
+        {
+            enabled,
+            intervalHours,
+            lastScanTime,
+            nextScheduledScan
+        });
+    }
+    
+    private static async Task<IResult> UpdateScanSchedule(HttpContext context, IConfiguration configuration, AdminAuthService authService)
+    {
+        var (valid, _) = await ValidateSession(context, authService);
+        if (!valid) return Results.Unauthorized();
+        
+        var request = await context.Request.ReadFromJsonAsync<ScanScheduleRequest>();
+        if (request == null) return Results.BadRequest(new { success = false, message = "Invalid request" });
+        
+        try
+        {
+            // Update appsettings file
+            var appsettingsPath = Path.Combine(Directory.GetCurrentDirectory(), "appsettings.json");
+            var json = await File.ReadAllTextAsync(appsettingsPath);
+            var jsonDoc = System.Text.Json.JsonDocument.Parse(json);
+            
+            using var stream = new MemoryStream();
+            using var writer = new System.Text.Json.Utf8JsonWriter(stream, new System.Text.Json.JsonWriterOptions { Indented = true });
+            
+            writer.WriteStartObject();
+            foreach (var property in jsonDoc.RootElement.EnumerateObject())
+            {
+                if (property.Name == "ScanScheduling")
+                {
+                    writer.WriteStartObject("ScanScheduling");
+                    writer.WriteBoolean("Enabled", request.Enabled);
+                    writer.WriteNumber("IntervalHours", request.IntervalHours);
+                    
+                    // Preserve LastScanTime if it exists
+                    if (property.Value.TryGetProperty("LastScanTime", out var lastScanTime) && lastScanTime.ValueKind != System.Text.Json.JsonValueKind.Null)
+                    {
+                        writer.WriteString("LastScanTime", lastScanTime.GetString());
+                    }
+                    else
+                    {
+                        writer.WriteNull("LastScanTime");
+                    }
+                    
+                    // Preserve NextScheduledScan if it exists
+                    if (property.Value.TryGetProperty("NextScheduledScan", out var nextScan) && nextScan.ValueKind != System.Text.Json.JsonValueKind.Null)
+                    {
+                        writer.WriteString("NextScheduledScan", nextScan.GetString());
+                    }
+                    else
+                    {
+                        writer.WriteNull("NextScheduledScan");
+                    }
+                    
+                    writer.WriteEndObject();
+                }
+                else
+                {
+                    property.WriteTo(writer);
+                }
+            }
+            writer.WriteEndObject();
+            await writer.FlushAsync();
+            
+            await File.WriteAllBytesAsync(appsettingsPath, stream.ToArray());
+            
+            return Results.Ok(new { success = true });
+        }
+        catch (Exception ex)
+        {
+            return Results.Ok(new { success = false, message = ex.Message });
+        }
+    }
+    
+    // Helper method to update last scan time
+    private static async Task UpdateLastScanTime(DateTime scanTime)
+    {
+        try
+        {
+            var appsettingsPath = Path.Combine(Directory.GetCurrentDirectory(), "appsettings.json");
+            var json = await File.ReadAllTextAsync(appsettingsPath);
+            var jsonDoc = System.Text.Json.JsonDocument.Parse(json);
+            
+            using var stream = new MemoryStream();
+            using var writer = new System.Text.Json.Utf8JsonWriter(stream, new System.Text.Json.JsonWriterOptions { Indented = true });
+            
+            writer.WriteStartObject();
+            foreach (var property in jsonDoc.RootElement.EnumerateObject())
+            {
+                if (property.Name == "ScanScheduling")
+                {
+                    writer.WriteStartObject("ScanScheduling");
+                    
+                    // Preserve existing settings
+                    var isEnabled = property.Value.TryGetProperty("Enabled", out var enabled) ? enabled.GetBoolean() : false;
+                    var intervalHours = property.Value.TryGetProperty("IntervalHours", out var interval) ? interval.GetInt32() : 24;
+                    
+                    writer.WriteBoolean("Enabled", isEnabled);
+                    writer.WriteNumber("IntervalHours", intervalHours);
+                    
+                    // Update LastScanTime
+                    writer.WriteString("LastScanTime", scanTime.ToString("o"));
+                    
+                    // Calculate and set NextScheduledScan
+                    if (isEnabled)
+                    {
+                        var nextScan = scanTime.AddHours(intervalHours);
+                        writer.WriteString("NextScheduledScan", nextScan.ToString("o"));
+                    }
+                    else
+                    {
+                        writer.WriteNull("NextScheduledScan");
+                    }
+                    
+                    writer.WriteEndObject();
+                }
+                else
+                {
+                    property.WriteTo(writer);
+                }
+            }
+            writer.WriteEndObject();
+            await writer.FlushAsync();
+            
+            await File.WriteAllBytesAsync(appsettingsPath, stream.ToArray());
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Failed to update last scan time: {ex.Message}");
+        }
+    }
+    
+    private static async Task<IResult> SetNextScheduledScan(HttpContext context, IConfiguration configuration, AdminAuthService authService)
+    {
+        var (valid, _) = await ValidateSession(context, authService);
+        if (!valid) return Results.Unauthorized();
+        
+        try
+        {
+            var intervalHours = configuration.GetValue<int>("ScanScheduling:IntervalHours", 24);
+            var nextScan = DateTime.UtcNow.AddHours(intervalHours);
+            
+            var appsettingsPath = Path.Combine(Directory.GetCurrentDirectory(), "appsettings.json");
+            var json = await File.ReadAllTextAsync(appsettingsPath);
+            var jsonDoc = System.Text.Json.JsonDocument.Parse(json);
+            
+            using var stream = new MemoryStream();
+            using var writer = new System.Text.Json.Utf8JsonWriter(stream, new System.Text.Json.JsonWriterOptions { Indented = true });
+            
+            writer.WriteStartObject();
+            foreach (var property in jsonDoc.RootElement.EnumerateObject())
+            {
+                if (property.Name == "ScanScheduling")
+                {
+                    writer.WriteStartObject("ScanScheduling");
+                    
+                    // Preserve all existing settings
+                    writer.WriteBoolean("Enabled", 
+                        property.Value.TryGetProperty("Enabled", out var enabled) ? enabled.GetBoolean() : false);
+                    writer.WriteNumber("IntervalHours", intervalHours);
+                    
+                    if (property.Value.TryGetProperty("LastScanTime", out var lastScan) && lastScan.ValueKind != System.Text.Json.JsonValueKind.Null)
+                    {
+                        writer.WriteString("LastScanTime", lastScan.GetString());
+                    }
+                    else
+                    {
+                        writer.WriteNull("LastScanTime");
+                    }
+                    
+                    // Set NextScheduledScan to now + interval
+                    writer.WriteString("NextScheduledScan", nextScan.ToString("o"));
+                    
+                    writer.WriteEndObject();
+                }
+                else
+                {
+                    property.WriteTo(writer);
+                }
+            }
+            writer.WriteEndObject();
+            await writer.FlushAsync();
+            
+            await File.WriteAllBytesAsync(appsettingsPath, stream.ToArray());
+            
+            return Results.Ok(new { success = true, nextScheduledScan = nextScan });
+        }
+        catch (Exception ex)
+        {
+            return Results.Ok(new { success = false, message = ex.Message });
+        }
+    }
+    
     // Account Management Endpoints
     
     private static async Task<IResult> ChangeUsername(HttpContext context, AdminAuthService authService, JumpChainDbContext dbContext)
@@ -3045,4 +3609,5 @@ rm -f drive-scan.pid
     // Request models
     private record ChangeUsernameRequest(string NewUsername, string CurrentPassword);
     private record ChangePasswordRequest(string CurrentPassword, string NewPassword);
+    private record ScanScheduleRequest(bool Enabled, int IntervalHours);
 }

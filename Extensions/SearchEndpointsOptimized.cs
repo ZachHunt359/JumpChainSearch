@@ -1,8 +1,9 @@
-﻿using JumpChainSearch.Data;
+using JumpChainSearch.Data;
 using JumpChainSearch.Models;
 using JumpChainSearch.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Options;
 using System.Text;
 
 namespace JumpChainSearch.Extensions;
@@ -11,19 +12,25 @@ namespace JumpChainSearch.Extensions;
 /// Optimized search endpoints with:
 /// - FTS5 full-text search with BM25 ranking
 /// - AND logic for search terms (find documents with ALL terms)
-/// - Response caching with 5-minute TTL
+/// - Response caching with configurable TTL (default 5 minutes)
 /// - Minus operator support (drag -dragon excludes "dragon")
 /// - Quoted phrase support ("dragon age" as exact match)
 /// - Tag filtering with AND/NOT logic
 /// </summary>
 public static class SearchEndpointsOptimized
 {
-    private static readonly TimeSpan CacheDuration = TimeSpan.FromMinutes(5);
+    private static TimeSpan _cacheDuration = TimeSpan.FromMinutes(5);
+    
+    public static void SetCacheDuration(int minutes)
+    {
+        _cacheDuration = TimeSpan.FromMinutes(minutes);
+    }
     
     public static RouteGroupBuilder MapOptimizedSearchEndpoints(this RouteGroupBuilder group)
     {
         group.MapGet("/", OptimizedSearch);
         group.MapGet("/tags", GetTagFrequencies);
+        group.MapGet("/tags/batch", GetDocumentTagsBatch);
         group.MapGet("/count", GetDocumentCount);
         return group;
     }
@@ -116,27 +123,85 @@ public static class SearchEndpointsOptimized
                 // Build FTS5 query
                 var fts5Query = fts5Service.BuildFts5Query(searchTerms, phrases, excludedTerms);
                 
-                // Get total count
-                var totalCount = await fts5Service.GetFts5CountAsync(fts5Query);
+                // If we have tag filters, we need to apply them BEFORE pagination
+                bool hasTagFilters = !string.IsNullOrWhiteSpace(includeTags) || !string.IsNullOrWhiteSpace(excludeTags);
                 
-                // Get scored results from FTS5
-                var fts5Results = await fts5Service.SearchFts5Async(fts5Query, limit, offset);
+                List<(int Id, double Score)> fts5Results;
+                int totalCount;
                 
-                if (fts5Results.Count == 0)
+                if (hasTagFilters)
                 {
-                    var emptyResponse = new
-                    {
-                        success = true,
-                        query = q ?? "",
-                        includeTags = includeTags ?? "",
-                        excludeTags = excludeTags ?? "",
-                        resultCount = 0,
-                        totalCount = 0,
-                        results = new List<object>()
-                    };
+                    // Strategy: Get more results than we need, filter by tags, then paginate
+                    // Use a reasonable multiplier to balance accuracy vs performance
+                    var fetchLimit = Math.Min(limit * 20, 2000); // Fetch up to 2000 results max
+                    var fetchOffset = offset; // Start at the requested offset
                     
-                    cache.Set(cacheKey, emptyResponse, CacheDuration);
-                    return Results.Ok(emptyResponse);
+                    Console.WriteLine($"[SEARCH] Tag filters detected, fetching {fetchLimit} FTS5 results starting at {fetchOffset}");
+                    fts5Results = await fts5Service.SearchFts5Async(fts5Query, fetchLimit, fetchOffset);
+                    
+                    if (fts5Results.Count == 0)
+                    {
+                        var emptyResponse = new
+                        {
+                            success = true,
+                            query = q ?? "",
+                            includeTags = includeTags ?? "",
+                            excludeTags = excludeTags ?? "",
+                            resultCount = 0,
+                            totalCount = 0,
+                            results = new List<object>()
+                        };
+                        
+                        cache.Set(cacheKey, emptyResponse, _cacheDuration);
+                        return Results.Ok(emptyResponse);
+                    }
+                    
+                    // Get all document IDs and apply tag filtering
+                    var allDocumentIds = fts5Results.Select(r => r.Id).ToList();
+                    Console.WriteLine($"[SEARCH] FTS5 returned {allDocumentIds.Count} documents, filtering by tags...");
+                    
+                    // Query for IDs only with tag filtering applied
+                    var filteredQuery = context.JumpDocuments
+                        .AsNoTracking()
+                        .Where(d => allDocumentIds.Contains(d.Id));
+                    
+                    filteredQuery = ApplyTagFilters(filteredQuery, includeTags, excludeTags);
+                    
+                    // Get filtered document IDs
+                    var filteredDocumentIds = await filteredQuery.Select(d => d.Id).ToListAsync();
+                    Console.WriteLine($"[SEARCH] After tag filtering: {filteredDocumentIds.Count} documents remain");
+                    
+                    // Filter FTS5 results to only include documents that passed tag filtering
+                    fts5Results = fts5Results.Where(r => filteredDocumentIds.Contains(r.Id)).ToList();
+                    
+                    // Calculate correct total and apply pagination
+                    totalCount = fts5Results.Count;
+                    fts5Results = fts5Results.Skip(0).Take(limit).ToList();
+                    
+                    Console.WriteLine($"[SEARCH] After pagination (limit={limit}): {fts5Results.Count} documents");
+                }
+                else
+                {
+                    // No tag filters - use original pagination logic
+                    totalCount = await fts5Service.GetFts5CountAsync(fts5Query);
+                    fts5Results = await fts5Service.SearchFts5Async(fts5Query, limit, offset);
+                    
+                    if (fts5Results.Count == 0)
+                    {
+                        var emptyResponse = new
+                        {
+                            success = true,
+                            query = q ?? "",
+                            includeTags = includeTags ?? "",
+                            excludeTags = excludeTags ?? "",
+                            resultCount = 0,
+                            totalCount = 0,
+                            results = new List<object>()
+                        };
+                        
+                        cache.Set(cacheKey, emptyResponse, _cacheDuration);
+                        return Results.Ok(emptyResponse);
+                    }
                 }
                 
                 // Get document IDs from FTS5 results
@@ -145,7 +210,7 @@ public static class SearchEndpointsOptimized
                 var scoreMap = fts5Results.ToDictionary(r => r.Id, r => r.Score);
                 Console.WriteLine($"[SEARCH] Created scoreMap with {scoreMap.Count} entries");
                 
-                // Fetch full document details
+                // Fetch full document details (tags already filtered if tag filters were applied)
                 Console.WriteLine($"[SEARCH] Fetching documents for IDs: {string.Join(", ", documentIds.Take(5))}...");
                 var query = context.JumpDocuments
                     .AsNoTracking()
@@ -158,13 +223,17 @@ public static class SearchEndpointsOptimized
                     query = query.Where(d => d.Id == docId.Value);
                 }
                 
-                // Apply tag filters
-                query = ApplyTagFilters(query, includeTags, excludeTags);
+                // Note: Tag filters already applied above if hasTagFilters was true
+                // Only apply here if no tag filters (shouldn't change anything, but kept for safety)
+                if (!hasTagFilters)
+                {
+                    query = ApplyTagFilters(query, includeTags, excludeTags);
+                }
                 
                 Console.WriteLine($"[SEARCH] Executing query...");
                 var documents = await query.ToListAsync();
                 
-                Console.WriteLine($"[SEARCH] FTS5 returned {fts5Results.Count} IDs, fetched {documents.Count} documents after tag filtering");
+                Console.WriteLine($"[SEARCH] Fetched {documents.Count} documents with full details");
                 
                 // Build results with FTS5 scores, preserving FTS5 ranking order
                 // Create position map ONCE outside the loop for efficiency
@@ -217,7 +286,7 @@ public static class SearchEndpointsOptimized
                 Console.WriteLine($"[SEARCH] Built response object with {results.Count} results");
                 
                 // Cache the response
-                cache.Set(cacheKey, response, CacheDuration);
+                cache.Set(cacheKey, response, _cacheDuration);
                 
                 Console.WriteLine($"[SEARCH] Cached response, returning OK");
                 
@@ -278,7 +347,7 @@ public static class SearchEndpointsOptimized
                 };
                 
                 // Cache the response
-                cache.Set(cacheKey, response, CacheDuration);
+                cache.Set(cacheKey, response, _cacheDuration);
                 
                 return Results.Ok(response);
             }
@@ -488,6 +557,63 @@ public static class SearchEndpointsOptimized
         {
             return Results.BadRequest(new { 
                 success = false, 
+                error = ex.Message 
+            });
+        }
+    }
+
+    /// <summary>
+    /// Batch fetch tags for multiple documents by their IDs.
+    /// Used for SFW mode favorites filtering.
+    /// GET /api/search/tags/batch?docIds=123,456,789
+    /// Returns: { "Documents": [{ "DocumentId": 123, "Tags": ["Jump", "NSFW"] }] }
+    /// </summary>
+    private static async Task<IResult> GetDocumentTagsBatch(
+        JumpChainDbContext context,
+        string? docIds = null)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(docIds))
+            {
+                return Results.BadRequest(new { 
+                    Success = false, 
+                    Message = "docIds parameter is required" 
+                });
+            }
+
+            // Parse comma-separated IDs
+            var ids = docIds.Split(',', StringSplitOptions.RemoveEmptyEntries)
+                .Select(id => int.TryParse(id.Trim(), out var num) ? num : -1)
+                .Where(id => id > 0)
+                .ToList();
+
+            if (!ids.Any())
+            {
+                return Results.BadRequest(new { 
+                    Success = false, 
+                    Message = "No valid document IDs provided" 
+                });
+            }
+
+            // Fetch documents with their tags
+            var documents = await context.JumpDocuments
+                .Where(d => ids.Contains(d.Id))
+                .Include(d => d.Tags)
+                .Select(d => new {
+                    DocumentId = d.Id,
+                    Tags = d.Tags.Select(t => t.TagName).ToList()
+                })
+                .ToListAsync();
+
+            return Results.Ok(new { 
+                Documents = documents 
+            });
+        }
+        catch (Exception ex)
+        {
+            return Results.BadRequest(new { 
+                Success = false, 
                 error = ex.Message 
             });
         }

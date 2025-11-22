@@ -130,8 +130,11 @@
 </div>
 
 @using Microsoft.JSInterop
+@using JumpChainSearch.Services
 @inject IJSRuntime JSRuntime
 @inject NavigationManager NavigationManager
+@inject SfwModeService SfwMode
+@inject HttpClient Http
 @implements IDisposable
 
 @code {
@@ -151,6 +154,7 @@
     };
     
     private List<FavoriteDocument> favoriteDocuments = new List<FavoriteDocument>();
+    private HashSet<string> nsfwFavoriteIds = new HashSet<string>();
     private int? draggedIndex = null;
 
     private string? NavMenuCssClass => collapseNavMenu ? "collapsed" : "expanded";
@@ -232,7 +236,18 @@
                 var favorites = System.Text.Json.JsonSerializer.Deserialize<List<FavoriteDocument>>(json);
                 if (favorites != null)
                 {
-                    favoriteDocuments = favorites;
+                    // In SFW mode, filter out favorites with NSFW tags
+                    if (SfwMode.IsSfwMode && favorites.Any())
+                    {
+                        await LoadNsfwFavoriteIds(favorites);
+                        favoriteDocuments = favorites
+                            .Where(f => !nsfwFavoriteIds.Contains(f.Id))
+                            .ToList();
+                    }
+                    else
+                    {
+                        favoriteDocuments = favorites;
+                    }
                 }
             }
         }
@@ -240,6 +255,45 @@
         {
             Console.WriteLine($"Error loading favorites: {ex.Message}");
         }
+    }
+    
+    private async Task LoadNsfwFavoriteIds(List<FavoriteDocument> favorites)
+    {
+        nsfwFavoriteIds.Clear();
+        
+        try
+        {
+            // Fetch tags for all favorite documents in batch
+            var favoriteIds = string.Join(",", favorites.Select(f => f.Id));
+            var response = await Http.GetFromJsonAsync<TagsBatchResponse>($"/api/search/tags/batch?docIds={favoriteIds}");
+            
+            if (response?.Documents != null)
+            {
+                foreach (var doc in response.Documents)
+                {
+                    // Check if document has any NSFW tags
+                    if (doc.Tags != null && doc.Tags.Any(tag => SfwMode.IsNsfwTag(tag)))
+                    {
+                        nsfwFavoriteIds.Add(doc.DocumentId.ToString());
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error checking NSFW favorites: {ex.Message}");
+        }
+    }
+    
+    private class TagsBatchResponse
+    {
+        public List<DocumentTagInfo> Documents { get; set; } = new();
+    }
+    
+    private class DocumentTagInfo
+    {
+        public int DocumentId { get; set; }
+        public List<string> Tags { get; set; } = new();
     }
     
     private async Task SaveFavorites()

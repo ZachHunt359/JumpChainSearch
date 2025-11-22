@@ -56,6 +56,22 @@ var connectionString = builder.Configuration.GetConnectionString("DefaultConnect
 builder.Services.AddMemoryCache();
 builder.Services.AddJumpChainServices(connectionString);
 
+// Register HttpContextAccessor for SFW mode detection
+builder.Services.AddHttpContextAccessor();
+
+// Register SFW mode service (scoped to detect domain per request)
+builder.Services.AddScoped<SfwModeService>(sp =>
+{
+    var httpContextAccessor = sp.GetRequiredService<IHttpContextAccessor>();
+    var host = httpContextAccessor.HttpContext?.Request.Host.Host ?? "";
+    
+    // Enable SFW mode for .net and .org domains
+    bool isSfwMode = host.Contains("jumpchainsearch.net", StringComparison.OrdinalIgnoreCase) ||
+                     host.Contains("jumpchainsearch.org", StringComparison.OrdinalIgnoreCase);
+    
+    return new SfwModeService(isSfwMode);
+});
+
 // Register a scoped HttpClient for server-side Blazor components that inject it.
 // Use NavigationManager.BaseUri as the BaseAddress so relative URLs like "/api/..." work.
 builder.Services.AddScoped(sp =>

@@ -2,9 +2,11 @@
 @using System.Text.Json
 @using System.Text.Json.Serialization
 @using System.Web
+@using JumpChainSearch.Services
 @inject HttpClient Http
 @inject IJSRuntime JSRuntime
 @inject NavigationManager NavigationManager
+@inject SfwModeService SfwMode
 @implements IDisposable
 
 <PageTitle>JumpChain Search</PageTitle>
@@ -235,21 +237,28 @@
                                             }
                                             @if (document.Tags != null && document.Tags.Any())
                                             {
-                                                <div class="tags-container mb-2">
-                                                    @foreach (var tag in document.Tags.Take(8)) // Show fewer tags to save space
-                                                    {
-                                                        <span class="badge @GetTagColor(tag) me-1 mb-1 clickable-tag" 
-                                                              @onclick:stopPropagation="true"
-                                                              @onclick="() => ToggleTagFilter(tag)" 
-                                                              title="Click to filter by this tag">
-                                                            @tag
-                                                        </span>
-                                                    }
-                                                    @if (document.Tags.Count > 8)
-                                                    {
-                                                        <span class="badge bg-secondary">+@(document.Tags.Count - 8) more</span>
-                                                    }
-                                                </div>
+                                                var visibleTags = SfwMode.IsSfwMode 
+                                                    ? document.Tags.Where(tag => !SfwMode.IsNsfwTag(tag)).ToList()
+                                                    : document.Tags.ToList();
+                                                    
+                                                @if (visibleTags.Any())
+                                                {
+                                                    <div class="tags-container mb-2">
+                                                        @foreach (var tag in visibleTags.Take(8)) // Show fewer tags to save space
+                                                        {
+                                                            <span class="badge @GetTagColor(tag) me-1 mb-1 clickable-tag" 
+                                                                  @onclick:stopPropagation="true"
+                                                                  @onclick="() => ToggleTagFilter(tag)" 
+                                                                  title="Click to filter by this tag">
+                                                                @tag
+                                                            </span>
+                                                        }
+                                                        @if (visibleTags.Count > 8)
+                                                        {
+                                                            <span class="badge bg-secondary">+@(visibleTags.Count - 8) more</span>
+                                                        }
+                                                    </div>
+                                                }
                                             }
                                         </div>
                                         <div class="col-md-4 text-md-end">
@@ -524,28 +533,35 @@
                     <!-- Tags Section -->
                     @if (selectedDocument.Tags != null && selectedDocument.Tags.Any())
                     {
-                        <div class="mt-4">
-                            <h6 class="text-primary mb-3">
-                                <i class="fas fa-tags me-1"></i>Tags (@selectedDocument.Tags.Count)
-                            </h6>
-                            <div class="tags-container-modal">
-                                @foreach (var tag in selectedDocument.Tags)
-                                {
-                                    <span class="badge @GetTagColor(tag) me-1 mb-1 position-relative tag-with-remove">
-                                        <span class="clickable-tag" @onclick="() => { ToggleTagFilter(tag); CloseModal(); }" 
-                                              title="Click to filter by this tag">
-                                            @tag
+                        var visibleTags = SfwMode.IsSfwMode 
+                            ? selectedDocument.Tags.Where(tag => !SfwMode.IsNsfwTag(tag)).ToList()
+                            : selectedDocument.Tags.ToList();
+                            
+                        @if (visibleTags.Any())
+                        {
+                            <div class="mt-4">
+                                <h6 class="text-primary mb-3">
+                                    <i class="fas fa-tags me-1"></i>Tags (@visibleTags.Count)
+                                </h6>
+                                <div class="tags-container-modal">
+                                    @foreach (var tag in visibleTags)
+                                    {
+                                        <span class="badge @GetTagColor(tag) me-1 mb-1 position-relative tag-with-remove">
+                                            <span class="clickable-tag" @onclick="() => { ToggleTagFilter(tag); CloseModal(); }" 
+                                                  title="Click to filter by this tag">
+                                                @tag
+                                            </span>
+                                            <button type="button" class="tag-remove-btn" 
+                                                    @onclick="() => RequestRemoval(tag, GetCategoryFromTag(tag))"
+                                                    @onclick:stopPropagation="true"
+                                                    title="Request removal of this tag">
+                                                ×
+                                            </button>
                                         </span>
-                                        <button type="button" class="tag-remove-btn" 
-                                                @onclick="() => RequestRemoval(tag, GetCategoryFromTag(tag))"
-                                                @onclick:stopPropagation="true"
-                                                title="Request removal of this tag">
-                                            ×
-                                        </button>
-                                    </span>
-                                }
+                                    }
+                                </div>
                             </div>
-                        </div>
+                        }
                     }
                     
                     <!-- Community Tag Voting Section -->
@@ -765,6 +781,7 @@
     
     // Tag filtering with inclusion/exclusion support
     private List<TagInfo> availableTags = new List<TagInfo>();
+    private HashSet<string> nsfwChildTags = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
     private Dictionary<string, List<string>> tagHierarchyMap = new Dictionary<string, List<string>>(); // Parent -> Children
     private HashSet<string> childTags = new HashSet<string>(); // All tags that are children
     private HashSet<string> includedTags = new HashSet<string>(); // Tags to include (green)
@@ -962,6 +979,15 @@
             if (response?.Success == true)
             {
                 searchResults = response.Results;
+                
+                // Filter out documents with NSFW tags in SFW mode
+                if (SfwMode.IsSfwMode && searchResults.Any())
+                {
+                    searchResults = searchResults
+                        .Where(doc => !doc.Tags.Any(tag => SfwMode.IsNsfwTag(tag)))
+                        .ToList();
+                }
+                
                 totalResults = response.TotalCount > 0 ? response.TotalCount : response.ResultCount;
                 showNoResultsMessage = !searchResults.Any();
             }
@@ -1006,6 +1032,7 @@
     {
         userId = await GetOrCreateUserId();
         await LoadAvailableTagsAsync();
+        await LoadNsfwChildTagsAsync();
         
         // Load document count from API (which returns cached singleton value)
         await LoadTotalDocumentCountAsync();
@@ -1069,6 +1096,14 @@
                     Count = t.Count
                 }).ToList();
                 
+                // Filter out NSFW tags in SFW mode
+                if (SfwMode.IsSfwMode)
+                {
+                    availableTags = availableTags
+                        .Where(t => !SfwMode.IsNsfwTag(t.Name))
+                        .ToList();
+                }
+                
                 // Load tag hierarchies after loading tags
                 await LoadTagHierarchies();
             }
@@ -1105,6 +1140,41 @@
                     tagHierarchyMap[hierarchy.ParentTagName].Add(hierarchy.ChildTagName);
                     childTags.Add(hierarchy.ChildTagName);
                 }
+            }
+        }
+        catch (Exception)
+        {
+            // Handle error silently
+        }
+    }
+    
+    private async Task LoadNsfwChildTagsAsync()
+    {
+        if (!SfwMode.IsSfwMode)
+            return;
+            
+        try
+        {
+            var response = await Http.GetFromJsonAsync<TagHierarchyAllResponse>("/api/tags/hierarchy/all");
+            
+            if (response?.Success == true && response.Hierarchies != null)
+            {
+                // Find all children of NSFW tag (and any tag containing "NSFW")
+                var nsfwChildren = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                var nsfwParents = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "NSFW" };
+                
+                // Find all tags that have NSFW as parent
+                foreach (var hierarchy in response.Hierarchies)
+                {
+                    if (nsfwParents.Contains(hierarchy.ParentTagName))
+                    {
+                        nsfwChildren.Add(hierarchy.ChildTagName);
+                    }
+                }
+                
+                // Update the service with NSFW child tags
+                SfwMode.UpdateNsfwChildTags(nsfwChildren);
+                nsfwChildTags = nsfwChildren;
             }
         }
         catch (Exception)
@@ -1172,12 +1242,24 @@
             if (response?.Success == true && response.Results.Any())
             {
                 searchResults = response.Results;
+                
+                // Filter out documents with NSFW tags in SFW mode
+                if (SfwMode.IsSfwMode && searchResults.Any())
+                {
+                    searchResults = searchResults
+                        .Where(doc => !doc.Tags.Any(tag => SfwMode.IsNsfwTag(tag)))
+                        .ToList();
+                }
+                
                 totalResults = 1;
                 showNoResultsMessage = false;
                 
                 // Automatically select the document to show details
-                var document = response.Results.First();
-                await ShowDocumentDetails(document);
+                if (searchResults.Any())
+                {
+                    var document = searchResults.First();
+                    await ShowDocumentDetails(document);
+                }
             }
             else
             {

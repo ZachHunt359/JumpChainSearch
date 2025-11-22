@@ -13,6 +13,7 @@ public static class SearchEndpoints
         
         // Tag management endpoints
         group.MapGet("/tags", GetTagFrequencies);
+        group.MapGet("/tags/batch", GetDocumentTagsBatch);
         group.MapGet("/browse-text", BrowseExtractedText);
         group.MapGet("/browse-text/{documentId:int}", GetDocumentText);
         
@@ -397,6 +398,61 @@ public static class SearchEndpoints
         {
             return Results.BadRequest(new { 
                 success = false, 
+                error = ex.Message 
+            });
+        }
+    }
+
+    /// <summary>
+    /// Batch fetch tags for multiple documents by their IDs.
+    /// Used for SFW mode favorites filtering.
+    /// </summary>
+    private static async Task<IResult> GetDocumentTagsBatch(
+        JumpChainDbContext context,
+        string? docIds = null)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(docIds))
+            {
+                return Results.BadRequest(new { 
+                    Success = false, 
+                    Message = "docIds parameter is required" 
+                });
+            }
+
+            // Parse comma-separated IDs
+            var ids = docIds.Split(',', StringSplitOptions.RemoveEmptyEntries)
+                .Select(id => int.TryParse(id.Trim(), out var num) ? num : -1)
+                .Where(id => id > 0)
+                .ToList();
+
+            if (!ids.Any())
+            {
+                return Results.BadRequest(new { 
+                    Success = false, 
+                    Message = "No valid document IDs provided" 
+                });
+            }
+
+            // Fetch documents with their tags
+            var documents = await context.JumpDocuments
+                .Where(d => ids.Contains(d.Id))
+                .Include(d => d.Tags)
+                .Select(d => new {
+                    DocumentId = d.Id,
+                    Tags = d.Tags.Select(t => t.TagName).ToList()
+                })
+                .ToListAsync();
+
+            return Results.Ok(new { 
+                Documents = documents 
+            });
+        }
+        catch (Exception ex)
+        {
+            return Results.BadRequest(new { 
+                Success = false, 
                 error = ex.Message 
             });
         }
