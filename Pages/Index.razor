@@ -1031,6 +1031,10 @@
     protected override async Task OnInitializedAsync()
     {
         userId = await GetOrCreateUserId();
+        
+        // Diagnostic: Log SFW mode status
+        Console.WriteLine($"[INDEX] SFW Mode Active: {SfwMode.IsSfwMode}");
+        
         await LoadAvailableTagsAsync();
         await LoadNsfwChildTagsAsync();
         
@@ -1099,9 +1103,15 @@
                 // Filter out NSFW tags in SFW mode
                 if (SfwMode.IsSfwMode)
                 {
+                    Console.WriteLine($"[TAGS] Filtering NSFW tags. Before: {availableTags.Count}");
                     availableTags = availableTags
                         .Where(t => !SfwMode.IsNsfwTag(t.Name))
                         .ToList();
+                    Console.WriteLine($"[TAGS] After filtering: {availableTags.Count}");
+                }
+                else
+                {
+                    Console.WriteLine("[TAGS] SFW mode NOT active, showing all tags");
                 }
                 
                 // Load tag hierarchies after loading tags
