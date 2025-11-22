@@ -528,7 +528,7 @@ public static class SearchEndpointsOptimized
         return query;
     }
 
-    private static async Task<IResult> GetTagFrequencies(JumpChainDbContext context)
+    private static async Task<IResult> GetTagFrequencies(JumpChainDbContext context, SfwModeService? sfwMode = null)
     {
         try
         {
@@ -541,6 +541,14 @@ public static class SearchEndpointsOptimized
                 })
                 .OrderByDescending(t => t.Count)
                 .ToListAsync();
+
+            // Filter NSFW tags in SFW mode
+            if (sfwMode?.IsSfwMode == true)
+            {
+                tagFrequencies = tagFrequencies
+                    .Where(t => !sfwMode.IsNsfwTag(t.TagName))
+                    .ToList();
+            }
 
             var categorizedTags = tagFrequencies
                 .GroupBy(t => t.TagCategory)
