@@ -39,6 +39,7 @@ public static class SearchEndpointsOptimized
         JumpChainDbContext context,
         IMemoryCache cache,
         Fts5SearchService fts5Service,
+        SfwModeService? sfwMode = null,
         string? q = null,
         int limit = 50,
         int offset = 0,
@@ -48,6 +49,15 @@ public static class SearchEndpointsOptimized
     {
         try
         {
+            // In SFW mode, automatically exclude NSFW tags
+            if (sfwMode?.IsSfwMode == true)
+            {
+                var nsfwExclusion = "NSFW";
+                excludeTags = string.IsNullOrWhiteSpace(excludeTags) 
+                    ? nsfwExclusion 
+                    : $"{excludeTags},{nsfwExclusion}";
+            }
+            
             // Skip caching if docId is provided (direct document lookup)
             if (docId.HasValue)
             {

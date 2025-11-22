@@ -121,12 +121,13 @@
                             <div class="tag-filter-compact">
                                 @foreach (var category in availableTags.GroupBy(t => t.Category).OrderBy(g => GetCategoryOrder(g.Key)))
                                 {
-                                    <div class="tag-category-inline mb-2">
-                                        <span class="category-label">@category.Key:</span>
-                                        @foreach (var tag in category.OrderByDescending(t => t.Count))
-                                        {
-                                            @* Only show parent tags or tags without hierarchy in main list *@
-                                            @if (!childTags.Contains(tag.Name))
+                                    @* Skip empty categories (all tags filtered out) *@
+                                    var visibleTags = category.Where(t => !childTags.Contains(t.Name)).ToList();
+                                    @if (visibleTags.Any())
+                                    {
+                                        <div class="tag-category-inline mb-2">
+                                            <span class="category-label">@category.Key:</span>
+                                            @foreach (var tag in visibleTags.OrderByDescending(t => t.Count))
                                             {
                                                 <span class="badge @GetTagFilterClass(tag.Name) me-1 mb-1 clickable-tag" 
                                                       @onclick="() => ToggleTagFilter(tag.Name)"
@@ -153,8 +154,8 @@
                                                     </div>
                                                 }
                                             }
-                                        }
-                                    </div>
+                                        </div>
+                                    }
                                 }
                             </div>
                         }
