@@ -38,13 +38,25 @@ if [ ! -f "JumpChainSearch.csproj" ]; then
     exit 1
 fi
 
-echo "Step 1: Pulling latest changes from Git..."
+echo "Step 1: Stopping the service..."
+sudo systemctl stop $SERVICE_NAME
+echo "✓ Service stopped"
+echo ""
+
+echo "Step 2: Cleaning previous build..."
+sudo rm -rf "$PUBLISH_DIR"
+sudo rm -rf "$APP_DIR/obj"
+sudo rm -rf "$APP_DIR/bin"
+echo "✓ Previous build cleaned"
+echo ""
+
+echo "Step 3: Pulling latest changes from Git..."
 git fetch origin
 git reset --hard origin/$BRANCH
 echo "✓ Code updated to latest commit"
 echo ""
 
-echo "Step 2: Backing up database..."
+echo "Step 4: Backing up database..."
 # Extract database file path from connection string
 DB_PATH=$(echo "$DB_CONNECTION" | grep -o 'Data Source=[^;]*' | cut -d'=' -f2)
 BACKUP_FILE="$DB_PATH.backup-$(date +%Y%m%d-%H%M%S)"
@@ -54,16 +66,6 @@ if [ -f "$DB_PATH" ]; then
 else
     echo "⚠ No database file found at: $DB_PATH (first deployment?)"
 fi
-echo ""
-
-echo "Step 3: Stopping the service..."
-sudo systemctl stop $SERVICE_NAME
-echo "✓ Service stopped"
-echo ""
-
-echo "Step 4: Cleaning previous build..."
-rm -rf "$PUBLISH_DIR"
-echo "✓ Previous build cleaned"
 echo ""
 
 echo "Step 5: Building the application..."
