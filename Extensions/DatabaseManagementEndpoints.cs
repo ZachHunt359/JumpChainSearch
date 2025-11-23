@@ -320,7 +320,7 @@ public static class DatabaseManagementEndpoints
         }
     }
 
-    private static async Task<IResult> MergeDuplicates(JumpChainDbContext context, int? groupIndex = null)
+    private static async Task<IResult> MergeDuplicates(JumpChainDbContext context, IDocumentCountService documentCountService, int? groupIndex = null)
     {
         Console.WriteLine($"[MergeDuplicates] Called with groupIndex: {groupIndex}");
         try
@@ -440,12 +440,17 @@ public static class DatabaseManagementEndpoints
 
             // Save all changes
             await context.SaveChangesAsync();
+            
+            // Refresh document count after merge
+            await documentCountService.RefreshCountAsync();
+            var finalCount = await documentCountService.GetCountAsync();
 
             return Results.Ok(new {
                 success = true,
                 message = $"Successfully merged {totalMergedGroups} duplicate groups, consolidating {totalDocumentsMerged} documents",
                 mergedGroups = totalMergedGroups,
                 documentsMerged = totalDocumentsMerged,
+                currentTotalDocuments = finalCount,
                 mergeDetails = mergeResults
             });
         }

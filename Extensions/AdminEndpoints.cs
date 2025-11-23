@@ -45,6 +45,9 @@ public static class AdminEndpoints
         // System management endpoints
         group.MapGet("/system/cache-ttl", GetCacheTTL);
         group.MapPost("/system/cache-ttl", UpdateCacheTTL);
+        #pragma warning disable ASP0016
+        group.MapPost("/system/refresh-document-count", RefreshDocumentCount).DisableAntiforgery();
+        #pragma warning restore ASP0016
         group.MapGet("/system/scan-schedule", GetScanSchedule);
         group.MapPost("/system/scan-schedule", UpdateScanSchedule);
         group.MapPost("/system/scan-schedule/set-next", SetNextScheduledScan);
@@ -428,6 +431,11 @@ public static class AdminEndpoints
                 <div class=""stat-card"">
                     <h3>Total Documents</h3>
                     <div class=""stat-value"" id=""total-docs"">{totalDocuments}</div>
+                    <button class=""btn btn-sm btn-primary"" onclick=""refreshDocumentCount()"" 
+                            style=""margin-top: 0.5rem;"" 
+                            title=""Refresh the document count cache used by the front page"">
+                        <i class=""fas fa-sync-alt""></i> Refresh Count
+                    </button>
                 </div>
                 <div class=""stat-card"">
                     <h3>Processed Documents</h3>
@@ -1225,6 +1233,35 @@ public static class AdminEndpoints
                 }}
             }} catch (e) {{
                 alert('Error: ' + e.message);
+            }}
+        }}
+        
+        async function refreshDocumentCount() {{
+            const btn = event.target.closest('button');
+            const icon = btn.querySelector('i');
+            try {{
+                btn.disabled = true;
+                icon.classList.add('fa-spin');
+                const resp = await fetch('/admin/system/refresh-document-count', {{ method: 'POST' }});
+                
+                if (!resp.ok) {{
+                    const errorText = await resp.text();
+                    alert('Server error: ' + resp.status + ' - ' + errorText);
+                    return;
+                }}
+                
+                const data = await resp.json();
+                if (data.success) {{
+                    document.getElementById('total-docs').textContent = data.currentCount.toLocaleString();
+                    alert('Document count refreshed: ' + data.currentCount.toLocaleString());
+                }} else {{
+                    alert('Error: ' + (data.error || 'Failed to refresh'));
+                }}
+            }} catch (error) {{
+                alert('Error: ' + error.message);
+            }} finally {{
+                btn.disabled = false;
+                icon.classList.remove('fa-spin');
             }}
         }}
         
@@ -3309,6 +3346,34 @@ rm -f drive-scan.pid
         catch (Exception ex)
         {
             return Results.Ok(new { success = false, message = ex.Message });
+        }
+    }
+    
+    /// <summary>
+    /// Refresh the document count cache used by the front page
+    /// </summary>
+    private static async Task<IResult> RefreshDocumentCount(
+        HttpContext context,
+        AdminAuthService authService,
+        IDocumentCountService documentCountService)
+    {
+        var (valid, _) = await ValidateSession(context, authService);
+        if (!valid) return Results.Ok(new { success = false, error = "Session expired - please log in again" });
+        
+        try
+        {
+            await documentCountService.RefreshCountAsync();
+            var currentCount = await documentCountService.GetCountAsync();
+            
+            return Results.Ok(new { 
+                success = true, 
+                currentCount,
+                message = $"Document count refreshed: {currentCount:N0}" 
+            });
+        }
+        catch (Exception ex)
+        {
+            return Results.BadRequest(new { success = false, error = ex.Message });
         }
     }
     

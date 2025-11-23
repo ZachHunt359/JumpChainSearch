@@ -24,9 +24,6 @@ public static class GoogleDriveEndpoints
         // Drive scanning endpoint for admin portal
         group.MapPost("/scan-all", ScanAllDrives);
         
-        // Scan a single drive and save to database
-        group.MapPost("/scan-drive/{driveName}", ScanSingleDrive);
-        
         // Sync drive configurations from .env
         group.MapPost("/sync-drives", SyncDriveConfigurations);
         
@@ -480,7 +477,7 @@ public static class GoogleDriveEndpoints
         }
     }
 
-    private static async Task<IResult> ScanAllDrives(JumpChainDbContext dbContext, IGoogleDriveService driveService)
+    private static async Task<IResult> ScanAllDrives(JumpChainDbContext dbContext, IGoogleDriveService driveService, IDocumentCountService documentCountService)
     {
         Console.WriteLine("===== ScanAllDrives ENDPOINT INVOKED =====");
         try
@@ -502,6 +499,7 @@ public static class GoogleDriveEndpoints
             var results = new List<object>();
             var totalDocuments = 0;
             var newDocuments = 0;
+            var duplicatesDetected = 0;
 
             foreach (var drive in drives)
             {
@@ -534,6 +532,7 @@ public static class GoogleDriveEndpoints
                     var newDocsInDrive = 0;
                     var updatedDocs = 0;
                     var driveTagsAdded = 0;
+                    var duplicatesInDrive = 0;
                     
                     if (documentsList.Count > 0)
                     {
@@ -545,7 +544,8 @@ public static class GoogleDriveEndpoints
                             .ToListAsync();
                         var existingFileIds = existingDocuments.ToDictionary(d => d.GoogleDriveFileId, d => d.Id);
                         
-                        Console.WriteLine($"Found {existingFileIds.Count} existing documents - will add drive tags where missing");
+                        duplicatesInDrive = existingFileIds.Count;
+                        Console.WriteLine($"Found {duplicatesInDrive} existing documents (duplicates) - will add drive tags where missing");
                         
                         var addedInThisBatch = new HashSet<string>();
                         
@@ -717,6 +717,7 @@ public static class GoogleDriveEndpoints
                     
                     totalDocuments += currentCount;
                     newDocuments += newDocsInDrive;
+                    duplicatesDetected += duplicatesInDrive;
                     
                     results.Add(new
                     {
@@ -724,6 +725,7 @@ public static class GoogleDriveEndpoints
                         success = true,
                         totalDocuments = currentCount,
                         newDocuments = newDocsInDrive,
+                        duplicatesDetected = duplicatesInDrive,
                         driveTagsAdded = driveTagsAdded
                     });
                 }
@@ -744,43 +746,126 @@ public static class GoogleDriveEndpoints
             Console.WriteLine("Saving changes to database");
             await dbContext.SaveChangesAsync();
 
+            Console.WriteLine("Scan complete! Running duplicate detection and cleanup...");
+            
+            // Run duplicate detection and auto-merge if duplicates found
+            var duplicateMergeResults = new { mergedGroups = 0, documentsMerged = 0 };
+            if (duplicatesDetected > 0)
+            {
+                Console.WriteLine($"Detected {duplicatesDetected} duplicate documents during scan. Running auto-merge...");
+                try
+                {
+                    var mergeResult = await AutoMergeDuplicates(dbContext);
+                    duplicateMergeResults = new { 
+                        mergedGroups = mergeResult.mergedGroups, 
+                        documentsMerged = mergeResult.documentsMerged 
+                    };
+                    Console.WriteLine($"Auto-merge complete: {duplicateMergeResults.mergedGroups} groups, {duplicateMergeResults.documentsMerged} documents merged");
+                }
+                catch (Exception mergeEx)
+                {
+                    Console.WriteLine($"Warning: Auto-merge failed: {mergeEx.Message}");
+                }
+            }
+            
+            // Refresh document count cache
+            Console.WriteLine("Refreshing document count cache...");
+            await documentCountService.RefreshCountAsync();
+            var finalCount = await documentCountService.GetCountAsync();
+            Console.WriteLine($"Final document count: {finalCount}");
+
             Console.WriteLine("Scan complete!");
             return Results.Ok(new
             {
                 success = true,
-                message = $"Scanned {drives.Count} drives",
+                message = $"Scanned {drives.Count} drives, found {newDocuments} new documents, detected {duplicatesDetected} duplicates",
                 drivesScanned = drives.Count,
-                totalDocuments,
+                totalDocuments = finalCount,
                 newDocuments,
+                duplicatesDetected,
+                duplicateMerge = duplicateMergeResults,
                 results
             });
         }
         catch (Exception ex)
         {
             Console.WriteLine($"===== CRITICAL ERROR in ScanAllDrives =====");
-            Console.WriteLine($"Exception Type: {ex.GetType().FullName}");
-            Console.WriteLine($"Message: {ex.Message}");
-            Console.WriteLine($"Stack Trace: {ex.StackTrace}");
-            if (ex.InnerException != null)
-            {
-                Console.WriteLine($"Inner Exception: {ex.InnerException.Message}");
-                Console.WriteLine($"Inner Stack Trace: {ex.InnerException.StackTrace}");
-            }
-            Console.WriteLine($"===========================================");
-            
-            return Results.Json(new
-            {
-                success = false,
-                error = ex.Message,
-                detail = ex.ToString(),
-                stackTrace = ex.StackTrace
-            }, statusCode: 500);
+            Console.WriteLine($"Error: {ex.Message}");
+            Console.WriteLine($"Stack trace: {ex.StackTrace}");
+            return Results.Problem(ex.Message);
         }
     }
 
-    private static async Task<IResult> ScanSingleDrive(string driveName, JumpChainDbContext dbContext, IGoogleDriveService driveService)
+    /// <summary>
+    /// Auto-merge duplicate documents found during scan
+    /// </summary>
+    private static async Task<(int mergedGroups, int documentsMerged)> AutoMergeDuplicates(JumpChainDbContext context)
     {
-        Console.WriteLine($"===== ScanSingleDrive ENDPOINT INVOKED for {driveName} =====");
+        var allDocuments = await context.JumpDocuments
+            .Include(d => d.Tags)
+            .ToListAsync();
+            
+        var duplicateGroups = allDocuments
+            .GroupBy(d => new { 
+                NormalizedName = d.Name.ToLower().Trim(),
+                d.Size,
+                d.MimeType
+            })
+            .Where(g => g.Count() > 1)
+            .ToList();
+
+        if (!duplicateGroups.Any())
+        {
+            return (0, 0);
+        }
+
+        int mergedGroups = 0;
+        int documentsMerged = 0;
+
+        foreach (var group in duplicateGroups)
+        {
+            var docs = group.ToList();
+            
+            // Pick primary document (prefer documents with most tags, then oldest)
+            var primaryDoc = docs
+                .OrderByDescending(d => d.Tags.Count)
+                .ThenBy(d => d.CreatedTime)
+                .First();
+            
+            var duplicateDocs = docs.Where(d => d.Id != primaryDoc.Id).ToList();
+            
+            // Merge tags and URLs from duplicates into primary
+            foreach (var duplicate in duplicateDocs)
+            {
+                // Add any missing tags
+                foreach (var tag in duplicate.Tags)
+                {
+                    if (!primaryDoc.Tags.Any(t => t.TagName == tag.TagName && t.TagCategory == tag.TagCategory))
+                    {
+                        primaryDoc.Tags.Add(new DocumentTag
+                        {
+                            JumpDocumentId = primaryDoc.Id,
+                            TagName = tag.TagName,
+                            TagCategory = tag.TagCategory
+                        });
+                    }
+                }
+                
+                // Remove the duplicate document
+                context.JumpDocuments.Remove(duplicate);
+                documentsMerged++;
+            }
+            
+            mergedGroups++;
+        }
+
+        await context.SaveChangesAsync();
+        return (mergedGroups, documentsMerged);
+    }
+
+    private static async Task<IResult> TestScanSingleDrive(string driveName, JumpChainDbContext dbContext, IGoogleDriveService driveService)
+    {
+        Console.WriteLine($"===== TestScanSingleDrive ENDPOINT INVOKED for {driveName} =====");
         try
         {
             var drive = await dbContext.DriveConfigurations
@@ -1143,49 +1228,6 @@ Text Preview: {text?.Substring(0, Math.Min(200, text?.Length ?? 0))}
         catch (Exception ex)
         {
             Console.WriteLine($"Error syncing drive configurations: {ex.Message}");
-            return Results.Json(new
-            {
-                success = false,
-                error = ex.Message,
-                detail = ex.ToString()
-            }, statusCode: 500);
-        }
-    }
-
-    private static async Task<IResult> TestScanSingleDrive(string driveName, JumpChainDbContext dbContext, IGoogleDriveService driveService)
-    {
-        try
-        {
-            Console.WriteLine($"Testing scan of single drive: {driveName}");
-            
-            var drive = await dbContext.DriveConfigurations
-                .FirstOrDefaultAsync(d => d.DriveName == driveName);
-            
-            if (drive == null)
-            {
-                return Results.NotFound(new { success = false, error = $"Drive '{driveName}' not found in configuration" });
-            }
-            
-            Console.WriteLine($"Found drive: {drive.DriveName} (ID: {drive.DriveId})");
-            Console.WriteLine($"Scanning folder with service account authentication...");
-            
-            var (documents, method) = await driveService.ScanDriveUnifiedAsync(drive);
-            var documentsList = documents.ToList();
-            
-            Console.WriteLine($"Scan returned {documentsList.Count} documents");
-            
-            return Results.Ok(new
-            {
-                success = true,
-                driveName = drive.DriveName,
-                driveId = drive.DriveId,
-                documentsFound = documentsList.Count,
-                sampleDocuments = documentsList.Take(10).Select(d => new { d.Name, d.FolderPath, d.MimeType })
-            });
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Error: {ex.Message}");
             return Results.Json(new
             {
                 success = false,
