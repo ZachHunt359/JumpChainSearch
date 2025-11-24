@@ -3446,10 +3446,27 @@ rm -f drive-scan.pid
                         writer.WriteNull("LastScanTime");
                     }
                     
-                    // Preserve NextScheduledScan if it exists
-                    if (property.Value.TryGetProperty("NextScheduledScan", out var nextScan) && nextScan.ValueKind != System.Text.Json.JsonValueKind.Null)
+                    // Calculate NextScheduledScan based on current state
+                    DateTime? nextScheduledScan = null;
+                    if (request.Enabled)
                     {
-                        writer.WriteString("NextScheduledScan", nextScan.GetString());
+                        // If LastScanTime exists, schedule from there. Otherwise schedule from now.
+                        if (property.Value.TryGetProperty("LastScanTime", out var lastScanProp) && 
+                            lastScanProp.ValueKind != System.Text.Json.JsonValueKind.Null &&
+                            DateTime.TryParse(lastScanProp.GetString(), out var lastScan))
+                        {
+                            nextScheduledScan = lastScan.AddHours(request.IntervalHours);
+                        }
+                        else
+                        {
+                            // No last scan - schedule for the configured interval from now
+                            nextScheduledScan = DateTime.UtcNow.AddHours(request.IntervalHours);
+                        }
+                    }
+                    
+                    if (nextScheduledScan.HasValue)
+                    {
+                        writer.WriteString("NextScheduledScan", nextScheduledScan.Value.ToString("o"));
                     }
                     else
                     {
