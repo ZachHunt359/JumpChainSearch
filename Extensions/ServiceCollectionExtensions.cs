@@ -24,6 +24,10 @@ public static class ServiceCollectionExtensions
         services.AddScoped<Fts5SetupService>();
         services.AddScoped<Fts5SearchService>();
         services.AddSingleton<IDocumentCountService, DocumentCountService>();
+        
+        // Add background services
+        services.AddHostedService<ScanSchedulerService>();
+        
         return services;
     }
 }

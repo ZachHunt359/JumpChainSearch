@@ -44,6 +44,10 @@ if (cliResult >= 0) return cliResult;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Enable configuration reload when appsettings.json changes
+builder.Configuration.AddJsonFile("appsettings.json", optional: false, reloadOnChange: true);
+builder.Configuration.AddJsonFile($"appsettings.{builder.Environment.EnvironmentName}.json", optional: true, reloadOnChange: true);
+
 // Determine connection string (fallback to SQLite file if not set)
 // Use absolute path to avoid confusion between dev/prod environments
 var dbPath = Environment.GetEnvironmentVariable("JUMPCHAIN_DB_PATH") 
