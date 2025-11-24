@@ -51,6 +51,7 @@ public static class AdminEndpoints
         group.MapGet("/system/scan-schedule", GetScanSchedule);
         group.MapPost("/system/scan-schedule", UpdateScanSchedule);
         group.MapPost("/system/scan-schedule/set-next", SetNextScheduledScan);
+        group.MapPost("/system/scan-schedule/init", InitializeScanSchedule);
         group.MapGet("/system/diagnostic", GetSystemDiagnostic);
         
         // Account management endpoints
@@ -3605,6 +3606,60 @@ rm -f drive-scan.pid
             await File.WriteAllBytesAsync(appsettingsPath, stream.ToArray());
             
             return Results.Ok(new { success = true, nextScheduledScan = nextScan });
+        }
+        catch (Exception ex)
+        {
+            return Results.Ok(new { success = false, message = ex.Message });
+        }
+    }
+    
+    /// <summary>
+    /// Initialize scan schedule after deployment - localhost only, no auth required
+    /// </summary>
+    private static async Task<IResult> InitializeScanSchedule(HttpContext context, IConfiguration configuration)
+    {
+        // Only allow from localhost for security
+        var remoteIp = context.Connection.RemoteIpAddress;
+        if (remoteIp == null || (!remoteIp.ToString().StartsWith("127.") && !remoteIp.ToString().StartsWith("::1")))
+        {
+            return Results.Forbid();
+        }
+        
+        try
+        {
+            var intervalHours = configuration.GetValue<int>("ScanScheduling:IntervalHours", 1);
+            var nextScan = DateTime.UtcNow.AddHours(intervalHours);
+            
+            var appsettingsPath = Path.Combine(AppContext.BaseDirectory, "appsettings.json");
+            var json = await File.ReadAllTextAsync(appsettingsPath);
+            var jsonDoc = System.Text.Json.JsonDocument.Parse(json);
+            
+            using var stream = new MemoryStream();
+            using var writer = new System.Text.Json.Utf8JsonWriter(stream, new System.Text.Json.JsonWriterOptions { Indented = true });
+            
+            writer.WriteStartObject();
+            foreach (var property in jsonDoc.RootElement.EnumerateObject())
+            {
+                if (property.Name == "ScanScheduling")
+                {
+                    writer.WriteStartObject("ScanScheduling");
+                    writer.WriteBoolean("Enabled", true);
+                    writer.WriteNumber("IntervalHours", intervalHours);
+                    writer.WriteNull("LastScanTime");
+                    writer.WriteString("NextScheduledScan", nextScan.ToString("o"));
+                    writer.WriteEndObject();
+                }
+                else
+                {
+                    property.WriteTo(writer);
+                }
+            }
+            writer.WriteEndObject();
+            await writer.FlushAsync();
+            
+            await File.WriteAllBytesAsync(appsettingsPath, stream.ToArray());
+            
+            return Results.Ok(new { success = true, enabled = true, nextScheduledScan = nextScan, message = "Scan schedule initialized" });
         }
         catch (Exception ex)
         {

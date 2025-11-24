@@ -106,6 +106,18 @@ else
 fi
 
 echo ""
+echo "Step 9: Initializing scan schedule..."
+sleep 3  # Give the service time to fully start
+INIT_RESPONSE=$(curl -s -X POST http://localhost:5248/admin/system/scan-schedule/init)
+if echo "$INIT_RESPONSE" | grep -q '"success":true'; then
+    echo "✓ Scan schedule initialized"
+    echo "$INIT_RESPONSE" | grep -o '"nextScheduledScan":"[^"]*"' || true
+else
+    echo "⚠ Failed to initialize scan schedule (you can enable it manually in admin panel)"
+    echo "Response: $INIT_RESPONSE"
+fi
+
+echo ""
 echo "======================================"
 echo "Deployment completed successfully!"
 echo "======================================"
