@@ -35,6 +35,14 @@ public class ScanSchedulerService : BackgroundService
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         _logger.LogInformation("Scan Scheduler Service started");
+        
+        // Log initial configuration state
+        var enabled = _configuration.GetValue<bool>("ScanScheduling:Enabled", false);
+        var intervalHours = _configuration.GetValue<int>("ScanScheduling:IntervalHours", 24);
+        var nextScanStr = _configuration.GetValue<string>("ScanScheduling:NextScheduledScan");
+        _logger.LogInformation(
+            "Scan schedule configuration: Enabled={Enabled}, IntervalHours={IntervalHours}, NextScan={NextScan}",
+            enabled, intervalHours, nextScanStr ?? "null");
 
         while (!stoppingToken.IsCancellationRequested)
         {
@@ -60,7 +68,7 @@ public class ScanSchedulerService : BackgroundService
         var enabled = _configuration.GetValue<bool>("ScanScheduling:Enabled", false);
         if (!enabled)
         {
-            _logger.LogTrace("Scan scheduling is disabled");
+            _logger.LogDebug("Scan scheduling is disabled");
             return;
         }
 
@@ -83,7 +91,7 @@ public class ScanSchedulerService : BackgroundService
         if (now < nextScan)
         {
             var timeUntilScan = nextScan - now;
-            _logger.LogTrace("Next scan in {TimeUntilScan}", timeUntilScan);
+            _logger.LogDebug("Next scan in {TimeUntilScan}", timeUntilScan);
             return;
         }
 

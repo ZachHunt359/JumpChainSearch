@@ -112,6 +112,19 @@ INIT_RESPONSE=$(curl -s -X POST http://localhost:5248/admin/system/scan-schedule
 if echo "$INIT_RESPONSE" | grep -q '"success":true'; then
     echo "✓ Scan schedule initialized"
     echo "$INIT_RESPONSE" | grep -o '"nextScheduledScan":"[^"]*"' || true
+    
+    # Restart service to reload configuration
+    echo ""
+    echo "Step 10: Restarting service to apply scan schedule..."
+    sudo systemctl restart $SERVICE_NAME
+    sleep 2
+    if sudo systemctl is-active --quiet $SERVICE_NAME; then
+        echo "✓ Service restarted successfully"
+    else
+        echo "✗ Service failed to restart!"
+        sudo journalctl -u $SERVICE_NAME -n 20 --no-pager
+        exit 1
+    fi
 else
     echo "⚠ Failed to initialize scan schedule (you can enable it manually in admin panel)"
     echo "Response: $INIT_RESPONSE"
