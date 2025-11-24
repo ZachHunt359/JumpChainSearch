@@ -3311,7 +3311,7 @@ rm -f drive-scan.pid
             SearchEndpointsOptimized.SetCacheDuration(minutes);
             
             // Update appsettings file for persistence
-            var appsettingsPath = Path.Combine(Directory.GetCurrentDirectory(), "appsettings.json");
+            var appsettingsPath = Path.Combine(AppContext.BaseDirectory, "appsettings.json");
             var json = await File.ReadAllTextAsync(appsettingsPath);
             var jsonDoc = System.Text.Json.JsonDocument.Parse(json);
             
@@ -3419,7 +3419,7 @@ rm -f drive-scan.pid
         try
         {
             // Update appsettings file
-            var appsettingsPath = Path.Combine(Directory.GetCurrentDirectory(), "appsettings.json");
+            var appsettingsPath = Path.Combine(AppContext.BaseDirectory, "appsettings.json");
             var json = await File.ReadAllTextAsync(appsettingsPath);
             var jsonDoc = System.Text.Json.JsonDocument.Parse(json);
             
@@ -3480,7 +3480,7 @@ rm -f drive-scan.pid
     {
         try
         {
-            var appsettingsPath = Path.Combine(Directory.GetCurrentDirectory(), "appsettings.json");
+            var appsettingsPath = Path.Combine(AppContext.BaseDirectory, "appsettings.json");
             var json = await File.ReadAllTextAsync(appsettingsPath);
             var jsonDoc = System.Text.Json.JsonDocument.Parse(json);
             
@@ -3543,7 +3543,7 @@ rm -f drive-scan.pid
             var intervalHours = configuration.GetValue<int>("ScanScheduling:IntervalHours", 24);
             var nextScan = DateTime.UtcNow.AddHours(intervalHours);
             
-            var appsettingsPath = Path.Combine(Directory.GetCurrentDirectory(), "appsettings.json");
+            var appsettingsPath = Path.Combine(AppContext.BaseDirectory, "appsettings.json");
             var json = await File.ReadAllTextAsync(appsettingsPath);
             var jsonDoc = System.Text.Json.JsonDocument.Parse(json);
             
