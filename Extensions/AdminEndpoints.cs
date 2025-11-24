@@ -51,6 +51,7 @@ public static class AdminEndpoints
         group.MapGet("/system/scan-schedule", GetScanSchedule);
         group.MapPost("/system/scan-schedule", UpdateScanSchedule);
         group.MapPost("/system/scan-schedule/set-next", SetNextScheduledScan);
+        group.MapGet("/system/diagnostic", GetSystemDiagnostic);
         
         // Account management endpoints
         group.MapPost("/account/change-username", ChangeUsername);
@@ -3669,6 +3670,30 @@ rm -f drive-scan.pid
         });
         
         return Results.Redirect("/Admin/Login");
+    }
+    
+    private static Task<IResult> GetSystemDiagnostic(HttpContext context, IServiceProvider serviceProvider, AdminAuthService authService)
+    {
+        // Check if scanner service is registered
+        var hostedServices = serviceProvider.GetServices<Microsoft.Extensions.Hosting.IHostedService>();
+        var services = hostedServices.Select(s => s.GetType().Name).ToList();
+        
+        var scanSchedulerExists = services.Any(s => s.Contains("ScanScheduler"));
+        
+        var appsettingsPath = Path.Combine(AppContext.BaseDirectory, "appsettings.json");
+        var appsettingsExists = File.Exists(appsettingsPath);
+        
+        var diagnostic = new
+        {
+            hostedServices = services,
+            scanSchedulerRegistered = scanSchedulerExists,
+            appsettingsPath,
+            appsettingsExists,
+            baseDirectory = AppContext.BaseDirectory,
+            currentDirectory = Directory.GetCurrentDirectory()
+        };
+        
+        return Task.FromResult(Results.Ok(diagnostic));
     }
     
     // Request models
