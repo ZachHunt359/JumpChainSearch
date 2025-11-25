@@ -53,6 +53,7 @@ public static class AdminEndpoints
         group.MapPost("/system/scan-schedule/set-next", SetNextScheduledScan);
         group.MapPost("/system/scan-schedule/init", InitializeScanSchedule);
         group.MapGet("/system/diagnostic", GetSystemDiagnostic);
+        group.MapGet("/system/series-mappings-check", CheckSeriesMappings);
         
         // Account management endpoints
         group.MapPost("/account/change-username", ChangeUsername);
@@ -3804,6 +3805,59 @@ rm -f drive-scan.pid
         };
         
         return Task.FromResult(Results.Ok(diagnostic));
+    }
+    
+    /// <summary>
+    /// Check if series-mappings.json is loaded correctly and show its contents
+    /// </summary>
+    private static Task<IResult> CheckSeriesMappings(HttpContext context)
+    {
+        var seriesMappingsPath = Path.Combine(AppContext.BaseDirectory, "series-mappings.json");
+        var fileExists = File.Exists(seriesMappingsPath);
+        
+        Dictionary<string, List<string>>? mappings = null;
+        string? error = null;
+        
+        if (fileExists)
+        {
+            try
+            {
+                var json = File.ReadAllText(seriesMappingsPath);
+                var doc = System.Text.Json.JsonDocument.Parse(json);
+                
+                mappings = new Dictionary<string, List<string>>();
+                
+                if (doc.RootElement.TryGetProperty("seriesMappings", out var seriesMappingsElement))
+                {
+                    foreach (var series in seriesMappingsElement.EnumerateObject())
+                    {
+                        var patterns = new List<string>();
+                        foreach (var pattern in series.Value.EnumerateArray())
+                        {
+                            patterns.Add(pattern.GetString() ?? "");
+                        }
+                        mappings[series.Name] = patterns;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                error = ex.Message;
+            }
+        }
+        
+        var result = new
+        {
+            path = seriesMappingsPath,
+            fileExists,
+            error,
+            seriesCount = mappings?.Count ?? 0,
+            series = mappings?.Keys.ToList() ?? new List<string>(),
+            baseDirectory = AppContext.BaseDirectory,
+            currentDirectory = Directory.GetCurrentDirectory()
+        };
+        
+        return Task.FromResult(Results.Ok(result));
     }
     
     // Request models
