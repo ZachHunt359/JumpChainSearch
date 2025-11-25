@@ -3429,10 +3429,12 @@ rm -f drive-scan.pid
             using var writer = new System.Text.Json.Utf8JsonWriter(stream, new System.Text.Json.JsonWriterOptions { Indented = true });
             
             writer.WriteStartObject();
+            bool scanSchedulingWritten = false;
             foreach (var property in jsonDoc.RootElement.EnumerateObject())
             {
                 if (property.Name == "ScanScheduling")
                 {
+                    scanSchedulingWritten = true;
                     writer.WriteStartObject("ScanScheduling");
                     writer.WriteBoolean("Enabled", request.Enabled);
                     writer.WriteNumber("IntervalHours", request.IntervalHours);
@@ -3481,6 +3483,28 @@ rm -f drive-scan.pid
                     property.WriteTo(writer);
                 }
             }
+            
+            // If ScanScheduling section didn't exist, add it now
+            if (!scanSchedulingWritten)
+            {
+                writer.WriteStartObject("ScanScheduling");
+                writer.WriteBoolean("Enabled", request.Enabled);
+                writer.WriteNumber("IntervalHours", request.IntervalHours);
+                writer.WriteNull("LastScanTime");
+                
+                if (request.Enabled)
+                {
+                    var nextScheduledScan = DateTime.UtcNow.AddHours(request.IntervalHours);
+                    writer.WriteString("NextScheduledScan", nextScheduledScan.ToString("o"));
+                }
+                else
+                {
+                    writer.WriteNull("NextScheduledScan");
+                }
+                
+                writer.WriteEndObject();
+            }
+            
             writer.WriteEndObject();
             await writer.FlushAsync();
             
@@ -3638,10 +3662,12 @@ rm -f drive-scan.pid
             using var writer = new System.Text.Json.Utf8JsonWriter(stream, new System.Text.Json.JsonWriterOptions { Indented = true });
             
             writer.WriteStartObject();
+            bool scanSchedulingWritten = false;
             foreach (var property in jsonDoc.RootElement.EnumerateObject())
             {
                 if (property.Name == "ScanScheduling")
                 {
+                    scanSchedulingWritten = true;
                     writer.WriteStartObject("ScanScheduling");
                     writer.WriteBoolean("Enabled", true);
                     writer.WriteNumber("IntervalHours", intervalHours);
@@ -3654,6 +3680,18 @@ rm -f drive-scan.pid
                     property.WriteTo(writer);
                 }
             }
+            
+            // If ScanScheduling section didn't exist, add it now
+            if (!scanSchedulingWritten)
+            {
+                writer.WriteStartObject("ScanScheduling");
+                writer.WriteBoolean("Enabled", true);
+                writer.WriteNumber("IntervalHours", intervalHours);
+                writer.WriteNull("LastScanTime");
+                writer.WriteString("NextScheduledScan", nextScan.ToString("o"));
+                writer.WriteEndObject();
+            }
+            
             writer.WriteEndObject();
             await writer.FlushAsync();
             
