@@ -73,7 +73,14 @@ dotnet publish -c Release -o "$PUBLISH_DIR"
 echo "✓ Build completed"
 echo ""
 
-echo "Step 5.5: Validating deployment files..."
+echo "Step 5.5: Manually copying critical config files..."
+# Manually copy files to ensure they're always updated (dotnet publish cache can be stubborn)
+cp -f "$APP_DIR/series-mappings.json" "$PUBLISH_DIR/" 2>/dev/null && echo "✓ Copied series-mappings.json" || echo "⚠ Failed to copy series-mappings.json"
+cp -f "$APP_DIR/genre-mappings-scraped.json" "$PUBLISH_DIR/" 2>/dev/null && echo "✓ Copied genre-mappings-scraped.json" || echo "⚠ Failed to copy genre-mappings-scraped.json"
+cp -f "$APP_DIR/appsettings.json" "$PUBLISH_DIR/" 2>/dev/null && echo "✓ Copied appsettings.json" || echo "⚠ Failed to copy appsettings.json"
+echo ""
+
+echo "Step 5.6: Validating deployment files..."
 VALIDATION_FAILED=0
 
 # Critical files that must be copied from repo to publish/
