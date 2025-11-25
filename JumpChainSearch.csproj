@@ -23,4 +23,10 @@
     <PackageReference Include="UglyToad.PdfPig.DocumentLayoutAnalysis" Version="1.7.0-custom-5" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Content Include="series-mappings.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
 </Project>
