@@ -21,6 +21,7 @@
     "The Witcher": ["witcher", "geralt", "yennefer", "cirilla"],
     "Lord of the Rings": ["lord of the rings", "lotr", "middle-earth", "middle earth", "gondor", "shire", "sauron", "celebrimbor"],
     "Game of Thrones": ["game of thrones", "westeros", "essos", "targaryen", "lannister"],
-    "Final Fantasy": ["final fantasy", "ff vii", "ff viii", "ff ix", "ff x", "ff xii", "ff xiv", "ff xv", "ff xvi"]
+    "Final Fantasy": ["final fantasy", "ff vii", "ff viii", "ff ix", "ff x", "ff xii", "ff xiv", "ff xv", "ff xvi"],
+    "High School DxD": ["high school dxd", "highschool dxd", "Kuoh Academy", "Issei Hyodo", "Issei Hyoudou", "Rias Gremory", "Akeno Himejima", "Asia Argento", "Koneko Toujou"]
   }
 }

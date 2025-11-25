@@ -166,7 +166,7 @@ public static class TagGenerationHelpers
 
     private static Dictionary<string, List<GenreDocumentMapping>> LoadGenreMappingsFromJson()
     {
-        var jsonPath = Path.Combine(Directory.GetCurrentDirectory(), "genre-mappings-scraped.json");
+        var jsonPath = Path.Combine(AppContext.BaseDirectory, "genre-mappings-scraped.json");
         
         if (!File.Exists(jsonPath))
         {

@@ -73,6 +73,65 @@ dotnet publish -c Release -o "$PUBLISH_DIR"
 echo "✓ Build completed"
 echo ""
 
+echo "Step 5.5: Validating deployment files..."
+VALIDATION_FAILED=0
+
+# Critical files that must be copied from repo to publish/
+declare -A REQUIRED_FILES=(
+    ["series-mappings.json"]="Series tagging configuration"
+    ["genre-mappings-scraped.json"]="Genre tagging configuration"
+    ["appsettings.json"]="Application configuration"
+)
+
+for file in "${!REQUIRED_FILES[@]}"; do
+    SOURCE_FILE="$APP_DIR/$file"
+    DEST_FILE="$PUBLISH_DIR/$file"
+    DESCRIPTION="${REQUIRED_FILES[$file]}"
+    
+    if [ ! -f "$SOURCE_FILE" ]; then
+        echo "✗ MISSING SOURCE: $file ($DESCRIPTION)"
+        echo "  Expected at: $SOURCE_FILE"
+        VALIDATION_FAILED=1
+        continue
+    fi
+    
+    if [ ! -f "$DEST_FILE" ]; then
+        echo "✗ NOT COPIED: $file ($DESCRIPTION)"
+        echo "  Source exists but not in publish/"
+        echo "  Check JumpChainSearch.csproj <Content Update> configuration"
+        VALIDATION_FAILED=1
+        continue
+    fi
+    
+    # Compare file sizes to detect incomplete copies
+    SOURCE_SIZE=$(stat -f%z "$SOURCE_FILE" 2>/dev/null || stat -c%s "$SOURCE_FILE" 2>/dev/null)
+    DEST_SIZE=$(stat -f%z "$DEST_FILE" 2>/dev/null || stat -c%s "$DEST_FILE" 2>/dev/null)
+    
+    if [ "$SOURCE_SIZE" != "$DEST_SIZE" ]; then
+        echo "✗ SIZE MISMATCH: $file ($DESCRIPTION)"
+        echo "  Source: $SOURCE_SIZE bytes"
+        echo "  Publish: $DEST_SIZE bytes"
+        echo "  File may not have updated correctly"
+        VALIDATION_FAILED=1
+    else
+        echo "✓ $file ($SOURCE_SIZE bytes) - $DESCRIPTION"
+    fi
+done
+
+if [ $VALIDATION_FAILED -eq 1 ]; then
+    echo ""
+    echo "✗ Deployment validation FAILED!"
+    echo "Some required files are missing or incorrect in publish/"
+    echo ""
+    echo "Common fixes:"
+    echo "  1. Ensure JumpChainSearch.csproj has <Content Update> entries"
+    echo "  2. Use 'Always' not 'PreserveNewest' for CopyToOutputDirectory"
+    echo "  3. Check that source files exist in repository"
+    exit 1
+fi
+echo "✓ All deployment files validated"
+echo ""
+
 echo "Step 6: Applying database migrations..."
 # Ensure dotnet-ef is in PATH
 export PATH="$PATH:$HOME/.dotnet/tools"
