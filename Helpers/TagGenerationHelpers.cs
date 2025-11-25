@@ -84,7 +84,7 @@ public static class TagGenerationHelpers
 
     private static Dictionary<string, List<string>> LoadSeriesMappingsFromJson()
     {
-        var jsonPath = Path.Combine(Directory.GetCurrentDirectory(), "series-mappings.json");
+        var jsonPath = Path.Combine(AppContext.BaseDirectory, "series-mappings.json");
         
         if (!File.Exists(jsonPath))
         {

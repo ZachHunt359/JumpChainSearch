@@ -1784,7 +1784,7 @@ namespace JumpChainSearch.Services
 
         private Dictionary<string, List<string>> LoadSeriesMappingsFromJson()
         {
-            var jsonPath = Path.Combine(Directory.GetCurrentDirectory(), "series-mappings.json");
+            var jsonPath = Path.Combine(AppContext.BaseDirectory, "series-mappings.json");
             
             if (!System.IO.File.Exists(jsonPath))
             {
