@@ -186,6 +186,17 @@ fi
 echo "✓ All deployment files validated"
 echo ""
 
+echo "Step 6.7: Setting up database directory permissions..."
+# Ensure database directory exists with proper permissions for migrations
+DB_DIR=$(dirname "$DB_PATH")
+sudo mkdir -p "$DB_DIR"
+
+# Set ownership: deploy user (for migrations) + www-data group (for service)
+sudo chown $USER:www-data "$DB_DIR"
+sudo chmod 775 "$DB_DIR"
+echo "✓ Database directory ready: $DB_DIR"
+echo ""
+
 echo "Step 7: Applying database migrations..."
 # Ensure dotnet-ef is in PATH
 export PATH="$PATH:$HOME/.dotnet/tools"
@@ -194,7 +205,17 @@ if command -v dotnet-ef &> /dev/null; then
     # Use the same connection string as the production service
     export ConnectionStrings__DefaultConnection="$DB_CONNECTION"
     dotnet ef database update
-    echo "✓ Migrations applied to $DB_PATH"
+    
+    # After migration, ensure database file has correct permissions for www-data
+    if [ -f "$DB_PATH" ]; then
+        sudo chown www-data:www-data "$DB_PATH"
+        sudo chmod 664 "$DB_PATH"
+        # Also fix any SQLite journal files
+        sudo chown www-data:www-data "$DB_PATH"-* 2>/dev/null || true
+        echo "✓ Migrations applied to $DB_PATH"
+    else
+        echo "⚠ Database file not created at $DB_PATH"
+    fi
 else
     echo "⚠ dotnet-ef not found. Install with: dotnet tool install --global dotnet-ef"
     echo "⚠ Skipping migrations - you may need to run manually"
