@@ -7,10 +7,12 @@ namespace JumpChainSearch.Services;
 public class SeriesTagService
 {
     private readonly JumpChainDbContext _context;
+    private readonly TagRuleService _tagRuleService;
     
-    public SeriesTagService(JumpChainDbContext context)
+    public SeriesTagService(JumpChainDbContext context, TagRuleService tagRuleService)
     {
         _context = context;
+        _tagRuleService = tagRuleService;
     }
     
     public async Task<(int matched, int tagged)> ApplySeriesTagsFromCommunityList()
@@ -74,6 +76,12 @@ public class SeriesTagService
         
         await _context.SaveChangesAsync();
         Console.WriteLine($"Applied {taggedCount} new series tags across {matchedCount} documents");
+        
+        // Apply approved rules to restore community-voted Series tags after regeneration
+        Console.WriteLine("Applying approved Series tag rules...");
+        var rulesResult = await _tagRuleService.ApplyApprovedRules("Series");
+        Console.WriteLine($"Applied {rulesResult.AdditionsApplied} tag additions and {rulesResult.RemovalsApplied} tag removals from {rulesResult.TotalRules} Series rules");
+        
         return (matchedCount, taggedCount);
     }
     

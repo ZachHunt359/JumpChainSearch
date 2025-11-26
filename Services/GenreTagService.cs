@@ -7,10 +7,12 @@ namespace JumpChainSearch.Services;
 public class GenreTagService
 {
     private readonly JumpChainDbContext _context;
+    private readonly TagRuleService _tagRuleService;
     
-    public GenreTagService(JumpChainDbContext context)
+    public GenreTagService(JumpChainDbContext context, TagRuleService tagRuleService)
     {
         _context = context;
+        _tagRuleService = tagRuleService;
     }
     
     public async Task<(int matched, int tagged)> ApplyGenreTagsFromCommunityList()
@@ -55,6 +57,12 @@ public class GenreTagService
         
         await _context.SaveChangesAsync();
         Console.WriteLine($"Applied {taggedCount} new genre tags across {matchedCount} documents");
+        
+        // Apply approved rules to restore community-voted Genre tags
+        Console.WriteLine("Applying approved Genre tag rules...");
+        var rulesResult = await _tagRuleService.ApplyApprovedRules("Genre");
+        Console.WriteLine($"Applied {rulesResult.AdditionsApplied} tag additions and {rulesResult.RemovalsApplied} tag removals from {rulesResult.TotalRules} Genre rules");
+        
         return (matchedCount, taggedCount);
     }
     

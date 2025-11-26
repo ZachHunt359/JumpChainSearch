@@ -3,14 +3,54 @@
 # JumpChain Search Deployment Script
 # Run this on your Ubuntu VPS to pull updates and restart the service
 #
-# Usage: ./deploy.sh
+# Usage: 
+#   ./deploy.sh             # Deploy to production
+#   ./deploy.sh --staging   # Deploy to staging environment
 
 set -e  # Exit on any error
 
+# ==========================================
+# Environment Configuration
+# ==========================================
+
+# Default to production
+ENVIRONMENT="production"
+if [ "$1" == "--staging" ]; then
+    ENVIRONMENT="staging"
+fi
+
+# Environment-specific settings
+if [ "$ENVIRONMENT" == "staging" ]; then
+    SERVICE_NAME="jumpchain-staging"
+    DEPLOY_DIR="/opt/jumpchain-staging"
+    DB_PATH="/var/lib/jumpchain/jumpsearch-staging.db"
+    PORT=5001
+    DOMAIN="dev.jumpchainsearch.app"
+else
+    SERVICE_NAME="jumpchain"
+    DEPLOY_DIR="/opt/jumpchain"
+    DB_PATH="/var/lib/jumpchain/jumpsearch.db"
+    PORT=5000
+    DOMAIN="jumpchainsearch.app"
+fi
+
 echo "======================================"
 echo "JumpChain Search - Deployment Script"
+echo "Environment: $ENVIRONMENT"
 echo "======================================"
 echo ""
+
+# Production safety check
+if [ "$ENVIRONMENT" == "production" ]; then
+    echo "⚠️  DEPLOYING TO PRODUCTION ($DOMAIN)"
+    read -p "Continue? (y/n) " -n 1 -r
+    echo
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        echo "Deployment cancelled."
+        exit 0
+    fi
+    echo ""
+fi
 
 # Request sudo password upfront to minimize downtime later
 echo "Requesting sudo access (needed for service restart)..."
@@ -23,14 +63,16 @@ while true; do sudo -n true; sleep 60; kill -0 "$$" || exit; done 2>/dev/null &
 
 # Configuration
 APP_DIR=$(pwd)
-PUBLISH_DIR="$APP_DIR/publish"
-SERVICE_NAME="jumpchain"
+PUBLISH_DIR="$DEPLOY_DIR/publish"
 BRANCH="main"
 
-# Production database location (matches systemd service configuration)
-DB_PATH="/var/lib/jumpchain/jumpsearch.db"
+# Database connection
 DB_CONNECTION="Data Source=$DB_PATH;Mode=ReadWrite"
-echo "Database: $DB_CONNECTION"
+echo "Service: $SERVICE_NAME"
+echo "Deploy to: $DEPLOY_DIR"
+echo "Database: $DB_PATH"
+echo "Port: $PORT"
+echo ""
 
 # Check if we're in the right directory
 if [ ! -f "JumpChainSearch.csproj" ]; then
@@ -50,15 +92,20 @@ sudo rm -rf "$APP_DIR/bin"
 echo "✓ Previous build cleaned"
 echo ""
 
-echo "Step 3: Pulling latest changes from Git..."
+echo "Step 3: Ensuring deployment directory exists..."
+sudo mkdir -p "$DEPLOY_DIR"
+sudo chown $USER:$USER "$DEPLOY_DIR"
+echo "✓ Deployment directory ready"
+echo ""
+
+echo "Step 4: Pulling latest changes from Git..."
 git fetch origin
 git reset --hard origin/$BRANCH
 echo "✓ Code updated to latest commit"
 echo ""
 
-echo "Step 4: Backing up database..."
+echo "Step 5: Backing up database..."
 # Extract database file path from connection string
-DB_PATH=$(echo "$DB_CONNECTION" | grep -o 'Data Source=[^;]*' | cut -d'=' -f2)
 BACKUP_FILE="$DB_PATH.backup-$(date +%Y%m%d-%H%M%S)"
 if [ -f "$DB_PATH" ]; then
     cp "$DB_PATH" "$BACKUP_FILE"
@@ -68,19 +115,19 @@ else
 fi
 echo ""
 
-echo "Step 5: Building the application..."
+echo "Step 6: Building the application..."
 dotnet publish -c Release -o "$PUBLISH_DIR"
 echo "✓ Build completed"
 echo ""
 
-echo "Step 5.5: Manually copying critical config files..."
+echo "Step 6.5: Manually copying critical config files..."
 # Manually copy files to ensure they're always updated (dotnet publish cache can be stubborn)
 cp -f "$APP_DIR/series-mappings.json" "$PUBLISH_DIR/" 2>/dev/null && echo "✓ Copied series-mappings.json" || echo "⚠ Failed to copy series-mappings.json"
 cp -f "$APP_DIR/genre-mappings-scraped.json" "$PUBLISH_DIR/" 2>/dev/null && echo "✓ Copied genre-mappings-scraped.json" || echo "⚠ Failed to copy genre-mappings-scraped.json"
 cp -f "$APP_DIR/appsettings.json" "$PUBLISH_DIR/" 2>/dev/null && echo "✓ Copied appsettings.json" || echo "⚠ Failed to copy appsettings.json"
 echo ""
 
-echo "Step 5.6: Validating deployment files..."
+echo "Step 6.6: Validating deployment files..."
 VALIDATION_FAILED=0
 
 # Critical files that must be copied from repo to publish/
@@ -139,7 +186,7 @@ fi
 echo "✓ All deployment files validated"
 echo ""
 
-echo "Step 6: Applying database migrations..."
+echo "Step 7: Applying database migrations..."
 # Ensure dotnet-ef is in PATH
 export PATH="$PATH:$HOME/.dotnet/tools"
 if command -v dotnet-ef &> /dev/null; then
@@ -154,12 +201,12 @@ else
 fi
 echo ""
 
-echo "Step 7: Starting the service..."
+echo "Step 8: Starting the service..."
 sudo systemctl start $SERVICE_NAME
 echo "✓ Service started"
 echo ""
 
-echo "Step 8: Checking service status..."
+echo "Step 9: Checking service status..."
 sleep 2
 if sudo systemctl is-active --quiet $SERVICE_NAME; then
     echo "✓ Service is running"
@@ -172,16 +219,16 @@ else
 fi
 
 echo ""
-echo "Step 9: Initializing scan schedule..."
+echo "Step 10: Initializing scan schedule..."
 sleep 3  # Give the service time to fully start
-INIT_RESPONSE=$(curl -s -X POST http://localhost:5248/admin/system/scan-schedule/init)
+INIT_RESPONSE=$(curl -s -X POST http://localhost:$PORT/admin/system/scan-schedule/init)
 if echo "$INIT_RESPONSE" | grep -q '"success":true'; then
     echo "✓ Scan schedule initialized"
     echo "$INIT_RESPONSE" | grep -o '"nextScheduledScan":"[^"]*"' || true
     
     # Restart service to reload configuration
     echo ""
-    echo "Step 10: Restarting service to apply scan schedule..."
+    echo "Step 11: Restarting service to apply scan schedule..."
     sudo systemctl restart $SERVICE_NAME
     sleep 2
     if sudo systemctl is-active --quiet $SERVICE_NAME; then

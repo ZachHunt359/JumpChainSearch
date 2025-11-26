@@ -60,6 +60,9 @@ var connectionString = builder.Configuration.GetConnectionString("DefaultConnect
 builder.Services.AddMemoryCache();
 builder.Services.AddJumpChainServices(connectionString);
 
+// Register TagRuleService for applying approved tag rules
+builder.Services.AddScoped<TagRuleService>();
+
 // Register HttpContextAccessor for SFW mode detection
 builder.Services.AddHttpContextAccessor();
 

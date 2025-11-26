@@ -1005,7 +1005,7 @@ public static class TagVotingEndpoints
         }
     }
 
-    private static async Task<IResult> ApplyApprovedRules(HttpContext httpContext, JumpChainDbContext context, AdminAuthService authService, ApplyRulesRequest? request)
+    private static async Task<IResult> ApplyApprovedRules(HttpContext httpContext, TagRuleService tagRuleService, AdminAuthService authService, ApplyRulesRequest? request)
     {
         var (valid, user) = await ValidateSession(httpContext, authService);
         if (!valid)
@@ -1013,80 +1013,16 @@ public static class TagVotingEndpoints
 
         try
         {
-            var rules = await context.ApprovedTagRules
-                .Where(r => r.IsActive)
-                .ToListAsync();
-
-            int additionsApplied = 0;
-            int removalsApplied = 0;
-            int notFound = 0;
-            var appliedRuleIds = new List<int>();
-
-            foreach (var rule in rules)
-            {
-                // Find the document by GoogleDriveFileId
-                var document = await context.JumpDocuments
-                    .FirstOrDefaultAsync(d => d.GoogleDriveFileId == rule.GoogleDriveFileId);
-
-                if (document == null)
-                {
-                    notFound++;
-                    continue;
-                }
-
-                if (rule.RuleType == "Add")
-                {
-                    // Check if tag already exists
-                    var existingTag = await context.DocumentTags
-                        .FirstOrDefaultAsync(t => t.JumpDocumentId == document.Id && 
-                                                t.TagName == rule.TagName && 
-                                                t.TagCategory == rule.TagCategory);
-
-                    if (existingTag == null)
-                    {
-                        // Add the tag
-                        context.DocumentTags.Add(new DocumentTag
-                        {
-                            JumpDocumentId = document.Id,
-                            TagName = rule.TagName,
-                            TagCategory = rule.TagCategory
-                        });
-
-                        additionsApplied++;
-                        appliedRuleIds.Add(rule.Id);
-                    }
-                }
-                else if (rule.RuleType == "Remove")
-                {
-                    // Find and remove the tag
-                    var tagToRemove = await context.DocumentTags
-                        .FirstOrDefaultAsync(t => t.JumpDocumentId == document.Id && 
-                                                t.TagName == rule.TagName && 
-                                                t.TagCategory == rule.TagCategory);
-
-                    if (tagToRemove != null)
-                    {
-                        context.DocumentTags.Remove(tagToRemove);
-                        removalsApplied++;
-                        appliedRuleIds.Add(rule.Id);
-                    }
-                }
-
-                // Update rule metadata
-                rule.LastAppliedAt = DateTime.UtcNow;
-                rule.TimesApplied++;
-            }
-
-            await context.SaveChangesAsync();
+            var result = await tagRuleService.ApplyApprovedRules();
 
             return Results.Ok(new { 
                 success = true, 
                 message = "Approved rules applied successfully",
-                totalRules = rules.Count,
-                additionsApplied,
-                removalsApplied,
-                documentsNotFound = notFound,
-                appliedRuleIds
+                totalRules = result.TotalRules,
+                additionsApplied = result.AdditionsApplied,
+                removalsApplied = result.RemovalsApplied,
+                documentsNotFound = result.DocumentsNotFound,
+                appliedRuleIds = result.AppliedRuleIds
             });
         }
         catch (Exception ex)
