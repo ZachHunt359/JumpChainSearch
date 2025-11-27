@@ -28,9 +28,9 @@ if [ "$ENVIRONMENT" == "staging" ]; then
     DOMAIN="dev.jumpchainsearch.app"
 else
     SERVICE_NAME="jumpchain"
-    DEPLOY_DIR="/opt/jumpchain"
+    DEPLOY_DIR="/home/deploy/JumpChainSearch"
     DB_PATH="/var/lib/jumpchain/jumpsearch.db"
-    PORT=5000
+    PORT=5248
     DOMAIN="jumpchainsearch.app"
 fi
 

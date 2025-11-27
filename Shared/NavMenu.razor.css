@@ -242,6 +242,18 @@
     vertical-align: middle;
 }
 
+/* Desktop Styles - Sidebar stays on left */
+@media (min-width: 641px) {
+    .nav-scrollable {
+        display: block;
+        position: relative;
+    }
+    
+    .nav-scrollable.collapsed {
+        display: block;
+    }
+}
+
 /* Mobile Styles */
 @media (max-width: 640.98px) {
     .sidebar-header {
