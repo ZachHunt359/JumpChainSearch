@@ -1201,6 +1201,12 @@
                 $"count={randomCount}"
             };
             
+            // Add search query if present
+            if (!string.IsNullOrWhiteSpace(searchQuery))
+            {
+                queryParams.Add($"q={Uri.EscapeDataString(searchQuery)}");
+            }
+            
             // Add tag filters if active
             if (includedTags.Any())
             {

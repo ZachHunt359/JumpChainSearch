@@ -639,18 +639,51 @@ public static class SearchEndpointsOptimized
     }
 
     /// <summary>
-    /// Get random documents, optionally filtered by include/exclude tags and SFW mode
+    /// Get random documents, optionally filtered by search query, include/exclude tags and SFW mode
     /// </summary>
     private static async Task<IResult> GetRandomDocuments(
         JumpChainDbContext context,
+        Fts5SearchService fts5Service,
         SfwModeService? sfwMode = null,
+        string? q = null,
         int count = 10,
         string? includeTags = null,
         string? excludeTags = null)
     {
         try
         {
+            List<int> matchingIds;
+            
+            // If search query provided, use FTS5 to get matching document IDs first
+            if (!string.IsNullOrWhiteSpace(q))
+            {
+                var (searchTerms, excludedTerms, phrases) = ParseAdvancedSearchQuery(q);
+                var fts5Query = fts5Service.BuildFts5Query(searchTerms, phrases, excludedTerms);
+                var fts5Results = await fts5Service.SearchFts5Async(fts5Query, 10000, 0); // Get up to 10k results
+                matchingIds = fts5Results.Select(r => r.Id).ToList();
+                
+                if (matchingIds.Count == 0)
+                {
+                    return Results.Ok(new
+                    {
+                        Success = true,
+                        Count = 0,
+                        Documents = new List<object>()
+                    });
+                }
+            }
+            else
+            {
+                matchingIds = new List<int>(); // Will be populated from filtered query
+            }
+            
             var query = context.JumpDocuments.Include(d => d.Tags).Include(d => d.Urls).AsQueryable();
+            
+            // Apply search filter if we have FTS5 results
+            if (matchingIds.Any())
+            {
+                query = query.Where(d => matchingIds.Contains(d.Id));
+            }
             
             // Apply SFW filtering if enabled
             if (sfwMode?.IsSfwMode == true)
@@ -685,8 +718,17 @@ public static class SearchEndpointsOptimized
                 }
             }
             
-            // Get all matching IDs
-            var matchingIds = await query.Select(d => d.Id).ToListAsync();
+            // Get all matching IDs (or update the list if we didn't have search query)
+            if (!matchingIds.Any())
+            {
+                matchingIds = await query.Select(d => d.Id).ToListAsync();
+            }
+            else
+            {
+                // We already have FTS5 IDs, just apply tag filters
+                var filteredIds = await query.Select(d => d.Id).ToListAsync();
+                matchingIds = matchingIds.Where(id => filteredIds.Contains(id)).ToList();
+            }
             var totalCount = matchingIds.Count;
             
             // Cap count at available documents
