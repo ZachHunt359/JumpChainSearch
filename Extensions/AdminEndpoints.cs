@@ -1196,12 +1196,12 @@ public static class AdminEndpoints
             try {{
                 const resp = await fetch('/admin/tags/recategorize', {{
                     method: 'POST',
-                    headers: {{{{ 'Content-Type': 'application/json' }}}},
-                    body: JSON.stringify({{{{
+                    headers: {{ 'Content-Type': 'application/json' }},
+                    body: JSON.stringify({{
                         tagName: selectedTag.tagName,
                         oldCategory: selectedTag.tagCategory,
                         newCategory: newCategory
-                    }}}})
+                    }})
                 }});
                 
                 const data = await resp.json();
@@ -1738,7 +1738,7 @@ public static class AdminEndpoints
                     ? '/api/voting/admin/approve-suggestion/' + id + '?categoryOverride=' + encodeURIComponent(selectedCategory)
                     : '/api/voting/admin/approve-suggestion/' + id;
                     
-                const response = await fetch(url, {{{{ 
+                const response = await fetch(url, {{ 
                     method: 'POST',
                     credentials: 'same-origin'
                 }});
@@ -1756,7 +1756,7 @@ public static class AdminEndpoints
         
         async function rejectSuggestion(id) {{
             try {{
-                const response = await fetch('/api/voting/admin/reject-suggestion/' + id, {{{{ 
+                const response = await fetch('/api/voting/admin/reject-suggestion/' + id, {{ 
                     method: 'POST',
                     credentials: 'same-origin'
                 }});
@@ -1779,7 +1779,7 @@ public static class AdminEndpoints
         
         async function approveRemoval(id) {{
             try {{
-                const response = await fetch('/api/voting/admin/approve-removal/' + id, {{{{ 
+                const response = await fetch('/api/voting/admin/approve-removal/' + id, {{ 
                     method: 'POST',
                     credentials: 'same-origin'
                 }});
@@ -1797,7 +1797,7 @@ public static class AdminEndpoints
         
         async function rejectRemoval(id) {{
             try {{
-                const response = await fetch('/api/voting/admin/reject-removal/' + id, {{{{ 
+                const response = await fetch('/api/voting/admin/reject-removal/' + id, {{ 
                     method: 'POST',
                     credentials: 'same-origin'
                 }});
