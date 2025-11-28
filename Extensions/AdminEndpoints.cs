@@ -553,45 +553,38 @@ public static class AdminEndpoints
                     Change the category of a tag across all documents. Associated approval rules will be updated automatically.
                 </p>
                 <div class=""action-card"">
-                    <h3>Search and Recategorize</h3>
-                    <div style=""margin-top: 1rem;"">
-                        <label style=""display: block; margin-bottom: 0.5rem; font-weight: 500;"">Search for Tag:</label>
+                    <div style=""display: grid; grid-template-columns: 2fr 1fr auto; gap: 1rem; align-items: start;"">
                         <div style=""position: relative;"">
-                            <input type=""text"" id=""tag-search-input"" placeholder=""Type to search tags..."" 
+                            <input type=""text"" id=""tag-search-input"" placeholder=""Search tags (case-insensitive)..."" 
                                    oninput=""searchTagsDebounced(this.value)""
                                    autocomplete=""off""
                                    style=""width: 100%; padding: 0.75rem; border: 1px solid var(--border); border-radius: 4px; background: var(--bg); font-size: 1rem;"" />
                             <div id=""tag-search-results"" style=""position: absolute; width: 100%; max-height: 300px; overflow-y: auto; background: var(--bg-secondary); border: 1px solid var(--border); border-top: none; border-radius: 0 0 4px 4px; display: none; z-index: 1000;""></div>
                         </div>
                         
-                        <div id=""selected-tag-info"" style=""display: none; margin-top: 1.5rem; padding: 1rem; background: var(--card-bg); border: 1px solid var(--border); border-radius: 4px;"">
-                            <div style=""margin-bottom: 1rem;"">
-                                <strong>Selected Tag:</strong> <span id=""selected-tag-name"" style=""color: var(--accent);""></span><br>
-                                <strong>Current Category:</strong> <span id=""selected-tag-category""></span><br>
-                                <strong>Used in:</strong> <span id=""selected-tag-count""></span> documents
-                            </div>
-                            
-                            <label style=""display: block; margin-bottom: 0.5rem; font-weight: 500;"">New Category:</label>
-                            <select id=""new-category-select"" style=""width: 100%; padding: 0.75rem; border: 1px solid var(--border); border-radius: 4px; background: var(--bg); font-size: 1rem; margin-bottom: 1rem;"">
-                                <option value="""">Select category...</option>
-                                <option value=""Format"">Format</option>
-                                <option value=""Genre"">Genre</option>
-                                <option value=""Series"">Series</option>
-                                <option value=""Franchise"">Franchise</option>
-                                <option value=""Setting"">Setting</option>
-                                <option value=""Type"">Type</option>
-                                <option value=""Author"">Author</option>
-                                <option value=""ContentRating"">Content Rating</option>
-                                <option value=""Other"">Other</option>
-                            </select>
-                            
-                            <button class=""btn btn-primary"" onclick=""recategorizeSelectedTag()"" style=""width: 100%;"">
-                                Recategorize Tag
-                            </button>
-                        </div>
+                        <select id=""new-category-select"" disabled style=""width: 100%; padding: 0.75rem; border: 1px solid var(--border); border-radius: 4px; background: var(--bg); font-size: 1rem;"">
+                            <option value="""">Select tag first...</option>
+                            <option value=""Format"">Format</option>
+                            <option value=""Genre"">Genre</option>
+                            <option value=""Series"">Series</option>
+                            <option value=""Franchise"">Franchise</option>
+                            <option value=""Setting"">Setting</option>
+                            <option value=""Type"">Type</option>
+                            <option value=""Author"">Author</option>
+                            <option value=""ContentRating"">Content Rating</option>
+                            <option value=""Other"">Other</option>
+                        </select>
                         
-                        <div id=""recategorize-result"" style=""margin-top: 1rem; color: var(--text-secondary); font-size: 0.9rem;""></div>
+                        <button class=""btn btn-primary"" onclick=""recategorizeSelectedTag()"" disabled id=""recategorize-btn"" style=""white-space: nowrap; padding: 0.75rem 1.5rem;"">
+                            Recategorize
+                        </button>
                     </div>
+                    <div id=""selected-tag-info"" style=""display: none; margin-top: 0.5rem; padding: 0.5rem; color: var(--text-secondary); font-size: 0.9rem;"">
+                        <strong id=""selected-tag-name"" style=""color: var(--accent);""></strong> · 
+                        <span id=""selected-tag-category""></span> · 
+                        <span id=""selected-tag-count""></span> documents
+                    </div>
+                    <div id=""recategorize-result"" style=""margin-top: 0.5rem; color: var(--text-secondary); font-size: 0.9rem;""></div>
                 </div>
             </section>
         </div>
@@ -1161,12 +1154,13 @@ public static class AdminEndpoints
             document.getElementById('selected-tag-category').textContent = tagCategory;
             document.getElementById('selected-tag-count').textContent = documentCount;
             
-            // Set dropdown to current category and disable it as an option
+            // Set dropdown to current category and enable it
             const select = document.getElementById('new-category-select');
-            select.value = '';
-            Array.from(select.options).forEach(opt => {{
-                opt.disabled = opt.value === tagCategory;
-            }});
+            select.disabled = false;
+            select.value = tagCategory;
+            
+            // Enable recategorize button
+            document.getElementById('recategorize-btn').disabled = false;
             
             document.getElementById('selected-tag-info').style.display = 'block';
             document.getElementById('recategorize-result').innerHTML = '';
@@ -1177,12 +1171,12 @@ public static class AdminEndpoints
             
             const newCategory = document.getElementById('new-category-select').value;
             if (!newCategory) {{
-                alert('Please select a new category');
+                alert('Please select a category');
                 return;
             }}
             
             if (newCategory === selectedTag.tagCategory) {{
-                alert('New category is the same as current category');
+                alert('Please select a different category. Current category is already "' + newCategory + '"');
                 return;
             }}
             
@@ -4072,9 +4066,9 @@ rm -f drive-scan.pid
         {
             var searchQuery = query?.Trim() ?? "";
             
-            // Get distinct tags matching the search query
+            // Get distinct tags matching the search query (case-insensitive)
             var tags = await dbContext.DocumentTags
-                .Where(t => string.IsNullOrEmpty(searchQuery) || t.TagName.Contains(searchQuery))
+                .Where(t => string.IsNullOrEmpty(searchQuery) || EF.Functions.Like(t.TagName, $"%{searchQuery}%"))
                 .GroupBy(t => new { t.TagName, t.TagCategory })
                 .Select(g => new {
                     tagName = g.Key.TagName,
