@@ -1151,7 +1151,7 @@ public static class AdminEndpoints
         }}
         
         function selectTag(tagName, tagCategory, documentCount) {{
-            selectedTag = {{{{ tagName, tagCategory, documentCount }}}};
+            selectedTag = {{ tagName, tagCategory, documentCount }};
             
             // Update UI
             document.getElementById('tag-search-input').value = tagName;
