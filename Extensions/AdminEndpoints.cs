@@ -40,6 +40,7 @@ public static class AdminEndpoints
         group.MapPost("/tags/apply-community-series", ApplyCommunitySeriesTags);
         
         // Tag recategorization endpoint
+        group.MapGet("/tags/categories", GetTagCategories);
         group.MapGet("/tags/search", SearchTags);
         group.MapPost("/tags/recategorize", RecategorizeTag);
         
@@ -564,15 +565,7 @@ public static class AdminEndpoints
                         
                         <select id=""new-category-select"" disabled style=""width: 100%; padding: 0.75rem; border: 1px solid var(--border); border-radius: 4px; background: var(--bg); font-size: 1rem;"">
                             <option value="""">Select tag first...</option>
-                            <option value=""Format"">Format</option>
-                            <option value=""Genre"">Genre</option>
-                            <option value=""Series"">Series</option>
-                            <option value=""Franchise"">Franchise</option>
-                            <option value=""Setting"">Setting</option>
-                            <option value=""Type"">Type</option>
-                            <option value=""Author"">Author</option>
-                            <option value=""ContentRating"">Content Rating</option>
-                            <option value=""Other"">Other</option>
+                            <!-- Categories loaded dynamically -->
                         </select>
                         
                         <button class=""btn btn-primary"" onclick=""recategorizeSelectedTag()"" disabled id=""recategorize-btn"" style=""white-space: nowrap; padding: 0.75rem 1.5rem;"">
@@ -1084,6 +1077,32 @@ public static class AdminEndpoints
         // Tag Recategorization Functions
         let searchDebounceTimer;
         let selectedTag = null;
+        
+        // Load tag categories dynamically on page load
+        async function loadTagCategories() {{
+            try {{
+                const resp = await fetch('/admin/tags/categories');
+                const data = await resp.json();
+                
+                if (data.success && data.categories) {{
+                    const select = document.getElementById('new-category-select');
+                    // Keep first option, add categories
+                    data.categories.forEach(function(cat) {{
+                        const opt = document.createElement('option');
+                        opt.value = cat;
+                        opt.textContent = cat;
+                        select.appendChild(opt);
+                    }});
+                }}
+            }} catch (e) {{
+                console.error('Failed to load tag categories:', e);
+            }}
+        }}
+        
+        // Initialize when tabs are switched
+        if (document.getElementById('new-category-select')) {{
+            loadTagCategories();
+        }}
         
         function searchTagsDebounced(query) {{
             clearTimeout(searchDebounceTimer);
@@ -4056,6 +4075,23 @@ rm -f drive-scan.pid
     /// <summary>
     /// Search for tags by name (for autocomplete)
     /// Returns distinct tag names with their categories and usage count
+    /// </summary>
+    /// <summary>
+    /// Get the list of valid tag categories
+    /// Returns the authoritative list from TagCategory constants
+    /// </summary>
+    private static IResult GetTagCategories(HttpContext context)
+    {
+        return Results.Ok(new
+        {
+            success = true,
+            categories = TagCategory.UserFacing
+        });
+    }
+
+    /// <summary>
+    /// Search for existing tags by name (case-insensitive)
+    /// Returns matching tags with their current category and document count
     /// </summary>
     private static async Task<IResult> SearchTags(
         HttpContext context,
