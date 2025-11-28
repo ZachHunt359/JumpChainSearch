@@ -28,6 +28,12 @@
                     </span>
                     <input type="search" class="form-control" placeholder="Search for jumps, supplements, gauntlets... (type to search instantly)" 
                            @bind="searchQuery" @bind:event="oninput" @onkeyup="OnSearchInput" aria-label="Search documents">
+                    @if (!string.IsNullOrWhiteSpace(searchQuery) || HasAnyTagFilters())
+                    {
+                        <button type="button" class="btn btn-outline-secondary" @onclick="CopySearchUrl" title="Copy shareable link to this search">
+                            <i class="fas fa-link"></i>
+                        </button>
+                    }
                 </div>
                 
                 @if (isSearching)
@@ -1047,6 +1053,9 @@
         
         // Check for docId query parameter and load that document
         await CheckAndLoadDocumentFromUrl();
+        
+        // Load search parameters from URL
+        LoadSearchParametersFromUrl();
     }
     
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -1074,6 +1083,81 @@
         {
             await LoadDocumentById(docId);
         }
+    }
+    
+    private void LoadSearchParametersFromUrl()
+    {
+        var uri = new Uri(NavigationManager.Uri);
+        var queryParams = System.Web.HttpUtility.ParseQueryString(uri.Query);
+        
+        // Load search query
+        var queryParam = queryParams["q"];
+        if (!string.IsNullOrEmpty(queryParam))
+        {
+            searchQuery = queryParam;
+        }
+        
+        // Load included tags
+        var includeParam = queryParams["include"];
+        if (!string.IsNullOrEmpty(includeParam))
+        {
+            var tags = includeParam.Split(',', StringSplitOptions.RemoveEmptyEntries);
+            foreach (var tag in tags)
+            {
+                includedTags.Add(tag.Trim());
+            }
+        }
+        
+        // Load excluded tags
+        var excludeParam = queryParams["exclude"];
+        if (!string.IsNullOrEmpty(excludeParam))
+        {
+            var tags = excludeParam.Split(',', StringSplitOptions.RemoveEmptyEntries);
+            foreach (var tag in tags)
+            {
+                excludedTags.Add(tag.Trim());
+            }
+        }
+        
+        // If we loaded any search parameters, perform the search
+        if (!string.IsNullOrEmpty(searchQuery) || HasAnyTagFilters())
+        {
+            _ = PerformSearch();
+        }
+    }
+    
+    private async Task CopySearchUrl()
+    {
+        var baseUrl = NavigationManager.BaseUri.TrimEnd('/');
+        var queryParams = new List<string>();
+        
+        // Add search query
+        if (!string.IsNullOrWhiteSpace(searchQuery))
+        {
+            queryParams.Add($"q={Uri.EscapeDataString(searchQuery)}");
+        }
+        
+        // Add included tags
+        if (includedTags.Any())
+        {
+            queryParams.Add($"include={Uri.EscapeDataString(string.Join(",", includedTags))}");
+        }
+        
+        // Add excluded tags
+        if (excludedTags.Any())
+        {
+            queryParams.Add($"exclude={Uri.EscapeDataString(string.Join(",", excludedTags))}");
+        }
+        
+        var shareUrl = queryParams.Any() 
+            ? $"{baseUrl}/?{string.Join("&", queryParams)}"
+            : baseUrl;
+        
+        // Copy to clipboard using JavaScript interop
+        await JSRuntime.InvokeVoidAsync("navigator.clipboard.writeText", shareUrl);
+        
+        // Show a brief success message (you could add a toast notification here)
+        await JSRuntime.InvokeVoidAsync("alert", "Search link copied to clipboard!");
     }
 
     private async Task LoadAvailableTagsAsync()
