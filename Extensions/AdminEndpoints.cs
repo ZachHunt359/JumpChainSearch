@@ -992,7 +992,7 @@ public static class AdminEndpoints
         async function startBatch() {{
             if (!confirm('Start batch processing?')) return;
             try {{
-                const resp = await fetch('/admin/batch/start', {{{{ method: 'POST' }}}});
+                const resp = await fetch('/admin/batch/start', {{ method: 'POST' }});
                 const data = await resp.json();
                 
                 if (!resp.ok) {{
@@ -1011,7 +1011,7 @@ public static class AdminEndpoints
         async function stopBatch() {{
             if (!confirm('Stop batch processing?')) return;
             try {{
-                const resp = await fetch('/admin/batch/stop', {{{{ method: 'POST' }}}});
+                const resp = await fetch('/admin/batch/stop', {{ method: 'POST' }});
                 const data = await resp.json();
                 alert(data.message || 'Batch processing stopped');
                 updateStatus();
@@ -1023,7 +1023,7 @@ public static class AdminEndpoints
         async function startDriveScan() {{
             if (!confirm('Start scanning Google Drives? This may take a while.')) return;
             try {{
-                const resp = await fetch('/admin/drives/scan', {{{{ method: 'POST' }}}});
+                const resp = await fetch('/admin/drives/scan', {{ method: 'POST' }});
                 const data = await resp.json();
                 
                 if (!resp.ok) {{
@@ -1042,7 +1042,7 @@ public static class AdminEndpoints
         async function stopDriveScan() {{
             if (!confirm('Stop drive scanning?')) return;
             try {{
-                const resp = await fetch('/admin/drives/scan/stop', {{{{ method: 'POST' }}}});
+                const resp = await fetch('/admin/drives/scan/stop', {{ method: 'POST' }});
                 const data = await resp.json();
                 
                 if (!resp.ok) {{
@@ -1062,7 +1062,7 @@ public static class AdminEndpoints
             if (!confirm('Apply community genre tags to documents? This may take a few minutes.')) return;
             document.getElementById('genre-info').innerHTML = '<span class=""spinner""></span> Processing...';
             try {{
-                const resp = await fetch('/admin/tags/apply-community-genres', {{{{ method: 'POST' }}}});
+                const resp = await fetch('/admin/tags/apply-community-genres', {{ method: 'POST' }});
                 const data = await resp.json();
                 document.getElementById('genre-info').innerHTML = data.message || 
                     '✓ Applied ' + data.newTagsApplied + ' tags to ' + data.matchedDocuments + ' documents';
@@ -1077,7 +1077,7 @@ public static class AdminEndpoints
             if (!confirm('Apply community series tags to documents? This may take a few minutes.')) return;
             document.getElementById('series-info').innerHTML = '<span class=""spinner""></span> Processing...';
             try {{
-                const resp = await fetch('/admin/tags/apply-community-series', {{{{ method: 'POST' }}}});
+                const resp = await fetch('/admin/tags/apply-community-series', {{ method: 'POST' }});
                 const data = await resp.json();
                 document.getElementById('series-info').innerHTML = data.message || 
                     '✓ Applied ' + data.newTagsApplied + ' tags to ' + data.matchedDocuments + ' documents';
@@ -1194,7 +1194,7 @@ public static class AdminEndpoints
             resultDiv.innerHTML = '<span class=""spinner""></span> Processing...';
             
             try {{
-                const resp = await fetch('/admin/tags/recategorize', {{{{
+                const resp = await fetch('/admin/tags/recategorize', {{
                     method: 'POST',
                     headers: {{{{ 'Content-Type': 'application/json' }}}},
                     body: JSON.stringify({{{{
@@ -1202,7 +1202,7 @@ public static class AdminEndpoints
                         oldCategory: selectedTag.tagCategory,
                         newCategory: newCategory
                     }}}})
-                }}}});
+                }});
                 
                 const data = await resp.json();
                 
@@ -1226,7 +1226,7 @@ public static class AdminEndpoints
         async function restartServer() {{
             if (!confirm('Restart the server? The page will reload automatically.')) return;
             try {{
-                await fetch('/admin/server/restart', {{{{ method: 'POST' }}}});
+                await fetch('/admin/server/restart', {{ method: 'POST' }});
                 alert('Server restarting... Page will reload in 10 seconds');
                 setTimeout(() => location.reload(), 10000);
             }} catch (e) {{
@@ -1444,7 +1444,7 @@ public static class AdminEndpoints
             try {{
                 btn.disabled = true;
                 icon.classList.add('fa-spin');
-                const resp = await fetch('/admin/system/refresh-document-count', {{{{ method: 'POST' }}}});
+                const resp = await fetch('/admin/system/refresh-document-count', {{ method: 'POST' }});
                 
                 if (!resp.ok) {{
                     const errorText = await resp.text();
@@ -1741,7 +1741,7 @@ public static class AdminEndpoints
                 const response = await fetch(url, {{{{ 
                     method: 'POST',
                     credentials: 'same-origin'
-                }}}});
+                }});
                 const data = await response.json();
                 if (data.success) {{
                     alert('✓ Tag suggestion approved!');
@@ -1759,7 +1759,7 @@ public static class AdminEndpoints
                 const response = await fetch('/api/voting/admin/reject-suggestion/' + id, {{{{ 
                     method: 'POST',
                     credentials: 'same-origin'
-                }}}});
+                }});
                 if (!response.ok) {{
                     const text = await response.text();
                     alert('Error: ' + (text || 'Failed to reject suggestion'));
@@ -1782,7 +1782,7 @@ public static class AdminEndpoints
                 const response = await fetch('/api/voting/admin/approve-removal/' + id, {{{{ 
                     method: 'POST',
                     credentials: 'same-origin'
-                }}}});
+                }});
                 const data = await response.json();
                 if (data.success) {{
                     alert('✓ Tag removal approved');
@@ -1800,7 +1800,7 @@ public static class AdminEndpoints
                 const response = await fetch('/api/voting/admin/reject-removal/' + id, {{{{ 
                     method: 'POST',
                     credentials: 'same-origin'
-                }}}});
+                }});
                 if (!response.ok) {{
                     const text = await response.text();
                     alert('Error: ' + (text || 'Failed to reject removal'));
