@@ -39,6 +39,10 @@ public static class AdminEndpoints
         // Series tagging endpoints
         group.MapPost("/tags/apply-community-series", ApplyCommunitySeriesTags);
         
+        // Tag recategorization endpoint
+        group.MapGet("/tags/search", SearchTags);
+        group.MapPost("/tags/recategorize", RecategorizeTag);
+        
         // Text review queue endpoint
         group.MapGet("/text-review/queue", GetTextReviewQueue);
         
@@ -82,6 +86,9 @@ public static class AdminEndpoints
         var totalDrives = await dbContext.DriveConfigurations.CountAsync();
         
         context.Response.ContentType = "text/html";
+        context.Response.Headers["Cache-Control"] = "no-cache, no-store, must-revalidate, max-age=0";
+        context.Response.Headers["Pragma"] = "no-cache";
+        context.Response.Headers["Expires"] = "0";
         var html = $@"<!DOCTYPE html>
 <html lang=""en"">
 <head>
@@ -539,6 +546,54 @@ public static class AdminEndpoints
                     </div>
                 </div>
             </section>
+            
+            <section style=""margin-top: 2rem; border-top: 2px solid var(--border); padding-top: 2rem;"">
+                <h2>🔄 Recategorize Tags</h2>
+                <p style=""color: var(--text-secondary); margin-bottom: 1rem;"">
+                    Change the category of a tag across all documents. Associated approval rules will be updated automatically.
+                </p>
+                <div class=""action-card"">
+                    <h3>Search and Recategorize</h3>
+                    <div style=""margin-top: 1rem;"">
+                        <label style=""display: block; margin-bottom: 0.5rem; font-weight: 500;"">Search for Tag:</label>
+                        <div style=""position: relative;"">
+                            <input type=""text"" id=""tag-search-input"" placeholder=""Type to search tags..."" 
+                                   oninput=""searchTagsDebounced(this.value)""
+                                   autocomplete=""off""
+                                   style=""width: 100%; padding: 0.75rem; border: 1px solid var(--border); border-radius: 4px; background: var(--bg); font-size: 1rem;"" />
+                            <div id=""tag-search-results"" style=""position: absolute; width: 100%; max-height: 300px; overflow-y: auto; background: var(--bg-secondary); border: 1px solid var(--border); border-top: none; border-radius: 0 0 4px 4px; display: none; z-index: 1000;""></div>
+                        </div>
+                        
+                        <div id=""selected-tag-info"" style=""display: none; margin-top: 1.5rem; padding: 1rem; background: var(--card-bg); border: 1px solid var(--border); border-radius: 4px;"">
+                            <div style=""margin-bottom: 1rem;"">
+                                <strong>Selected Tag:</strong> <span id=""selected-tag-name"" style=""color: var(--accent);""></span><br>
+                                <strong>Current Category:</strong> <span id=""selected-tag-category""></span><br>
+                                <strong>Used in:</strong> <span id=""selected-tag-count""></span> documents
+                            </div>
+                            
+                            <label style=""display: block; margin-bottom: 0.5rem; font-weight: 500;"">New Category:</label>
+                            <select id=""new-category-select"" style=""width: 100%; padding: 0.75rem; border: 1px solid var(--border); border-radius: 4px; background: var(--bg); font-size: 1rem; margin-bottom: 1rem;"">
+                                <option value="""">Select category...</option>
+                                <option value=""Format"">Format</option>
+                                <option value=""Genre"">Genre</option>
+                                <option value=""Series"">Series</option>
+                                <option value=""Franchise"">Franchise</option>
+                                <option value=""Setting"">Setting</option>
+                                <option value=""Type"">Type</option>
+                                <option value=""Author"">Author</option>
+                                <option value=""ContentRating"">Content Rating</option>
+                                <option value=""Other"">Other</option>
+                            </select>
+                            
+                            <button class=""btn btn-primary"" onclick=""recategorizeSelectedTag()"" style=""width: 100%;"">
+                                Recategorize Tag
+                            </button>
+                        </div>
+                        
+                        <div id=""recategorize-result"" style=""margin-top: 1rem; color: var(--text-secondary); font-size: 0.9rem;""></div>
+                    </div>
+                </div>
+            </section>
         </div>
         
         <!-- Tag Voting Tab -->
@@ -767,7 +822,7 @@ public static class AdminEndpoints
         </div>
     </main>
     
-    <script>
+    <script defer>
         // Tab Switching
         function switchTab(tabName) {{
             // Hide all tabs
@@ -818,6 +873,15 @@ public static class AdminEndpoints
                 checkReviewQueue();
                 checkVotingQueue();
             }}, 30000);
+            
+            // Hide tag search results when clicking outside
+            document.addEventListener('click', function(e) {{
+                const searchInput = document.getElementById('tag-search-input');
+                const resultsDiv = document.getElementById('tag-search-results');
+                if (searchInput && resultsDiv && !searchInput.contains(e.target) && !resultsDiv.contains(e.target)) {{
+                    resultsDiv.style.display = 'none';
+                }}
+            }});
         }});
         
         // Check review queue and update badge
@@ -834,7 +898,7 @@ public static class AdminEndpoints
                     badge.textContent = count;
                     badge.style.display = 'inline-block';
                     if (summary) {{
-                        summary.textContent = `${{count}} document${{count !== 1 ? 's' : ''}} need${{count === 1 ? 's' : ''}} review`;
+                        summary.textContent = count + ' document' + (count !== 1 ? 's' : '') + ' need' + (count === 1 ? 's' : '') + ' review';
                         summary.style.color = 'var(--warning)';
                     }}
                 }} else {{
@@ -865,7 +929,7 @@ public static class AdminEndpoints
                     badge.textContent = count;
                     badge.style.display = 'inline-block';
                     if (summary) {{
-                        summary.textContent = `${{count}} pending tag action${{count !== 1 ? 's' : ''}}`;
+                        summary.textContent = count + ' pending tag action' + (count !== 1 ? 's' : '');
                         summary.style.color = 'var(--warning)';
                     }}
                 }} else {{
@@ -891,11 +955,11 @@ public static class AdminEndpoints
                 if (batchData.isRunning) {{
                     batchStatus.className = 'status status-running';
                     batchStatus.innerHTML = '<span class=""spinner""></span> Running';
-                    batchInfo.innerHTML = `Currently processing: ${{batchData.currentBatch}}<br>Last run: ${{batchData.lastRun}}`;
+                    batchInfo.innerHTML = 'Currently processing: ' + batchData.currentBatch + '<br>Last run: ' + batchData.lastRun;
                 }} else {{
                     batchStatus.className = 'status status-idle';
                     batchStatus.textContent = 'Idle';
-                    batchInfo.innerHTML = `Last run: ${{batchData.lastRun}}`;
+                    batchInfo.innerHTML = 'Last run: ' + batchData.lastRun;
                 }}
             }} catch (e) {{
                 console.error('Failed to update batch status:', e);
@@ -928,7 +992,7 @@ public static class AdminEndpoints
         async function startBatch() {{
             if (!confirm('Start batch processing?')) return;
             try {{
-                const resp = await fetch('/admin/batch/start', {{ method: 'POST' }});
+                const resp = await fetch('/admin/batch/start', {{{{ method: 'POST' }}}});
                 const data = await resp.json();
                 
                 if (!resp.ok) {{
@@ -947,7 +1011,7 @@ public static class AdminEndpoints
         async function stopBatch() {{
             if (!confirm('Stop batch processing?')) return;
             try {{
-                const resp = await fetch('/admin/batch/stop', {{ method: 'POST' }});
+                const resp = await fetch('/admin/batch/stop', {{{{ method: 'POST' }}}});
                 const data = await resp.json();
                 alert(data.message || 'Batch processing stopped');
                 updateStatus();
@@ -959,7 +1023,7 @@ public static class AdminEndpoints
         async function startDriveScan() {{
             if (!confirm('Start scanning Google Drives? This may take a while.')) return;
             try {{
-                const resp = await fetch('/admin/drives/scan', {{ method: 'POST' }});
+                const resp = await fetch('/admin/drives/scan', {{{{ method: 'POST' }}}});
                 const data = await resp.json();
                 
                 if (!resp.ok) {{
@@ -978,7 +1042,7 @@ public static class AdminEndpoints
         async function stopDriveScan() {{
             if (!confirm('Stop drive scanning?')) return;
             try {{
-                const resp = await fetch('/admin/drives/scan/stop', {{ method: 'POST' }});
+                const resp = await fetch('/admin/drives/scan/stop', {{{{ method: 'POST' }}}});
                 const data = await resp.json();
                 
                 if (!resp.ok) {{
@@ -998,10 +1062,10 @@ public static class AdminEndpoints
             if (!confirm('Apply community genre tags to documents? This may take a few minutes.')) return;
             document.getElementById('genre-info').innerHTML = '<span class=""spinner""></span> Processing...';
             try {{
-                const resp = await fetch('/admin/tags/apply-community-genres', {{ method: 'POST' }});
+                const resp = await fetch('/admin/tags/apply-community-genres', {{{{ method: 'POST' }}}});
                 const data = await resp.json();
                 document.getElementById('genre-info').innerHTML = data.message || 
-                    `✓ Applied ${{data.newTagsApplied}} tags to ${{data.matchedDocuments}} documents`;
+                    '✓ Applied ' + data.newTagsApplied + ' tags to ' + data.matchedDocuments + ' documents';
                 alert(data.message || 'Genre tags applied successfully!');
             }} catch (e) {{
                 document.getElementById('genre-info').innerHTML = '✗ Error applying tags';
@@ -1013,10 +1077,10 @@ public static class AdminEndpoints
             if (!confirm('Apply community series tags to documents? This may take a few minutes.')) return;
             document.getElementById('series-info').innerHTML = '<span class=""spinner""></span> Processing...';
             try {{
-                const resp = await fetch('/admin/tags/apply-community-series', {{ method: 'POST' }});
+                const resp = await fetch('/admin/tags/apply-community-series', {{{{ method: 'POST' }}}});
                 const data = await resp.json();
                 document.getElementById('series-info').innerHTML = data.message || 
-                    `✓ Applied ${{data.newTagsApplied}} tags to ${{data.matchedDocuments}} documents`;
+                    '✓ Applied ' + data.newTagsApplied + ' tags to ' + data.matchedDocuments + ' documents';
                 alert(data.message || 'Series tags applied successfully!');
             }} catch (e) {{
                 document.getElementById('series-info').innerHTML = '✗ Error applying tags';
@@ -1024,10 +1088,145 @@ public static class AdminEndpoints
             }}
         }}
         
+        // Tag Recategorization Functions
+        let searchDebounceTimer;
+        let selectedTag = null;
+        
+        function searchTagsDebounced(query) {{
+            clearTimeout(searchDebounceTimer);
+            searchDebounceTimer = setTimeout(() => searchTags(query), 300);
+        }}
+        
+        async function searchTags(query) {{
+            const resultsDiv = document.getElementById('tag-search-results');
+            
+            if (!query || query.length < 2) {{
+                resultsDiv.style.display = 'none';
+                return;
+            }}
+            
+            try {{
+                const resp = await fetch('/admin/tags/search?query=' + encodeURIComponent(query));
+                const data = await resp.json();
+                
+                if (data.success && data.tags.length > 0) {{{{
+                    resultsDiv.innerHTML = '';
+                    data.tags.forEach(function(tag) {{{{
+                        const div = document.createElement('div');
+                        div.style.padding = '0.75rem';
+                        div.style.cursor = 'pointer';
+                        div.style.borderBottom = '1px solid var(--border)';
+                        div.style.transition = 'background 0.2s';
+                        div.onmouseover = function() {{{{ this.style.background = 'var(--bg-tertiary)'; }}}};
+                        div.onmouseout = function() {{{{ this.style.background = 'transparent'; }}}};
+                        div.onclick = function() {{{{ selectTag(tag.tagName, tag.tagCategory, tag.documentCount); }}}};
+                        
+                        const strong = document.createElement('strong');
+                        strong.textContent = tag.tagName;
+                        div.appendChild(strong);
+                        
+                        const span = document.createElement('span');
+                        span.style.color = 'var(--text-secondary)';
+                        span.style.marginLeft = '0.5rem';
+                        span.style.fontSize = '0.85rem';
+                        span.textContent = '[' + tag.tagCategory + '] · ' + tag.documentCount + ' docs';
+                        div.appendChild(span);
+                        
+                        resultsDiv.appendChild(div);
+                    }}}});
+                    resultsDiv.style.display = 'block';
+                }}}} else {{{{
+                    const div = document.createElement('div');
+                    div.style.padding = '0.75rem';
+                    div.style.color = 'var(--text-secondary)';
+                    div.textContent = 'No tags found';
+                    resultsDiv.innerHTML = '';
+                    resultsDiv.appendChild(div);
+                    resultsDiv.style.display = 'block';
+                }}}}
+            }} catch (e) {{
+                console.error('Error searching tags:', e);
+                resultsDiv.style.display = 'none';
+            }}
+        }}
+        
+        function selectTag(tagName, tagCategory, documentCount) {{{{
+            selectedTag = {{{{ tagName, tagCategory, documentCount }}}};
+            
+            // Update UI
+            document.getElementById('tag-search-input').value = tagName;
+            document.getElementById('tag-search-results').style.display = 'none';
+            
+            document.getElementById('selected-tag-name').textContent = tagName;
+            document.getElementById('selected-tag-category').textContent = tagCategory;
+            document.getElementById('selected-tag-count').textContent = documentCount;
+            
+            // Set dropdown to current category and disable it as an option
+            const select = document.getElementById('new-category-select');
+            select.value = '';
+            Array.from(select.options).forEach(opt => {{{{
+                opt.disabled = opt.value === tagCategory;
+            }}}});
+            
+            document.getElementById('selected-tag-info').style.display = 'block';
+            document.getElementById('recategorize-result').innerHTML = '';
+        }}
+        
+        async function recategorizeSelectedTag() {{
+            if (!selectedTag) return;
+            
+            const newCategory = document.getElementById('new-category-select').value;
+            if (!newCategory) {{
+                alert('Please select a new category');
+                return;
+            }}
+            
+            if (newCategory === selectedTag.tagCategory) {{
+                alert('New category is the same as current category');
+                return;
+            }}
+            
+            if (!confirm('Recategorize ""' + selectedTag.tagName + '"" from ""' + selectedTag.tagCategory + '"" to ""' + newCategory + '""?\\n\\nThis will update ' + selectedTag.documentCount + ' documents and any associated approval rules.')) {{
+                return;
+            }}
+            
+            const resultDiv = document.getElementById('recategorize-result');
+            resultDiv.innerHTML = '<span class=""spinner""></span> Processing...';
+            
+            try {{{{
+                const resp = await fetch('/admin/tags/recategorize', {{{{
+                    method: 'POST',
+                    headers: {{{{ 'Content-Type': 'application/json' }}}},
+                    body: JSON.stringify({{{{
+                        tagName: selectedTag.tagName,
+                        oldCategory: selectedTag.tagCategory,
+                        newCategory: newCategory
+                    }}}})
+                }}}});
+                
+                const data = await resp.json();
+                
+                if (data.success) {{
+                    resultDiv.innerHTML = '<span style=""color: var(--success);"">✓ ' + data.message + '</span><br>' +
+                        '<span style=""font-size: 0.85rem;"">Updated ' + data.documentTagsUpdated + ' document tags and ' + data.approvedRulesUpdated + ' approval rules</span>';
+                    
+                    // Reset form
+                    selectedTag = null;
+                    document.getElementById('tag-search-input').value = '';
+                    document.getElementById('selected-tag-info').style.display = 'none';
+                    document.getElementById('new-category-select').value = '';
+                }} else {{
+                    resultDiv.innerHTML = '<span style=""color: var(--accent);"">✗ ' + data.message + '</span>';
+                }}
+            }} catch (e) {{
+                resultDiv.innerHTML = '<span style=""color: var(--accent);"">✗ Error: ' + e.message + '</span>';
+            }}
+        }}
+        
         async function restartServer() {{
             if (!confirm('Restart the server? The page will reload automatically.')) return;
             try {{
-                await fetch('/admin/server/restart', {{ method: 'POST' }});
+                await fetch('/admin/server/restart', {{{{ method: 'POST' }}}});
                 alert('Server restarting... Page will reload in 10 seconds');
                 setTimeout(() => location.reload(), 10000);
             }} catch (e) {{
@@ -1072,7 +1271,7 @@ public static class AdminEndpoints
             }}
             
             try {{
-                const resp = await fetch(`/admin/system/cache-ttl?minutes=${{minutes}}`, {{
+                const resp = await fetch('/admin/system/cache-ttl?minutes=' + minutes, {{
                     method: 'POST'
                 }});
                 
@@ -1133,7 +1332,7 @@ public static class AdminEndpoints
                 }} else if (data.intervalHours === 168) {{
                     freqSpan.textContent = 'Weekly';
                 }} else {{
-                    freqSpan.textContent = `Every ${{data.intervalHours}} hours`;
+                    freqSpan.textContent = 'Every ' + data.intervalHours + ' hours';
                 }}
                 
                 // Update last scan time
@@ -1154,10 +1353,10 @@ public static class AdminEndpoints
                     if (diff > 0) {{
                         const hours = Math.floor(diff / 3600000);
                         const minutes = Math.floor((diff % 3600000) / 60000);
-                        nextScanSpan.textContent = `${{nextScan.toLocaleString()}} (in ${{hours}}h ${{minutes}}m)`;
+                        nextScanSpan.textContent = nextScan.toLocaleString() + ' (in ' + hours + 'h ' + minutes + 'm)';
                         nextScanSpan.style.color = 'var(--accent)';
                     }} else {{
-                        nextScanSpan.textContent = `${{nextScan.toLocaleString()}} (overdue)`;
+                        nextScanSpan.textContent = nextScan.toLocaleString() + ' (overdue)';
                         nextScanSpan.style.color = 'var(--warning)';
                     }}
                 }} else if (data.enabled) {{
@@ -1245,7 +1444,7 @@ public static class AdminEndpoints
             try {{
                 btn.disabled = true;
                 icon.classList.add('fa-spin');
-                const resp = await fetch('/admin/system/refresh-document-count', {{ method: 'POST' }});
+                const resp = await fetch('/admin/system/refresh-document-count', {{{{ method: 'POST' }}}});
                 
                 if (!resp.ok) {{
                     const errorText = await resp.text();
@@ -1339,7 +1538,7 @@ public static class AdminEndpoints
                     // Refresh analysis
                     setTimeout(() => analyzeDuplicates(), 2000);
                 }} else {{
-                    container.innerHTML = `<div style=""color: var(--danger);"">${{data.message || 'Merge failed'}}</div>`;
+                    container.innerHTML = '<div style=""color: var(--danger);"">' + (data.message || 'Merge failed') + '</div>';
                 }}
             }} catch (error) {{
                 container.innerHTML = `<div style=""color: var(--danger);"">Error: ${{error.message}}</div>`;
@@ -1347,24 +1546,24 @@ public static class AdminEndpoints
         }}
         
         async function mergeSpecificGroup(groupIndex) {{
-            if (!confirm(`Merge duplicate group #${{groupIndex + 1}}?`)) return;
+            if (!confirm('Merge duplicate group #' + (groupIndex + 1) + '?')) return;
             
             const groupsDiv = document.getElementById('duplicate-groups');
             
             try {{
-                const response = await fetch(`/api/database/merge-duplicates/${{groupIndex}}`, {{
+                const response = await fetch('/api/database/merge-duplicates/' + groupIndex, {{
                     method: 'POST'
                 }});
                 const data = await response.json();
                 
                 if (data.success) {{
-                    alert(`✅ ${{data.message}}`);
+                    alert('✅ ' + data.message);
                     analyzeDuplicates(); // Refresh
                 }} else {{
-                    alert(`❌ Error: ${{data.message || 'Merge failed'}}`);
+                    alert('❌ Error: ' + (data.message || 'Merge failed'));
                 }}
             }} catch (error) {{
-                alert(`❌ Error: ${{error.message}}`);
+                alert('❌ Error: ' + error.message);
             }}
         }}
         
@@ -1415,7 +1614,7 @@ public static class AdminEndpoints
                     container.innerHTML = '<div style=""color: var(--success); padding: 1rem;"">✅ No documents need review!</div>';
                 }}
             }} catch (error) {{
-                container.innerHTML = `<div style=""color: var(--danger);"">Error loading queue: ${{error.message}}</div>`;
+                container.innerHTML = '<div style=""color: var(--danger);"">Error loading queue: ' + error.message + '</div>';
             }}
         }}
         
@@ -1532,17 +1731,17 @@ public static class AdminEndpoints
         async function approveSuggestion(id) {{
             try {{
                 // Get the selected category from the dropdown
-                const categoryDropdown = document.getElementById(`category-${{id}}`);
+                const categoryDropdown = document.getElementById('category-' + id);
                 const selectedCategory = categoryDropdown ? categoryDropdown.value : null;
                 
                 const url = selectedCategory 
-                    ? `/api/voting/admin/approve-suggestion/${{id}}?categoryOverride=${{encodeURIComponent(selectedCategory)}}`
-                    : `/api/voting/admin/approve-suggestion/${{id}}`;
+                    ? '/api/voting/admin/approve-suggestion/' + id + '?categoryOverride=' + encodeURIComponent(selectedCategory)
+                    : '/api/voting/admin/approve-suggestion/' + id;
                     
-                const response = await fetch(url, {{ 
+                const response = await fetch(url, {{{{ 
                     method: 'POST',
                     credentials: 'same-origin'
-                }});
+                }}}});
                 const data = await response.json();
                 if (data.success) {{
                     alert('✓ Tag suggestion approved!');
@@ -1557,10 +1756,10 @@ public static class AdminEndpoints
         
         async function rejectSuggestion(id) {{
             try {{
-                const response = await fetch(`/api/voting/admin/reject-suggestion/${{id}}`, {{ 
+                const response = await fetch('/api/voting/admin/reject-suggestion/' + id, {{{{ 
                     method: 'POST',
                     credentials: 'same-origin'
-                }});
+                }}}});
                 if (!response.ok) {{
                     const text = await response.text();
                     alert('Error: ' + (text || 'Failed to reject suggestion'));
@@ -1580,10 +1779,10 @@ public static class AdminEndpoints
         
         async function approveRemoval(id) {{
             try {{
-                const response = await fetch(`/api/voting/admin/approve-removal/${{id}}`, {{ 
+                const response = await fetch('/api/voting/admin/approve-removal/' + id, {{{{ 
                     method: 'POST',
                     credentials: 'same-origin'
-                }});
+                }}}});
                 const data = await response.json();
                 if (data.success) {{
                     alert('✓ Tag removal approved');
@@ -1598,10 +1797,10 @@ public static class AdminEndpoints
         
         async function rejectRemoval(id) {{
             try {{
-                const response = await fetch(`/api/voting/admin/reject-removal/${{id}}`, {{ 
+                const response = await fetch('/api/voting/admin/reject-removal/' + id, {{{{ 
                     method: 'POST',
                     credentials: 'same-origin'
-                }});
+                }}}});
                 if (!response.ok) {{
                     const text = await response.text();
                     alert('Error: ' + (text || 'Failed to reject removal'));
@@ -1795,7 +1994,7 @@ public static class AdminEndpoints
                 const data = await response.json();
                 
                 if (data.success) {{
-                    alert(`✓ Tag relationship created: ${{parentTag}} → ${{childTag}}`);
+                    alert('✓ Tag relationship created: ' + parentTag + ' → ' + childTag);
                     parentInput.value = '';
                     childInput.value = '';
                     await loadTagHierarchies();
@@ -1808,12 +2007,12 @@ public static class AdminEndpoints
         }}
         
         async function removeTagHierarchy(hierarchyId, parentTag, childTag) {{
-            if (!confirm(`Remove relationship: ${{parentTag}} → ${{childTag}}?`)) {{
+            if (!confirm('Remove relationship: ' + parentTag + ' → ' + childTag + '?')) {{
                 return;
             }}
             
             try {{
-                const response = await fetch(`/api/tags/hierarchy/${{hierarchyId}}`, {{
+                const response = await fetch('/api/tags/hierarchy/' + hierarchyId, {{
                     method: 'DELETE'
                 }});
                 
@@ -1881,7 +2080,7 @@ public static class AdminEndpoints
                 html += '</div>';
                 container.innerHTML = html;
             }} catch (error) {{
-                container.innerHTML = `<div style=""color: var(--danger);"">Error loading drives: ${{error.message}}</div>`;
+                container.innerHTML = '<div style=""color: var(--danger);"">Error loading drives: ' + error.message + '</div>';
             }}
         }}
         
@@ -1904,7 +2103,7 @@ public static class AdminEndpoints
             container.innerHTML = '<div style=""color: var(--text-secondary); font-size: 0.85rem;""><span class=""spinner""></span> Loading folders...</div>';
             
             try {{
-                const response = await fetch(`/admin/drives/${{encodeURIComponent(driveName)}}/folders`);
+                const response = await fetch('/admin/drives/' + encodeURIComponent(driveName) + '/folders');
                 const folders = await response.json();
                 
                 if (!folders || folders.length === 0) {{
@@ -1925,18 +2124,18 @@ public static class AdminEndpoints
                 
                 container.innerHTML = html;
             }} catch (error) {{
-                container.innerHTML = `<div style=""color: var(--danger); font-size: 0.85rem;"">Error: ${{error.message}}</div>`;
+                container.innerHTML = '<div style=""color: var(--danger); font-size: 0.85rem;"">Error: ' + error.message + '</div>';
             }}
         }}
         
         async function scanDrive(driveName, index) {{
-            const statusDiv = document.getElementById(`drive-status-${{index}}`);
+            const statusDiv = document.getElementById('drive-status-' + index);
             statusDiv.style.display = 'block';
             statusDiv.style.color = 'var(--text-secondary)';
             statusDiv.innerHTML = '<span class=""spinner""></span> Scanning drive...';
             
             try {{
-                const response = await fetch(`/admin/drives/${{encodeURIComponent(driveName)}}/scan`, {{
+                const response = await fetch('/admin/drives/' + encodeURIComponent(driveName) + '/scan', {{
                     method: 'POST'
                 }});
                 const data = await response.json();
@@ -1959,13 +2158,13 @@ public static class AdminEndpoints
         }}
         
         async function refreshFolders(driveName, index) {{
-            const statusDiv = document.getElementById(`drive-status-${{index}}`);
+            const statusDiv = document.getElementById('drive-status-' + index);
             statusDiv.style.display = 'block';
             statusDiv.style.color = 'var(--text-secondary)';
             statusDiv.innerHTML = '<span class=""spinner""></span> Discovering folders...';
             
             try {{
-                const response = await fetch(`/admin/drives/${{encodeURIComponent(driveName)}}/refresh-folders`, {{
+                const response = await fetch('/admin/drives/' + encodeURIComponent(driveName) + '/refresh-folders', {{
                     method: 'POST'
                 }});
                 const data = await response.json();
@@ -2025,7 +2224,7 @@ public static class AdminEndpoints
                     document.getElementById('new-username').value = '';
                     document.getElementById('username-current-password').value = '';
                 }} else {{
-                    resultDiv.innerHTML = `<span style=""color: var(--danger);"">✗ ${{data.message || 'Failed to update username'}}</span>`;
+                    resultDiv.innerHTML = '<span style=""color: var(--danger);"">✗ ' + (data.message || 'Failed to update username') + '</span>';
                 }}
             }} catch (error) {{
                 resultDiv.innerHTML = `<span style=""color: var(--danger);"">✗ Error: ${{error.message}}</span>`;
@@ -2077,7 +2276,7 @@ public static class AdminEndpoints
                     // Redirect to login after 2 seconds
                     setTimeout(() => {{ window.location.href = '/admin/login'; }}, 2000);
                 }} else {{
-                    resultDiv.innerHTML = `<span style=""color: var(--danger);"">✗ ${{data.message || 'Failed to update password'}}</span>`;
+                    resultDiv.innerHTML = '<span style=""color: var(--danger);"">✗ ' + (data.message || 'Failed to update password') + '</span>';
                 }}
             }} catch (error) {{
                 resultDiv.innerHTML = `<span style=""color: var(--danger);"">✗ Error: ${{error.message}}</span>`;
@@ -3196,7 +3395,7 @@ rm -f drive-scan.pid
             const folderList = document.getElementById(`folders-${{index}}`);
             
             try {{
-                const response = await fetch(`/api/admin/drives/${{encodeURIComponent(driveName)}}/folders`);
+                const response = await fetch('/api/admin/drives/' + encodeURIComponent(driveName) + '/folders');
                 const folders = await response.json();
                 
                 if (folders.length === 0) {{
@@ -3210,7 +3409,7 @@ rm -f drive-scan.pid
                     `).join('');
                 }}
             }} catch (error) {{
-                folderList.innerHTML = `<p style=""color: var(--danger); padding: 1rem;"">Error loading folders: ${{error.message}}</p>`;
+                folderList.innerHTML = '<p style=""color: var(--danger); padding: 1rem;"">Error loading folders: ' + error.message + '</p>';
             }}
         }}
         
@@ -3225,7 +3424,7 @@ rm -f drive-scan.pid
             }}
             
             try {{
-                const response = await fetch(`/api/google-drive/scan-drive/${{encodeURIComponent(driveName)}}`, {{
+                const response = await fetch('/api/google-drive/scan-drive/' + encodeURIComponent(driveName), {{
                     method: 'POST'
                 }});
                 const result = await response.json();
@@ -3259,7 +3458,7 @@ rm -f drive-scan.pid
             }}
             
             try {{
-                const response = await fetch(`/api/google-drive/save-folders/${{encodeURIComponent(driveName)}}`, {{
+                const response = await fetch('/api/google-drive/save-folders/' + encodeURIComponent(driveName), {{
                     method: 'POST'
                 }});
                 const result = await response.json();
@@ -3860,8 +4059,120 @@ rm -f drive-scan.pid
         return Task.FromResult(Results.Ok(result));
     }
     
+    /// <summary>
+    /// Search for tags by name (for autocomplete)
+    /// Returns distinct tag names with their categories and usage count
+    /// </summary>
+    private static async Task<IResult> SearchTags(
+        HttpContext context,
+        JumpChainDbContext dbContext,
+        string? query = null)
+    {
+        try
+        {
+            var searchQuery = query?.Trim() ?? "";
+            
+            // Get distinct tags matching the search query
+            var tags = await dbContext.DocumentTags
+                .Where(t => string.IsNullOrEmpty(searchQuery) || t.TagName.Contains(searchQuery))
+                .GroupBy(t => new { t.TagName, t.TagCategory })
+                .Select(g => new {
+                    tagName = g.Key.TagName,
+                    tagCategory = g.Key.TagCategory,
+                    documentCount = g.Count()
+                })
+                .OrderByDescending(t => t.documentCount)
+                .Take(50)
+                .ToListAsync();
+
+            return Results.Ok(new { 
+                success = true, 
+                tags 
+            });
+        }
+        catch (Exception ex)
+        {
+            return Results.BadRequest(new { 
+                success = false, 
+                message = "Failed to search tags", 
+                error = ex.Message 
+            });
+        }
+    }
+    
+    /// <summary>
+    /// Recategorize all instances of a tag across all documents
+    /// Updates DocumentTags and associated ApprovedTagRules
+    /// </summary>
+    private static async Task<IResult> RecategorizeTag(
+        HttpContext context,
+        JumpChainDbContext dbContext,
+        RecategorizeTagRequest request)
+    {
+        try
+        {
+            // Validate input
+            if (string.IsNullOrWhiteSpace(request.TagName) || 
+                string.IsNullOrWhiteSpace(request.OldCategory) || 
+                string.IsNullOrWhiteSpace(request.NewCategory))
+            {
+                return Results.BadRequest(new { 
+                    success = false, 
+                    message = "TagName, OldCategory, and NewCategory are required" 
+                });
+            }
+
+            // Find all DocumentTags with this tag name and category
+            var tagsToUpdate = await dbContext.DocumentTags
+                .Where(t => t.TagName == request.TagName && t.TagCategory == request.OldCategory)
+                .ToListAsync();
+
+            if (tagsToUpdate.Count == 0)
+            {
+                return Results.NotFound(new { 
+                    success = false, 
+                    message = $"No tags found with name '{request.TagName}' in category '{request.OldCategory}'" 
+                });
+            }
+
+            // Update all DocumentTags
+            foreach (var tag in tagsToUpdate)
+            {
+                tag.TagCategory = request.NewCategory;
+            }
+
+            // Find and update associated ApprovedTagRules
+            var rulesToUpdate = await dbContext.ApprovedTagRules
+                .Where(r => r.TagName == request.TagName && r.TagCategory == request.OldCategory)
+                .ToListAsync();
+
+            foreach (var rule in rulesToUpdate)
+            {
+                rule.TagCategory = request.NewCategory;
+            }
+
+            await dbContext.SaveChangesAsync();
+
+            return Results.Ok(new { 
+                success = true, 
+                message = $"Recategorized tag '{request.TagName}' from '{request.OldCategory}' to '{request.NewCategory}'",
+                documentTagsUpdated = tagsToUpdate.Count,
+                approvedRulesUpdated = rulesToUpdate.Count
+            });
+        }
+        catch (Exception ex)
+        {
+            return Results.BadRequest(new { 
+                success = false, 
+                message = "Failed to recategorize tag", 
+                error = ex.Message 
+            });
+        }
+    }
+    
     // Request models
     private record ChangeUsernameRequest(string NewUsername, string CurrentPassword);
     private record ChangePasswordRequest(string CurrentPassword, string NewPassword);
     private record ScanScheduleRequest(bool Enabled, int IntervalHours);
+    private record RecategorizeTagRequest(string TagName, string OldCategory, string NewCategory);
 }
