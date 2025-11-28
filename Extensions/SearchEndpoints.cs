@@ -11,6 +11,9 @@ public static class SearchEndpoints
         // Main search endpoint with tag filtering
         group.MapGet("/", FastSearch);
         
+        // Random documents endpoint
+        group.MapGet("/random", GetRandomDocuments);
+        
         // Tag management endpoints
         group.MapGet("/tags", GetTagFrequencies);
         group.MapGet("/tags/batch", GetDocumentTagsBatch);
@@ -367,6 +370,102 @@ public static class SearchEndpoints
         }
         
         return count;
+    }
+
+    /// <summary>
+    /// Get random documents, optionally filtered by include/exclude tags
+    /// </summary>
+    private static async Task<IResult> GetRandomDocuments(
+        JumpChainDbContext context,
+        int count = 10,
+        string? includeTags = null,
+        string? excludeTags = null)
+    {
+        try
+        {
+            var query = context.JumpDocuments.Include(d => d.Tags).Include(d => d.Urls).AsQueryable();
+            
+            // Apply include tag filters if specified
+            if (!string.IsNullOrWhiteSpace(includeTags))
+            {
+                var includeTagList = includeTags.Split(',', StringSplitOptions.RemoveEmptyEntries)
+                    .Select(t => t.Trim().ToLower()).ToList();
+                
+                foreach (var tag in includeTagList)
+                {
+                    query = query.Where(d => d.Tags.Any(t => t.TagName.ToLower().Contains(tag)));
+                }
+            }
+            
+            // Apply exclude tag filters if specified
+            if (!string.IsNullOrWhiteSpace(excludeTags))
+            {
+                var excludeTagList = excludeTags.Split(',', StringSplitOptions.RemoveEmptyEntries)
+                    .Select(t => t.Trim().ToLower()).ToList();
+                
+                foreach (var tag in excludeTagList)
+                {
+                    query = query.Where(d => !d.Tags.Any(t => t.TagName.ToLower().Contains(tag)));
+                }
+            }
+            
+            // Get total count after filters
+            var totalCount = await query.CountAsync();
+            
+            // Cap count at available documents
+            var actualCount = Math.Min(count, totalCount);
+            
+            if (actualCount == 0)
+            {
+                return Results.Ok(new
+                {
+                    Success = true,
+                    Count = 0,
+                    Documents = new List<object>()
+                });
+            }
+            
+            // Use OrderBy(r => EF.Functions.Random()) for SQLite
+            var randomDocuments = await query
+                .OrderBy(d => Guid.NewGuid())
+                .Take(actualCount)
+                .Select(d => new {
+                    d.Id,
+                    d.Name,
+                    d.FolderPath,
+                    d.SourceDrive,
+                    d.MimeType,
+                    d.Size,
+                    d.WebViewLink,
+                    d.CreatedTime,
+                    d.ModifiedTime,
+                    d.Description,
+                    d.ThumbnailLink,
+                    Tags = d.Tags.Select(t => t.TagName).ToList(),
+                    Urls = d.Urls.Select(u => new {
+                        u.SourceDrive,
+                        u.FolderPath,
+                        u.WebViewLink,
+                        u.DownloadLink
+                    }).ToList(),
+                    HasMultipleUrls = d.Urls.Count > 1,
+                    HasThumbnail = !string.IsNullOrWhiteSpace(d.ThumbnailLink),
+                    HasExtractedText = !string.IsNullOrWhiteSpace(d.ExtractedText)
+                })
+                .ToListAsync();
+            
+            return Results.Ok(new
+            {
+                Success = true,
+                Count = randomDocuments.Count,
+                Documents = randomDocuments
+            });
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[ERROR] GetRandomDocuments failed: {ex.Message}");
+            return Results.Problem($"Error retrieving random documents: {ex.Message}");
+        }
     }
 
     private static async Task<IResult> GetTagFrequencies(JumpChainDbContext context)

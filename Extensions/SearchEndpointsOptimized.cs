@@ -29,6 +29,7 @@ public static class SearchEndpointsOptimized
     public static RouteGroupBuilder MapOptimizedSearchEndpoints(this RouteGroupBuilder group)
     {
         group.MapGet("/", OptimizedSearch);
+        group.MapGet("/random", GetRandomDocuments);
         group.MapGet("/tags", GetTagFrequencies);
         group.MapGet("/tags/batch", GetDocumentTagsBatch);
         group.MapGet("/count", GetDocumentCount);
@@ -634,6 +635,118 @@ public static class SearchEndpointsOptimized
                 Success = false, 
                 error = ex.Message 
             });
+        }
+    }
+
+    /// <summary>
+    /// Get random documents, optionally filtered by include/exclude tags and SFW mode
+    /// </summary>
+    private static async Task<IResult> GetRandomDocuments(
+        JumpChainDbContext context,
+        SfwModeService? sfwMode = null,
+        int count = 10,
+        string? includeTags = null,
+        string? excludeTags = null)
+    {
+        try
+        {
+            var query = context.JumpDocuments.Include(d => d.Tags).Include(d => d.Urls).AsQueryable();
+            
+            // Apply SFW filtering if enabled
+            if (sfwMode?.IsSfwMode == true)
+            {
+                query = query.Where(d => !d.Tags.Any(t => 
+                    t.TagName == "NSFW" || 
+                    t.TagName == "Lewd" || 
+                    t.TagName == "NSFW-ish"));
+            }
+            
+            // Apply include tag filters if specified
+            if (!string.IsNullOrWhiteSpace(includeTags))
+            {
+                var includeTagList = includeTags.Split(',', StringSplitOptions.RemoveEmptyEntries)
+                    .Select(t => t.Trim().ToLower()).ToList();
+                
+                foreach (var tag in includeTagList)
+                {
+                    query = query.Where(d => d.Tags.Any(t => t.TagName.ToLower().Contains(tag)));
+                }
+            }
+            
+            // Apply exclude tag filters if specified
+            if (!string.IsNullOrWhiteSpace(excludeTags))
+            {
+                var excludeTagList = excludeTags.Split(',', StringSplitOptions.RemoveEmptyEntries)
+                    .Select(t => t.Trim().ToLower()).ToList();
+                
+                foreach (var tag in excludeTagList)
+                {
+                    query = query.Where(d => !d.Tags.Any(t => t.TagName.ToLower().Contains(tag)));
+                }
+            }
+            
+            // Get all matching IDs
+            var matchingIds = await query.Select(d => d.Id).ToListAsync();
+            var totalCount = matchingIds.Count;
+            
+            // Cap count at available documents
+            var actualCount = Math.Min(count, totalCount);
+            
+            if (actualCount == 0)
+            {
+                return Results.Ok(new
+                {
+                    Success = true,
+                    Count = 0,
+                    Documents = new List<object>()
+                });
+            }
+            
+            // Randomly select IDs in memory
+            var random = new Random();
+            var selectedIds = matchingIds.OrderBy(x => random.Next()).Take(actualCount).ToList();
+            
+            // Fetch full documents for selected IDs
+            var randomDocuments = await context.JumpDocuments
+                .Include(d => d.Tags)
+                .Include(d => d.Urls)
+                .Where(d => selectedIds.Contains(d.Id))
+                .Select(d => new {
+                    d.Id,
+                    d.Name,
+                    d.FolderPath,
+                    d.SourceDrive,
+                    d.MimeType,
+                    d.Size,
+                    d.WebViewLink,
+                    d.CreatedTime,
+                    d.ModifiedTime,
+                    d.Description,
+                    d.ThumbnailLink,
+                    Tags = d.Tags.Select(t => t.TagName).ToList(),
+                    Urls = d.Urls.Select(u => new {
+                        u.SourceDrive,
+                        u.FolderPath,
+                        u.WebViewLink,
+                        u.DownloadLink
+                    }).ToList(),
+                    HasMultipleUrls = d.Urls.Count > 1,
+                    HasThumbnail = !string.IsNullOrWhiteSpace(d.ThumbnailLink),
+                    HasExtractedText = !string.IsNullOrWhiteSpace(d.ExtractedText)
+                })
+                .ToListAsync();
+            
+            return Results.Ok(new
+            {
+                Success = true,
+                Count = randomDocuments.Count,
+                Documents = randomDocuments
+            });
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[ERROR] GetRandomDocuments failed: {ex.Message}");
+            return Results.Problem($"Error retrieving random documents: {ex.Message}");
         }
     }
 
