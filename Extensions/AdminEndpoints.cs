@@ -1176,7 +1176,7 @@ public static class AdminEndpoints
             }}
             
             if (newCategory === selectedTag.tagCategory) {{
-                alert('Please select a different category. Current category is already "' + newCategory + '"');
+                alert('Please select a different category. Current category is already ""' + newCategory + '""');
                 return;
             }}
             
