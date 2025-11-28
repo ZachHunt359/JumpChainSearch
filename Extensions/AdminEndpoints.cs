@@ -1109,17 +1109,17 @@ public static class AdminEndpoints
                 const resp = await fetch('/admin/tags/search?query=' + encodeURIComponent(query));
                 const data = await resp.json();
                 
-                if (data.success && data.tags.length > 0) {{{{
+                if (data.success && data.tags.length > 0) {{
                     resultsDiv.innerHTML = '';
-                    data.tags.forEach(function(tag) {{{{
+                    data.tags.forEach(function(tag) {{
                         const div = document.createElement('div');
                         div.style.padding = '0.75rem';
                         div.style.cursor = 'pointer';
                         div.style.borderBottom = '1px solid var(--border)';
                         div.style.transition = 'background 0.2s';
-                        div.onmouseover = function() {{{{ this.style.background = 'var(--bg-tertiary)'; }}}};
-                        div.onmouseout = function() {{{{ this.style.background = 'transparent'; }}}};
-                        div.onclick = function() {{{{ selectTag(tag.tagName, tag.tagCategory, tag.documentCount); }}}};
+                        div.onmouseover = function() {{ this.style.background = 'var(--bg-tertiary)'; }};
+                        div.onmouseout = function() {{ this.style.background = 'transparent'; }};
+                        div.onclick = function() {{ selectTag(tag.tagName, tag.tagCategory, tag.documentCount); }};
                         
                         const strong = document.createElement('strong');
                         strong.textContent = tag.tagName;
@@ -1133,9 +1133,9 @@ public static class AdminEndpoints
                         div.appendChild(span);
                         
                         resultsDiv.appendChild(div);
-                    }}}});
+                    }});
                     resultsDiv.style.display = 'block';
-                }}}} else {{{{
+                }} else {{
                     const div = document.createElement('div');
                     div.style.padding = '0.75rem';
                     div.style.color = 'var(--text-secondary)';
@@ -1143,14 +1143,14 @@ public static class AdminEndpoints
                     resultsDiv.innerHTML = '';
                     resultsDiv.appendChild(div);
                     resultsDiv.style.display = 'block';
-                }}}}
+                }}
             }} catch (e) {{
                 console.error('Error searching tags:', e);
                 resultsDiv.style.display = 'none';
             }}
         }}
         
-        function selectTag(tagName, tagCategory, documentCount) {{{{
+        function selectTag(tagName, tagCategory, documentCount) {{
             selectedTag = {{{{ tagName, tagCategory, documentCount }}}};
             
             // Update UI
@@ -1164,9 +1164,9 @@ public static class AdminEndpoints
             // Set dropdown to current category and disable it as an option
             const select = document.getElementById('new-category-select');
             select.value = '';
-            Array.from(select.options).forEach(opt => {{{{
+            Array.from(select.options).forEach(opt => {{
                 opt.disabled = opt.value === tagCategory;
-            }}}});
+            }});
             
             document.getElementById('selected-tag-info').style.display = 'block';
             document.getElementById('recategorize-result').innerHTML = '';
@@ -1193,7 +1193,7 @@ public static class AdminEndpoints
             const resultDiv = document.getElementById('recategorize-result');
             resultDiv.innerHTML = '<span class=""spinner""></span> Processing...';
             
-            try {{{{
+            try {{
                 const resp = await fetch('/admin/tags/recategorize', {{{{
                     method: 'POST',
                     headers: {{{{ 'Content-Type': 'application/json' }}}},
