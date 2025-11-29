@@ -294,6 +294,7 @@ public static class TagVotingEndpoints
             var suggestions = await context.TagSuggestions
                 .Where(s => s.JumpDocumentId == documentId && s.Status == "Pending")
                 .Include(s => s.JumpDocument)
+                .Include(s => s.Votes)
                 .Select(s => new {
                     s.Id,
                     s.JumpDocumentId,
@@ -314,6 +315,7 @@ public static class TagVotingEndpoints
             var removalRequests = await context.TagRemovalRequests
                 .Where(r => r.JumpDocumentId == documentId && r.Status == "Pending")
                 .Include(r => r.JumpDocument)
+                .Include(r => r.Votes)
                 .Select(r => new {
                     r.Id,
                     r.JumpDocumentId,
