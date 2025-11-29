@@ -281,27 +281,6 @@ namespace JumpChainSearch.Data
                 entity.Property(e => e.ChildTagName).HasMaxLength(200);
             });
 
-            // Configure TagVote
-            modelBuilder.Entity<TagVote>(entity =>
-            {
-                entity.HasKey(e => e.Id);
-                entity.HasIndex(e => e.TagSuggestionId);
-                entity.HasIndex(e => e.TagRemovalRequestId);
-                entity.HasIndex(e => e.UserId);
-                
-                entity.Property(e => e.UserId).HasMaxLength(100);
-
-                entity.HasOne(d => d.TagSuggestion)
-                    .WithMany()
-                    .HasForeignKey(d => d.TagSuggestionId)
-                    .OnDelete(DeleteBehavior.SetNull);
-
-                entity.HasOne(d => d.TagRemovalRequest)
-                    .WithMany()
-                    .HasForeignKey(d => d.TagRemovalRequestId)
-                    .OnDelete(DeleteBehavior.SetNull);
-            });
-
             // Configure AdminUser
             modelBuilder.Entity<AdminUser>(entity =>
             {

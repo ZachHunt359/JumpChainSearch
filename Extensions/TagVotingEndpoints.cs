@@ -295,49 +295,51 @@ public static class TagVotingEndpoints
                 .Where(s => s.JumpDocumentId == documentId && s.Status == "Pending")
                 .Include(s => s.JumpDocument)
                 .Include(s => s.Votes)
-                .Select(s => new {
-                    s.Id,
-                    s.JumpDocumentId,
-                    DocumentName = s.JumpDocument.Name,
-                    s.TagName,
-                    s.TagCategory,
-                    s.SuggestedByUserId,
-                    s.CreatedAt,
-                    VoteCount = s.Votes.Count,
-                    FavorVotes = s.Votes.Where(v => v.IsInFavor).Sum(v => v.Weight),
-                    AgainstVotes = s.Votes.Where(v => !v.IsInFavor).Sum(v => v.Weight),
-                    TotalVotes = s.Votes.Sum(v => v.Weight),
-                    AgreementPercentage = s.Votes.Sum(v => v.Weight) > 0 ? 
-                        s.Votes.Where(v => v.IsInFavor).Sum(v => v.Weight) / s.Votes.Sum(v => v.Weight) * 100 : 0
-                })
                 .ToListAsync();
+
+            var suggestionDtos = suggestions.Select(s => new {
+                s.Id,
+                s.JumpDocumentId,
+                DocumentName = s.JumpDocument.Name,
+                s.TagName,
+                s.TagCategory,
+                s.SuggestedByUserId,
+                s.CreatedAt,
+                VoteCount = s.Votes.Count,
+                FavorVotes = s.Votes.Where(v => v.IsInFavor).Sum(v => v.Weight),
+                AgainstVotes = s.Votes.Where(v => !v.IsInFavor).Sum(v => v.Weight),
+                TotalVotes = s.Votes.Sum(v => v.Weight),
+                AgreementPercentage = s.Votes.Sum(v => v.Weight) > 0 ? 
+                    s.Votes.Where(v => v.IsInFavor).Sum(v => v.Weight) / s.Votes.Sum(v => v.Weight) * 100 : 0
+            }).ToList();
 
             var removalRequests = await context.TagRemovalRequests
                 .Where(r => r.JumpDocumentId == documentId && r.Status == "Pending")
                 .Include(r => r.JumpDocument)
                 .Include(r => r.Votes)
-                .Select(r => new {
-                    r.Id,
-                    r.JumpDocumentId,
-                    DocumentName = r.JumpDocument.Name,
-                    GoogleDriveLink = r.JumpDocument.WebViewLink,
-                    r.TagName,
-                    r.TagCategory,
-                    r.RequestedByUserId,
-                    r.CreatedAt,
-                    VoteCount = r.Votes.Count,
-                    FavorVotes = r.Votes.Where(v => v.IsInFavor).Sum(v => v.Weight),
-                    AgainstVotes = r.Votes.Where(v => !v.IsInFavor).Sum(v => v.Weight),
-                    TotalVotes = r.Votes.Sum(v => v.Weight),
-                    AgreementPercentage = r.Votes.Sum(v => v.Weight) > 0 ? 
-                        r.Votes.Where(v => v.IsInFavor).Sum(v => v.Weight) / r.Votes.Sum(v => v.Weight) * 100 : 0
-                })
                 .ToListAsync();
+
+            var removalDtos = removalRequests.Select(r => new {
+                r.Id,
+                r.JumpDocumentId,
+                DocumentName = r.JumpDocument.Name,
+                GoogleDriveLink = r.JumpDocument.WebViewLink,
+                r.TagName,
+                r.TagCategory,
+                r.RequestedByUserId,
+                r.CreatedAt,
+                VoteCount = r.Votes.Count,
+                FavorVotes = r.Votes.Where(v => v.IsInFavor).Sum(v => v.Weight),
+                AgainstVotes = r.Votes.Where(v => !v.IsInFavor).Sum(v => v.Weight),
+                TotalVotes = r.Votes.Sum(v => v.Weight),
+                AgreementPercentage = r.Votes.Sum(v => v.Weight) > 0 ? 
+                    r.Votes.Where(v => v.IsInFavor).Sum(v => v.Weight) / r.Votes.Sum(v => v.Weight) * 100 : 0
+            }).ToList();
 
             return Results.Ok(new { 
                 success = true, 
-                pendingSuggestions = suggestions, 
-                pendingRemovalRequests = removalRequests 
+                pendingSuggestions = suggestionDtos, 
+                pendingRemovalRequests = removalDtos 
             });
         }
         catch (Exception ex)
