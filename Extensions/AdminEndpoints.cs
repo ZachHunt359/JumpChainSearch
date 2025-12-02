@@ -1743,6 +1743,11 @@ public static class AdminEndpoints
                 options: {{
                     responsive: true,
                     maintainAspectRatio: true,
+                    layout: {{
+                        padding: {{
+                            top: 30
+                        }}
+                    }},
                     onClick: function(evt, activeEls) {{
                         if (activeEls.length > 0) {{
                             const index = activeEls[0].index;
@@ -1848,6 +1853,11 @@ public static class AdminEndpoints
                 options: {{
                     responsive: true,
                     maintainAspectRatio: true,
+                    layout: {{
+                        padding: {{
+                            top: 30
+                        }}
+                    }},
                     onClick: function(evt, activeEls) {{
                         if (activeEls.length > 0) {{
                             const index = activeEls[0].index;
@@ -1974,10 +1984,12 @@ public static class AdminEndpoints
             
             const statusSpan = document.getElementById('reprocess-status');
             const btn = document.getElementById('start-reprocess-btn');
+            const calcBtn = document.getElementById('calculate-reprocess-btn');
             
             statusSpan.textContent = 'Starting reprocessing...';
             statusSpan.style.color = 'var(--accent)';
             btn.disabled = true;
+            calcBtn.disabled = true;
             
             try {{
                 const response = await fetch('/admin/batch/start-reprocess', {{
@@ -1989,18 +2001,32 @@ public static class AdminEndpoints
                 const data = await response.json();
                 
                 if (data.success) {{
-                    statusSpan.textContent = 'Successfully queued ' + data.queued + ' documents for reprocessing!';
+                    statusSpan.textContent = 'Successfully queued ' + data.queued + ' documents for reprocessing! Refreshing analytics...';
                     statusSpan.style.color = 'var(--success)';
-                    alert('✅ Reprocessing started!\\n\\nQueued: ' + data.queued + ' documents\\n\\nMonitor progress in the Text Extraction Status section above.');
+                    
+                    // Wait 3 seconds then refresh analytics
+                    setTimeout(async () => {{
+                        try {{
+                            await loadOcrAnalytics();
+                            statusSpan.textContent = '✅ Reprocessed ' + data.queued + ' documents. Analytics refreshed. Monitor batch processing above.';
+                            statusSpan.style.color = 'var(--success)';
+                        }} catch (e) {{
+                            statusSpan.textContent = '✅ Reprocessed ' + data.queued + ' documents. (Failed to refresh analytics)';
+                        }}
+                        btn.disabled = false;
+                        calcBtn.disabled = false;
+                    }}, 3000);
                 }} else {{
                     statusSpan.textContent = 'Error: ' + (data.error || 'Failed to start reprocessing');
                     statusSpan.style.color = 'var(--error)';
                     btn.disabled = false;
+                    calcBtn.disabled = false;
                 }}
             }} catch (error) {{
                 statusSpan.textContent = 'Error: ' + error.message;
                 statusSpan.style.color = 'var(--error)';
                 btn.disabled = false;
+                calcBtn.disabled = false;
             }}
         }}
         
