@@ -813,6 +813,13 @@
     private HashSet<string> childTags = new HashSet<string>(); // All tags that are children
     private HashSet<string> includedTags = new HashSet<string>(); // Tags to include (green)
     private HashSet<string> excludedTags = new HashSet<string>(); // Tags to exclude (red)
+    
+    // Text length and OCR quality filters
+    private int? minTextLength = null;
+    private int? maxTextLength = null;
+    private double? minOcrQuality = null;
+    private double? maxOcrQuality = null;
+    private bool? hasOcr = null;
     private HashSet<string> expandedCategories = new HashSet<string>();
     private bool isTagFilterExpanded = false; // Start collapsed
     #pragma warning disable CS0414 // Field is assigned but its value is never used
@@ -996,6 +1003,30 @@
                 queryParams.Add($"excludeTags={Uri.EscapeDataString(string.Join(",", excludedTags))}");
             }
             
+            // Add text length filters
+            if (minTextLength.HasValue)
+            {
+                queryParams.Add($"minTextLength={minTextLength.Value}");
+            }
+            if (maxTextLength.HasValue)
+            {
+                queryParams.Add($"maxTextLength={maxTextLength.Value}");
+            }
+            
+            // Add OCR quality filters
+            if (minOcrQuality.HasValue)
+            {
+                queryParams.Add($"minOcrQuality={minOcrQuality.Value}");
+            }
+            if (maxOcrQuality.HasValue)
+            {
+                queryParams.Add($"maxOcrQuality={maxOcrQuality.Value}");
+            }
+            if (hasOcr.HasValue)
+            {
+                queryParams.Add($"hasOcr={hasOcr.Value.ToString().ToLower()}");
+            }
+            
             queryParams.Add($"limit={pageSize}");
             queryParams.Add($"offset={(currentPage - 1) * pageSize}");
             url += string.Join("&", queryParams);
@@ -1146,8 +1177,40 @@
             }
         }
         
+        // Load text length filters
+        var minTextLengthParam = queryParams["minTextLength"];
+        if (!string.IsNullOrEmpty(minTextLengthParam) && int.TryParse(minTextLengthParam, out int minLen))
+        {
+            minTextLength = minLen;
+        }
+        
+        var maxTextLengthParam = queryParams["maxTextLength"];
+        if (!string.IsNullOrEmpty(maxTextLengthParam) && int.TryParse(maxTextLengthParam, out int maxLen))
+        {
+            maxTextLength = maxLen;
+        }
+        
+        // Load OCR quality filters
+        var minOcrQualityParam = queryParams["minOcrQuality"];
+        if (!string.IsNullOrEmpty(minOcrQualityParam) && double.TryParse(minOcrQualityParam, out double minQuality))
+        {
+            minOcrQuality = minQuality;
+        }
+        
+        var maxOcrQualityParam = queryParams["maxOcrQuality"];
+        if (!string.IsNullOrEmpty(maxOcrQualityParam) && double.TryParse(maxOcrQualityParam, out double maxQuality))
+        {
+            maxOcrQuality = maxQuality;
+        }
+        
+        var hasOcrParam = queryParams["hasOcr"];
+        if (!string.IsNullOrEmpty(hasOcrParam) && bool.TryParse(hasOcrParam, out bool hasOcrValue))
+        {
+            hasOcr = hasOcrValue;
+        }
+        
         // If we loaded any search parameters, perform the search
-        if (!string.IsNullOrEmpty(searchQuery) || HasAnyTagFilters())
+        if (!string.IsNullOrEmpty(searchQuery) || HasAnyTagFilters() || minTextLength.HasValue || maxTextLength.HasValue || minOcrQuality.HasValue || maxOcrQuality.HasValue || hasOcr.HasValue)
         {
             _ = PerformSearch();
         }
