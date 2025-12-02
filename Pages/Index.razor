@@ -820,6 +820,7 @@
     private double? minOcrQuality = null;
     private double? maxOcrQuality = null;
     private bool? hasOcr = null;
+    private bool shouldTriggerSearchOnLoad = false;
     private HashSet<string> expandedCategories = new HashSet<string>();
     private bool isTagFilterExpanded = false; // Start collapsed
     #pragma warning disable CS0414 // Field is assigned but its value is never used
@@ -1117,8 +1118,8 @@
         // Check for docId query parameter and load that document
         await CheckAndLoadDocumentFromUrl();
         
-        // Load search parameters from URL
-        await LoadSearchParametersFromUrl();
+        // Load search parameters from URL (will trigger search in OnAfterRenderAsync)
+        LoadSearchParametersFromUrl();
     }
     
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -1128,6 +1129,14 @@
             // Setup event listener for NavMenu to open documents
             var dotNetRef = DotNetObjectReference.Create(this);
             await JSRuntime.InvokeVoidAsync("setupIndexListener", dotNetRef);
+            
+            // Trigger search if URL had filter parameters
+            if (shouldTriggerSearchOnLoad)
+            {
+                await JSRuntime.InvokeVoidAsync("console.log", $"[OnAfterRenderAsync] Triggering search with filters: minTextLength={minTextLength}, maxTextLength={maxTextLength}, minOcrQuality={minOcrQuality}, maxOcrQuality={maxOcrQuality}, hasOcr={hasOcr}");
+                shouldTriggerSearchOnLoad = false;
+                await PerformSearch();
+            }
         }
     }
     
@@ -1148,7 +1157,7 @@
         }
     }
     
-    private async Task LoadSearchParametersFromUrl()
+    private void LoadSearchParametersFromUrl()
     {
         var uri = new Uri(NavigationManager.Uri);
         var queryParams = System.Web.HttpUtility.ParseQueryString(uri.Query);
@@ -1214,19 +1223,10 @@
             hasOcr = hasOcrValue;
         }
         
-        // Debug logging
-        await JSRuntime.InvokeVoidAsync("console.log", $"[LoadSearchParametersFromUrl] minTextLength={minTextLength}, maxTextLength={maxTextLength}, minOcrQuality={minOcrQuality}, maxOcrQuality={maxOcrQuality}, hasOcr={hasOcr}");
-        await JSRuntime.InvokeVoidAsync("console.log", $"[LoadSearchParametersFromUrl] searchQuery='{searchQuery}', HasAnyTagFilters()={HasAnyTagFilters()}");
-        
-        // If we loaded any search parameters, perform the search
+        // If we loaded any search parameters, trigger search after render
         if (!string.IsNullOrEmpty(searchQuery) || HasAnyTagFilters() || minTextLength.HasValue || maxTextLength.HasValue || minOcrQuality.HasValue || maxOcrQuality.HasValue || hasOcr.HasValue)
         {
-            await JSRuntime.InvokeVoidAsync("console.log", "[LoadSearchParametersFromUrl] Triggering search with filters");
-            _ = PerformSearch();
-        }
-        else
-        {
-            await JSRuntime.InvokeVoidAsync("console.log", "[LoadSearchParametersFromUrl] No search parameters found, not triggering search");
+            shouldTriggerSearchOnLoad = true;
         }
     }
     
