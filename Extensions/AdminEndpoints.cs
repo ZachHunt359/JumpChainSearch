@@ -1800,7 +1800,8 @@ public static class AdminEndpoints
                             }}
                         }}
                     }}
-                }}
+                }},
+                plugins: [ChartDataLabels]
             }});
         }}
         
@@ -1904,7 +1905,8 @@ public static class AdminEndpoints
                             }}
                         }}
                     }}
-                }}
+                }},
+                plugins: [ChartDataLabels]
             }});
         }}
         
