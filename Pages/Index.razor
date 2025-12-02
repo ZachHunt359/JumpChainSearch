@@ -1033,7 +1033,7 @@
             queryParams.Add($"offset={(currentPage - 1) * pageSize}");
             url += string.Join("&", queryParams);
             
-            Console.WriteLine($"[PerformSearch] Making API call to: {url}");
+            await JSRuntime.InvokeVoidAsync("console.log", $"[PerformSearch] Making API call to: {url}");
             
             // Configure JSON options for case-insensitive deserialization
             var jsonOptions = new JsonSerializerOptions
@@ -1043,7 +1043,7 @@
             
             var httpResponse = await Http.GetAsync(url);
             var jsonContent = await httpResponse.Content.ReadAsStringAsync();
-            Console.WriteLine($"[PerformSearch] Response received: {jsonContent.Substring(0, Math.Min(200, jsonContent.Length))}...");
+            await JSRuntime.InvokeVoidAsync("console.log", $"[PerformSearch] Response received: {jsonContent.Substring(0, Math.Min(200, jsonContent.Length))}...");
             var response = JsonSerializer.Deserialize<SearchResponse>(jsonContent, jsonOptions);
             
             if (response?.Success == true)
@@ -1118,7 +1118,7 @@
         await CheckAndLoadDocumentFromUrl();
         
         // Load search parameters from URL
-        LoadSearchParametersFromUrl();
+        await LoadSearchParametersFromUrl();
     }
     
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -1148,7 +1148,7 @@
         }
     }
     
-    private void LoadSearchParametersFromUrl()
+    private async Task LoadSearchParametersFromUrl()
     {
         var uri = new Uri(NavigationManager.Uri);
         var queryParams = System.Web.HttpUtility.ParseQueryString(uri.Query);
@@ -1215,18 +1215,18 @@
         }
         
         // Debug logging
-        Console.WriteLine($"[LoadSearchParametersFromUrl] minTextLength={minTextLength}, maxTextLength={maxTextLength}, minOcrQuality={minOcrQuality}, maxOcrQuality={maxOcrQuality}, hasOcr={hasOcr}");
-        Console.WriteLine($"[LoadSearchParametersFromUrl] searchQuery='{searchQuery}', HasAnyTagFilters()={HasAnyTagFilters()}");
+        await JSRuntime.InvokeVoidAsync("console.log", $"[LoadSearchParametersFromUrl] minTextLength={minTextLength}, maxTextLength={maxTextLength}, minOcrQuality={minOcrQuality}, maxOcrQuality={maxOcrQuality}, hasOcr={hasOcr}");
+        await JSRuntime.InvokeVoidAsync("console.log", $"[LoadSearchParametersFromUrl] searchQuery='{searchQuery}', HasAnyTagFilters()={HasAnyTagFilters()}");
         
         // If we loaded any search parameters, perform the search
         if (!string.IsNullOrEmpty(searchQuery) || HasAnyTagFilters() || minTextLength.HasValue || maxTextLength.HasValue || minOcrQuality.HasValue || maxOcrQuality.HasValue || hasOcr.HasValue)
         {
-            Console.WriteLine("[LoadSearchParametersFromUrl] Triggering search with filters");
+            await JSRuntime.InvokeVoidAsync("console.log", "[LoadSearchParametersFromUrl] Triggering search with filters");
             _ = PerformSearch();
         }
         else
         {
-            Console.WriteLine("[LoadSearchParametersFromUrl] No search parameters found, not triggering search");
+            await JSRuntime.InvokeVoidAsync("console.log", "[LoadSearchParametersFromUrl] No search parameters found, not triggering search");
         }
     }
     
