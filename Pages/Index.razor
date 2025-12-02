@@ -1124,18 +1124,29 @@
     
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
+        Console.WriteLine($"[OnAfterRenderAsync] Called with firstRender={firstRender}, shouldTriggerSearchOnLoad={shouldTriggerSearchOnLoad}");
+        
         if (firstRender)
         {
             // Setup event listener for NavMenu to open documents
             var dotNetRef = DotNetObjectReference.Create(this);
             await JSRuntime.InvokeVoidAsync("setupIndexListener", dotNetRef);
             
+            // Log to browser console for visibility
+            await JSRuntime.InvokeVoidAsync("console.log", $"[OnAfterRenderAsync] firstRender=true, shouldTriggerSearchOnLoad={shouldTriggerSearchOnLoad}");
+            
             // Trigger search if URL had filter parameters
             if (shouldTriggerSearchOnLoad)
             {
+                Console.WriteLine($"[OnAfterRenderAsync] Triggering search NOW");
                 await JSRuntime.InvokeVoidAsync("console.log", $"[OnAfterRenderAsync] Triggering search with filters: minTextLength={minTextLength}, maxTextLength={maxTextLength}, minOcrQuality={minOcrQuality}, maxOcrQuality={maxOcrQuality}, hasOcr={hasOcr}");
                 shouldTriggerSearchOnLoad = false;
                 await PerformSearch();
+            }
+            else
+            {
+                Console.WriteLine("[OnAfterRenderAsync] NOT triggering search - flag is false");
+                await JSRuntime.InvokeVoidAsync("console.log", "[OnAfterRenderAsync] NOT triggering search - no filters detected");
             }
         }
     }
@@ -1223,10 +1234,19 @@
             hasOcr = hasOcrValue;
         }
         
+        // Server-side debug logging
+        Console.WriteLine($"[LoadSearchParametersFromUrl] Parsed filters: minTextLength={minTextLength}, maxTextLength={maxTextLength}, minOcr={minOcrQuality}, maxOcr={maxOcrQuality}, hasOcr={hasOcr}");
+        Console.WriteLine($"[LoadSearchParametersFromUrl] searchQuery='{searchQuery}', HasAnyTagFilters()={HasAnyTagFilters()}");
+        
         // If we loaded any search parameters, trigger search after render
         if (!string.IsNullOrEmpty(searchQuery) || HasAnyTagFilters() || minTextLength.HasValue || maxTextLength.HasValue || minOcrQuality.HasValue || maxOcrQuality.HasValue || hasOcr.HasValue)
         {
+            Console.WriteLine("[LoadSearchParametersFromUrl] Setting shouldTriggerSearchOnLoad = true");
             shouldTriggerSearchOnLoad = true;
+        }
+        else
+        {
+            Console.WriteLine("[LoadSearchParametersFromUrl] No filters found, NOT setting trigger flag");
         }
     }
     
