@@ -55,7 +55,7 @@ namespace JumpChainSearch.Migrations
                     b.HasIndex("SessionToken")
                         .IsUnique();
 
-                    b.ToTable("AdminSessions");
+                    b.ToTable("AdminSessions", (string)null);
                 });
 
             modelBuilder.Entity("JumpChainSearch.Models.AdminUser", b =>
@@ -91,7 +91,7 @@ namespace JumpChainSearch.Migrations
                     b.HasIndex("Username")
                         .IsUnique();
 
-                    b.ToTable("AdminUsers");
+                    b.ToTable("AdminUsers", (string)null);
                 });
 
             modelBuilder.Entity("JumpChainSearch.Models.ApprovedTagRule", b =>
@@ -177,7 +177,7 @@ namespace JumpChainSearch.Migrations
 
                     b.HasIndex("GoogleDriveFileId", "TagName", "TagCategory", "RuleType");
 
-                    b.ToTable("ApprovedTagRules");
+                    b.ToTable("ApprovedTagRules", (string)null);
                 });
 
             modelBuilder.Entity("JumpChainSearch.Models.DocumentPurchasable", b =>
@@ -236,7 +236,7 @@ namespace JumpChainSearch.Migrations
 
                     b.HasIndex("Category", "Name");
 
-                    b.ToTable("DocumentPurchasables");
+                    b.ToTable("DocumentPurchasables", (string)null);
                 });
 
             modelBuilder.Entity("JumpChainSearch.Models.DocumentTag", b =>
@@ -267,7 +267,7 @@ namespace JumpChainSearch.Migrations
                     b.HasIndex("JumpDocumentId", "TagName")
                         .IsUnique();
 
-                    b.ToTable("DocumentTags");
+                    b.ToTable("DocumentTags", (string)null);
                 });
 
             modelBuilder.Entity("JumpChainSearch.Models.DocumentUrl", b =>
@@ -326,7 +326,7 @@ namespace JumpChainSearch.Migrations
 
                     b.HasIndex("JumpDocumentId", "SourceDrive");
 
-                    b.ToTable("DocumentUrls");
+                    b.ToTable("DocumentUrls", (string)null);
                 });
 
             modelBuilder.Entity("JumpChainSearch.Models.DocumentViewCount", b =>
@@ -352,7 +352,7 @@ namespace JumpChainSearch.Migrations
                     b.HasIndex("JumpDocumentId")
                         .IsUnique();
 
-                    b.ToTable("DocumentViewCounts");
+                    b.ToTable("DocumentViewCounts", (string)null);
                 });
 
             modelBuilder.Entity("JumpChainSearch.Models.DriveConfiguration", b =>
@@ -400,7 +400,7 @@ namespace JumpChainSearch.Migrations
 
                     b.HasIndex("DriveName");
 
-                    b.ToTable("DriveConfigurations");
+                    b.ToTable("DriveConfigurations", (string)null);
                 });
 
             modelBuilder.Entity("JumpChainSearch.Models.FolderConfiguration", b =>
@@ -468,7 +468,7 @@ namespace JumpChainSearch.Migrations
 
                     b.HasIndex("ParentDriveId", "FolderName");
 
-                    b.ToTable("FolderConfigurations");
+                    b.ToTable("FolderConfigurations", (string)null);
                 });
 
             modelBuilder.Entity("JumpChainSearch.Models.JumpDocument", b =>
@@ -567,7 +567,7 @@ namespace JumpChainSearch.Migrations
 
                     b.HasIndex("SourceDrive", "Name");
 
-                    b.ToTable("JumpDocuments");
+                    b.ToTable("JumpDocuments", (string)null);
                 });
 
             modelBuilder.Entity("JumpChainSearch.Models.TagHierarchy", b =>
@@ -598,7 +598,7 @@ namespace JumpChainSearch.Migrations
                     b.HasIndex("ParentTagName", "ChildTagName")
                         .IsUnique();
 
-                    b.ToTable("TagHierarchies");
+                    b.ToTable("TagHierarchies", (string)null);
                 });
 
             modelBuilder.Entity("JumpChainSearch.Models.TagRemovalRequest", b =>
@@ -654,7 +654,7 @@ namespace JumpChainSearch.Migrations
 
                     b.HasIndex("JumpDocumentId", "TagName", "TagCategory");
 
-                    b.ToTable("TagRemovalRequests");
+                    b.ToTable("TagRemovalRequests", (string)null);
                 });
 
             modelBuilder.Entity("JumpChainSearch.Models.TagSuggestion", b =>
@@ -705,7 +705,7 @@ namespace JumpChainSearch.Migrations
 
                     b.HasIndex("JumpDocumentId", "TagName", "TagCategory");
 
-                    b.ToTable("TagSuggestions");
+                    b.ToTable("TagSuggestions", (string)null);
                 });
 
             modelBuilder.Entity("JumpChainSearch.Models.TagVote", b =>
@@ -758,7 +758,7 @@ namespace JumpChainSearch.Migrations
                     b.HasIndex("UserId", "TagSuggestionId")
                         .IsUnique();
 
-                    b.ToTable("TagVotes");
+                    b.ToTable("TagVotes", (string)null);
                 });
 
             modelBuilder.Entity("JumpChainSearch.Models.UserTagOverride", b =>
@@ -800,7 +800,7 @@ namespace JumpChainSearch.Migrations
                     b.HasIndex("UserId", "JumpDocumentId", "TagName", "TagCategory")
                         .IsUnique();
 
-                    b.ToTable("UserTagOverrides");
+                    b.ToTable("UserTagOverrides", (string)null);
                 });
 
             modelBuilder.Entity("JumpChainSearch.Models.VotingConfiguration", b =>
@@ -843,7 +843,7 @@ namespace JumpChainSearch.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("VotingConfigurations");
+                    b.ToTable("VotingConfigurations", (string)null);
                 });
 
             modelBuilder.Entity("JumpChainSearch.Models.AdminSession", b =>

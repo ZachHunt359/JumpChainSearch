@@ -46,7 +46,12 @@ public static class SearchEndpointsOptimized
         int offset = 0,
         string? includeTags = null,
         string? excludeTags = null,
-        int? docId = null)
+        int? docId = null,
+        int? minTextLength = null,
+        int? maxTextLength = null,
+        double? minOcrQuality = null,
+        double? maxOcrQuality = null,
+        bool? hasOcr = null)
     {
         try
         {
@@ -117,7 +122,7 @@ public static class SearchEndpointsOptimized
             }
             
             // Generate cache key
-            var cacheKey = GenerateCacheKey(q, limit, offset, includeTags, excludeTags);
+            var cacheKey = GenerateCacheKey(q, limit, offset, includeTags, excludeTags, minTextLength, maxTextLength, minOcrQuality, maxOcrQuality, hasOcr);
             
             // Try to get from cache
             if (cache.TryGetValue(cacheKey, out object? cachedResult) && cachedResult != null)
@@ -176,6 +181,7 @@ public static class SearchEndpointsOptimized
                         .AsNoTracking()
                         .Where(d => allDocumentIds.Contains(d.Id));
                     
+                    filteredQuery = ApplyOcrTextFilters(filteredQuery, minTextLength, maxTextLength, minOcrQuality, maxOcrQuality, hasOcr);
                     filteredQuery = ApplyTagFilters(filteredQuery, includeTags, excludeTags);
                     
                     // Get filtered document IDs
@@ -238,6 +244,7 @@ public static class SearchEndpointsOptimized
                 // Only apply here if no tag filters (shouldn't change anything, but kept for safety)
                 if (!hasTagFilters)
                 {
+                    query = ApplyOcrTextFilters(query, minTextLength, maxTextLength, minOcrQuality, maxOcrQuality, hasOcr);
                     query = ApplyTagFilters(query, includeTags, excludeTags);
                 }
                 
@@ -317,6 +324,7 @@ public static class SearchEndpointsOptimized
                     query = query.Where(d => d.Id == docId.Value);
                 }
                 
+                query = ApplyOcrTextFilters(query, minTextLength, maxTextLength, minOcrQuality, maxOcrQuality, hasOcr);
                 query = ApplyTagFilters(query, includeTags, excludeTags);
                 
                 var totalCount = await query.CountAsync();
@@ -385,7 +393,8 @@ public static class SearchEndpointsOptimized
         }
     }
 
-    private static string GenerateCacheKey(string? q, int limit, int offset, string? includeTags, string? excludeTags)
+    private static string GenerateCacheKey(string? q, int limit, int offset, string? includeTags, string? excludeTags, 
+        int? minTextLength, int? maxTextLength, double? minOcrQuality, double? maxOcrQuality, bool? hasOcr)
     {
         var sb = new StringBuilder("search:");
         sb.Append(q ?? "");
@@ -395,6 +404,16 @@ public static class SearchEndpointsOptimized
             sb.Append($":i{includeTags}");
         if (!string.IsNullOrEmpty(excludeTags))
             sb.Append($":e{excludeTags}");
+        if (minTextLength.HasValue)
+            sb.Append($":minLen{minTextLength}");
+        if (maxTextLength.HasValue)
+            sb.Append($":maxLen{maxTextLength}");
+        if (minOcrQuality.HasValue)
+            sb.Append($":minOcr{minOcrQuality}");
+        if (maxOcrQuality.HasValue)
+            sb.Append($":maxOcr{maxOcrQuality}");
+        if (hasOcr.HasValue)
+            sb.Append($":hasOcr{hasOcr}");
         return sb.ToString();
     }
 
@@ -533,6 +552,58 @@ public static class SearchEndpointsOptimized
             {
                 var tagLower = tag; // Capture for closure
                 query = query.Where(d => !d.Tags.Any(t => t.TagName.ToLower().Contains(tagLower)));
+            }
+        }
+        
+        return query;
+    }
+
+    /// <summary>
+    /// Apply text length and OCR quality filters
+    /// </summary>
+    private static IQueryable<JumpDocument> ApplyOcrTextFilters(
+        IQueryable<JumpDocument> query,
+        int? minTextLength,
+        int? maxTextLength,
+        double? minOcrQuality,
+        double? maxOcrQuality,
+        bool? hasOcr)
+    {
+        // Text length filters
+        if (minTextLength.HasValue)
+        {
+            query = query.Where(d => d.ExtractedText != null && d.ExtractedText.Length >= minTextLength.Value);
+        }
+        if (maxTextLength.HasValue)
+        {
+            query = query.Where(d => d.ExtractedText != null && d.ExtractedText.Length <= maxTextLength.Value);
+        }
+        
+        // OCR quality filters (uses OcrQuality column)
+        if (minOcrQuality.HasValue || maxOcrQuality.HasValue)
+        {
+            query = query.Where(d => d.OcrQuality != null);
+            
+            if (minOcrQuality.HasValue)
+            {
+                query = query.Where(d => d.OcrQuality >= minOcrQuality.Value);
+            }
+            if (maxOcrQuality.HasValue)
+            {
+                query = query.Where(d => d.OcrQuality <= maxOcrQuality.Value);
+            }
+        }
+        
+        // Has OCR flag (checks ExtractionMethod string)
+        if (hasOcr.HasValue)
+        {
+            if (hasOcr.Value)
+            {
+                query = query.Where(d => d.ExtractionMethod != null && d.ExtractionMethod.Contains("tesseract_ocr"));
+            }
+            else
+            {
+                query = query.Where(d => d.ExtractionMethod == null || !d.ExtractionMethod.Contains("tesseract_ocr"));
             }
         }
         

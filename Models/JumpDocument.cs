@@ -45,8 +45,11 @@ namespace JumpChainSearch.Models
         // Full text content extracted from the document
         public string? ExtractedText { get; set; }
         
-        // Method used to extract text (e.g., "google_drive_export", "basic_pdfpig", "improved_pdfpig")
+        // Method used to extract text (e.g., "google_drive_export", "basic_pdfpig", "improved_pdfpig", "tesseract_ocr_0.85")
         public string? ExtractionMethod { get; set; }
+        
+        // OCR quality score (0.0-1.0) - only populated for OCR extractions
+        public double? OcrQuality { get; set; }
         
         // Text review/editing fields
         public bool TextNeedsReview { get; set; }

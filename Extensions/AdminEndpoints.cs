@@ -1924,7 +1924,7 @@ public static class AdminEndpoints
             const parts = range.split('-');
             const min = parts[0];
             const max = parts[1] === 'inf' ? '999999' : parts[1];
-            const url = '/?textLengthMin=' + min + '&textLengthMax=' + max;
+            const url = '/?minTextLength=' + min + '&maxTextLength=' + max;
             window.open(url, '_blank');
         }}
         
@@ -1936,7 +1936,7 @@ public static class AdminEndpoints
             const parts = range.split('-');
             const min = parts[0];
             const max = parts[1];
-            const url = '/?ocrQualityMin=' + min + '&ocrQualityMax=' + max;
+            const url = '/?minOcrQuality=' + min + '&maxOcrQuality=' + max;
             window.open(url, '_blank');
         }}
         
