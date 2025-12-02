@@ -982,6 +982,8 @@
         showNoResultsMessage = false;
         StateHasChanged();
         
+        Console.WriteLine($"[PerformSearch] Starting search with filters: minTextLength={minTextLength}, maxTextLength={maxTextLength}, hasOcr={hasOcr}");
+        
         try
         {
             // Build URL with query and tag filters
@@ -1031,6 +1033,8 @@
             queryParams.Add($"offset={(currentPage - 1) * pageSize}");
             url += string.Join("&", queryParams);
             
+            Console.WriteLine($"[PerformSearch] Making API call to: {url}");
+            
             // Configure JSON options for case-insensitive deserialization
             var jsonOptions = new JsonSerializerOptions
             {
@@ -1039,6 +1043,7 @@
             
             var httpResponse = await Http.GetAsync(url);
             var jsonContent = await httpResponse.Content.ReadAsStringAsync();
+            Console.WriteLine($"[PerformSearch] Response received: {jsonContent.Substring(0, Math.Min(200, jsonContent.Length))}...");
             var response = JsonSerializer.Deserialize<SearchResponse>(jsonContent, jsonOptions);
             
             if (response?.Success == true)
@@ -1209,10 +1214,19 @@
             hasOcr = hasOcrValue;
         }
         
+        // Debug logging
+        Console.WriteLine($"[LoadSearchParametersFromUrl] minTextLength={minTextLength}, maxTextLength={maxTextLength}, minOcrQuality={minOcrQuality}, maxOcrQuality={maxOcrQuality}, hasOcr={hasOcr}");
+        Console.WriteLine($"[LoadSearchParametersFromUrl] searchQuery='{searchQuery}', HasAnyTagFilters()={HasAnyTagFilters()}");
+        
         // If we loaded any search parameters, perform the search
         if (!string.IsNullOrEmpty(searchQuery) || HasAnyTagFilters() || minTextLength.HasValue || maxTextLength.HasValue || minOcrQuality.HasValue || maxOcrQuality.HasValue || hasOcr.HasValue)
         {
+            Console.WriteLine("[LoadSearchParametersFromUrl] Triggering search with filters");
             _ = PerformSearch();
+        }
+        else
+        {
+            Console.WriteLine("[LoadSearchParametersFromUrl] No search parameters found, not triggering search");
         }
     }
     
