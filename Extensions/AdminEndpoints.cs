@@ -67,6 +67,8 @@ public static class AdminEndpoints
         
         // OCR Analytics endpoint
         group.MapGet("/analytics/ocr-quality", GetOcrQualityAnalytics);
+        group.MapGet("/analytics/reprocess-count", GetReprocessCount);
+        group.MapPost("/analytics/reprocess", StartReprocessing);
 
         return group;
     }
@@ -100,6 +102,7 @@ public static class AdminEndpoints
     <meta name=""viewport"" content=""width=device-width, initial-scale=1.0"">
     <title>Admin Portal - JumpChain Search</title>
     <script src=""https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js""></script>
+    <script src=""https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js""></script>
     <style>
         * {{ margin: 0; padding: 0; box-sizing: border-box; }}
         
@@ -529,17 +532,17 @@ public static class AdminEndpoints
                         <div class=""action-card"">
                             <h3>Document Count by Text Length</h3>
                             <p style=""font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1rem;"">
-                                Distribution of extracted text sizes. Very short text (&lt;100 chars) may indicate extraction failures.
+                                Click any bar to view those documents. Very short text (&lt;100 chars) may indicate extraction failures.
                             </p>
-                            <canvas id=""text-length-chart"" style=""max-height: 300px;""></canvas>
+                            <canvas id=""text-length-chart"" style=""max-height: 300px; cursor: pointer;""></canvas>
                         </div>
                         
                         <div class=""action-card"">
                             <h3>Document Count by OCR Quality</h3>
                             <p style=""font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1rem;"">
-                                OCR confidence scores. Quality &lt; 0.5 is flagged as low quality and may need review.
+                                Click any bar to view those documents. Quality &lt; 0.5 is flagged as low quality and may need review.
                             </p>
-                            <canvas id=""ocr-quality-chart"" style=""max-height: 300px;""></canvas>
+                            <canvas id=""ocr-quality-chart"" style=""max-height: 300px; cursor: pointer;""></canvas>
                         </div>
                     </div>
                     
@@ -551,6 +554,45 @@ public static class AdminEndpoints
                             <div>OCR Documents: <strong id=""ocr-docs-stat"">-</strong></div>
                             <div>Low Quality OCR (&lt;0.5): <strong id=""low-quality-stat"">-</strong></div>
                         </div>
+                    </div>
+                    
+                    <!-- Batch Re-processing Controls -->
+                    <div style=""margin-top: 2rem;"" class=""action-card"">
+                        <h3>🔄 Batch Re-processing</h3>
+                        <p style=""font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1rem;"">
+                            Re-process documents that meet specified criteria to improve extraction quality.
+                        </p>
+                        
+                        <div style=""display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;"">
+                            <div>
+                                <label style=""display: block; margin-bottom: 0.5rem; color: var(--text-secondary); font-size: 0.9rem;"">
+                                    Max Text Length (chars):
+                                </label>
+                                <input type=""number"" id=""reprocess-max-length"" value=""100"" min=""0"" step=""50"" 
+                                       style=""width: 100%; padding: 0.5rem; border: 1px solid var(--border); background: var(--bg-primary); color: var(--text-primary); border-radius: 4px;"">
+                                <small style=""color: var(--text-secondary); font-size: 0.8rem;"">Process docs with ≤ this many characters (0 = ignore)</small>
+                            </div>
+                            
+                            <div>
+                                <label style=""display: block; margin-bottom: 0.5rem; color: var(--text-secondary); font-size: 0.9rem;"">
+                                    Max OCR Quality:
+                                </label>
+                                <input type=""number"" id=""reprocess-max-quality"" value=""0.5"" min=""0"" max=""1"" step=""0.1"" 
+                                       style=""width: 100%; padding: 0.5rem; border: 1px solid var(--border); background: var(--bg-primary); color: var(--text-primary); border-radius: 4px;"">
+                                <small style=""color: var(--text-secondary); font-size: 0.8rem;"">Process docs with ≤ this quality (0 = ignore)</small>
+                            </div>
+                        </div>
+                        
+                        <div style=""margin-bottom: 1rem; padding: 1rem; background: var(--bg-secondary); border-radius: 4px; border-left: 3px solid var(--accent);"">
+                            <strong style=""color: var(--accent);"">Documents to process:</strong> <span id=""reprocess-count"">-</span>
+                        </div>
+                        
+                        <div class=""btn-group"">
+                            <button class=""btn btn-primary"" onclick=""calculateReprocessCount()"">Calculate Count</button>
+                            <button class=""btn btn-success"" onclick=""startReprocessing()"">Start Re-processing</button>
+                        </div>
+                        
+                        <div id=""reprocess-status"" style=""margin-top: 1rem; display: none;""></div>
                     </div>
                 </div>
             </section>
@@ -1703,6 +1745,13 @@ public static class AdminEndpoints
                 options: {{
                     responsive: true,
                     maintainAspectRatio: true,
+                    onClick: (event, elements) => {{
+                        if (elements.length > 0) {{
+                            const index = elements[0].index;
+                            const bucket = labels[index];
+                            openTextLengthSearch(bucket);
+                        }}
+                    }},
                     plugins: {{
                         legend: {{
                             display: false
@@ -1712,7 +1761,22 @@ public static class AdminEndpoints
                             titleColor: '#eee',
                             bodyColor: '#eee',
                             borderColor: '#e94560',
-                            borderWidth: 1
+                            borderWidth: 1,
+                            callbacks: {{
+                                label: function(context) {{
+                                    return 'Documents: ' + context.parsed.y.toLocaleString();
+                                }}
+                            }}
+                        }},
+                        datalabels: {{
+                            anchor: 'end',
+                            align: 'top',
+                            color: '#aaa',
+                            font: {{
+                                weight: 'bold',
+                                size: 11
+                            }},
+                            formatter: (value) => value.toLocaleString()
                         }}
                     }},
                     scales: {{
@@ -1783,6 +1847,13 @@ public static class AdminEndpoints
                 options: {{
                     responsive: true,
                     maintainAspectRatio: true,
+                    onClick: (event, elements) => {{
+                        if (elements.length > 0) {{
+                            const index = elements[0].index;
+                            const bucket = labels[index];
+                            openOcrQualitySearch(bucket);
+                        }}
+                    }},
                     plugins: {{
                         legend: {{
                             display: false
@@ -1792,7 +1863,22 @@ public static class AdminEndpoints
                             titleColor: '#eee',
                             bodyColor: '#eee',
                             borderColor: '#e94560',
-                            borderWidth: 1
+                            borderWidth: 1,
+                            callbacks: {{
+                                label: function(context) {{
+                                    return 'Documents: ' + context.parsed.y.toLocaleString();
+                                }}
+                            }}
+                        }},
+                        datalabels: {{
+                            anchor: 'end',
+                            align: 'top',
+                            color: '#aaa',
+                            font: {{
+                                weight: 'bold',
+                                size: 11
+                            }},
+                            formatter: (value) => value.toLocaleString()
                         }}
                     }},
                     scales: {{
@@ -1818,6 +1904,131 @@ public static class AdminEndpoints
                     }}
                 }}
             }});
+        }}
+        
+        // Search Navigation Functions
+        function openTextLengthSearch(bucket) {{
+            // Parse bucket range (e.g., "0-100" or "10000+")
+            let minLength = 0;
+            let maxLength = null;
+            
+            if (bucket.includes('+')) {{
+                minLength = parseInt(bucket.replace('+', ''));
+            }} else {{
+                const parts = bucket.split('-');
+                minLength = parseInt(parts[0]);
+                maxLength = parseInt(parts[1]);
+            }}
+            
+            // Build search URL with filters
+            let url = '/?';
+            if (maxLength !== null) {{
+                url += `minTextLength=${{minLength}}&maxTextLength=${{maxLength}}`;
+            }} else {{
+                url += `minTextLength=${{minLength}}`;
+            }}
+            
+            window.open(url, '_blank');
+        }}
+        
+        function openOcrQualitySearch(bucket) {{
+            if (bucket === 'No OCR') {{
+                // Search for documents without OCR
+                window.open('/?noOcr=true', '_blank');
+                return;
+            }}
+            
+            // Parse quality range (e.g., "0.8-0.9")
+            const parts = bucket.split('-');
+            const minQuality = parseFloat(parts[0]);
+            const maxQuality = parseFloat(parts[1]);
+            
+            // Build search URL with filters
+            const url = `/?minOcrQuality=${{minQuality}}&maxOcrQuality=${{maxQuality}}`;
+            window.open(url, '_blank');
+        }}
+        
+        // Reprocessing Functions
+        async function calculateReprocessCount() {{
+            const maxLength = parseInt(document.getElementById('reprocess-max-length').value) || 0;
+            const maxQuality = parseFloat(document.getElementById('reprocess-max-quality').value) || 0;
+            
+            try {{
+                const response = await fetch('/admin/analytics/reprocess-count?' + 
+                    `maxLength=${{maxLength}}&maxQuality=${{maxQuality}}`);
+                const data = await response.json();
+                
+                if (data.success) {{
+                    document.getElementById('reprocess-count').textContent = 
+                        data.count.toLocaleString() + ' documents';
+                }} else {{
+                    document.getElementById('reprocess-count').textContent = 
+                        'Error: ' + (data.error || 'Unknown error');
+                }}
+            }} catch (error) {{
+                document.getElementById('reprocess-count').textContent = 
+                    'Error: ' + error.message;
+            }}
+        }}
+        
+        async function startReprocessing() {{
+            const maxLength = parseInt(document.getElementById('reprocess-max-length').value) || 0;
+            const maxQuality = parseFloat(document.getElementById('reprocess-max-quality').value) || 0;
+            
+            if (maxLength === 0 && maxQuality === 0) {{
+                alert('Please set at least one criterion (text length or OCR quality)');
+                return;
+            }}
+            
+            if (!confirm(`Start re-processing documents with:\n\n` +
+                         `• Text length ≤ ${{maxLength}} chars ${{maxLength === 0 ? '(disabled)' : ''}}\n` +
+                         `• OCR quality ≤ ${{maxQuality}} ${{maxQuality === 0 ? '(disabled)' : ''}}\n\n` +
+                         `This may take a while. Continue?`)) {{
+                return;
+            }}
+            
+            const statusDiv = document.getElementById('reprocess-status');
+            statusDiv.style.display = 'block';
+            statusDiv.innerHTML = '<div style=""color: var(--text-secondary);"">Starting re-processing...</div>';
+            
+            try {{
+                const response = await fetch('/admin/analytics/reprocess', {{
+                    method: 'POST',
+                    headers: {{ 'Content-Type': 'application/json' }},
+                    body: JSON.stringify({{ maxLength, maxQuality }})
+                }});
+                
+                const data = await response.json();
+                
+                if (data.success) {{
+                    statusDiv.innerHTML = `
+                        <div style=""padding: 1rem; background: var(--bg-secondary); border-radius: 4px; border-left: 3px solid #46cc71;"">
+                            <strong style=""color: #46cc71;"">✓ Re-processing started successfully</strong><br>
+                            <span style=""color: var(--text-secondary); font-size: 0.9rem;"">
+                                Processing ${{data.count}} documents. Check batch processing status above for progress.
+                            </span>
+                        </div>
+                    `;
+                }} else {{
+                    statusDiv.innerHTML = `
+                        <div style=""padding: 1rem; background: var(--bg-secondary); border-radius: 4px; border-left: 3px solid #e74c60;"">
+                            <strong style=""color: #e74c60;"">✗ Error</strong><br>
+                            <span style=""color: var(--text-secondary); font-size: 0.9rem;"">
+                                ${{data.error || 'Unknown error occurred'}}
+                            </span>
+                        </div>
+                    `;
+                }}
+            }} catch (error) {{
+                statusDiv.innerHTML = `
+                    <div style=""padding: 1rem; background: var(--bg-secondary); border-radius: 4px; border-left: 3px solid #e74c60;"">
+                        <strong style=""color: #e74c60;"">✗ Error</strong><br>
+                        <span style=""color: var(--text-secondary); font-size: 0.9rem;"">
+                            ${{error.message}}
+                        </span>
+                    </div>
+                `;
+            }}
         }}
         
         function escapeHtml(text) {{
@@ -4575,9 +4786,154 @@ rm -f drive-scan.pid
         return null;
     }
     
+    private static async Task<IResult> GetReprocessCount(
+        HttpContext context,
+        JumpChainDbContext dbContext,
+        AdminAuthService authService,
+        [FromQuery] int maxLength,
+        [FromQuery] double maxQuality)
+    {
+        var (valid, _) = await ValidateSession(context, authService);
+        if (!valid) return Results.Unauthorized();
+
+        try
+        {
+            var query = dbContext.JumpDocuments.AsQueryable();
+
+            // Apply text length filter
+            if (maxLength > 0)
+            {
+                query = query.Where(d => d.ExtractedText != null && d.ExtractedText.Length <= maxLength);
+            }
+
+            // Apply OCR quality filter
+            if (maxQuality > 0)
+            {
+                query = query.Where(d => d.ExtractionMethod != null && d.ExtractionMethod.Contains("tesseract_ocr"));
+                
+                var docs = await query.Select(d => new { d.Id, d.ExtractionMethod }).ToListAsync();
+                var filtered = docs.Where(d => {
+                    var quality = ParseOcrQuality(d.ExtractionMethod);
+                    return quality.HasValue && quality.Value <= maxQuality;
+                }).ToList();
+
+                return Results.Ok(new { success = true, count = filtered.Count });
+            }
+
+            var count = await query.CountAsync();
+            return Results.Ok(new { success = true, count });
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error calculating reprocess count: {ex.Message}");
+            return Results.BadRequest(new { success = false, error = ex.Message });
+        }
+    }
+
+    private static async Task<IResult> StartReprocessing(
+        HttpContext context,
+        JumpChainDbContext dbContext,
+        AdminAuthService authService,
+        BatchProcessingService batchService,
+        [FromBody] ReprocessRequest request)
+    {
+        var (valid, _) = await ValidateSession(context, authService);
+        if (!valid) return Results.Unauthorized();
+
+        try
+        {
+            if (request.MaxLength == 0 && request.MaxQuality == 0)
+            {
+                return Results.BadRequest(new { success = false, error = "At least one criterion must be specified" });
+            }
+
+            var query = dbContext.JumpDocuments.AsQueryable();
+            var docsToProcess = new List<int>();
+
+            // Get documents matching criteria
+            if (request.MaxLength > 0 && request.MaxQuality > 0)
+            {
+                // Both filters
+                var docs = await query
+                    .Where(d => d.ExtractedText != null && d.ExtractedText.Length <= request.MaxLength)
+                    .Where(d => d.ExtractionMethod != null && d.ExtractionMethod.Contains("tesseract_ocr"))
+                    .Select(d => new { d.Id, d.ExtractionMethod })
+                    .ToListAsync();
+                
+                docsToProcess = docs
+                    .Where(d => {
+                        var quality = ParseOcrQuality(d.ExtractionMethod);
+                        return quality.HasValue && quality.Value <= request.MaxQuality;
+                    })
+                    .Select(d => d.Id)
+                    .ToList();
+            }
+            else if (request.MaxLength > 0)
+            {
+                // Text length only
+                docsToProcess = await query
+                    .Where(d => d.ExtractedText != null && d.ExtractedText.Length <= request.MaxLength)
+                    .Select(d => d.Id)
+                    .ToListAsync();
+            }
+            else
+            {
+                // OCR quality only
+                var docs = await query
+                    .Where(d => d.ExtractionMethod != null && d.ExtractionMethod.Contains("tesseract_ocr"))
+                    .Select(d => new { d.Id, d.ExtractionMethod })
+                    .ToListAsync();
+                
+                docsToProcess = docs
+                    .Where(d => {
+                        var quality = ParseOcrQuality(d.ExtractionMethod);
+                        return quality.HasValue && quality.Value <= request.MaxQuality;
+                    })
+                    .Select(d => d.Id)
+                    .ToList();
+            }
+
+            if (docsToProcess.Count == 0)
+            {
+                return Results.Ok(new { success = true, count = 0, message = "No documents match the criteria" });
+            }
+
+            // Clear extracted text for these documents to trigger reprocessing
+            var docs = await dbContext.JumpDocuments
+                .Where(d => docsToProcess.Contains(d.Id))
+                .ToListAsync();
+
+            foreach (var doc in docs)
+            {
+                doc.ExtractedText = null;
+                doc.ExtractionMethod = null;
+            }
+
+            await dbContext.SaveChangesAsync();
+
+            // Start batch processing if not already running
+            if (!batchService.IsProcessing())
+            {
+                _ = batchService.StartProcessingAsync(docsToProcess);
+            }
+
+            return Results.Ok(new { 
+                success = true, 
+                count = docsToProcess.Count,
+                message = $"Queued {docsToProcess.Count} documents for re-processing"
+            });
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error starting reprocessing: {ex.Message}");
+            return Results.BadRequest(new { success = false, error = ex.Message });
+        }
+    }
+    
     // Request models
     private record ChangeUsernameRequest(string NewUsername, string CurrentPassword);
     private record ChangePasswordRequest(string CurrentPassword, string NewPassword);
     private record ScanScheduleRequest(bool Enabled, int IntervalHours);
     private record RecategorizeTagRequest(string TagName, string OldCategory, string NewCategory);
+    private record ReprocessRequest(int MaxLength, double MaxQuality);
 }
