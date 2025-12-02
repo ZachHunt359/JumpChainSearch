@@ -70,3 +70,5 @@ node_modules/
 *.msi
 *.zip
 *.tar.gz
+
+ocr-debug.txt

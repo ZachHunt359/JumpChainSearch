@@ -64,6 +64,9 @@ public static class AdminEndpoints
         group.MapPost("/account/change-username", ChangeUsername);
         group.MapPost("/account/change-password", ChangePassword);
         group.MapPost("/logout", Logout);
+        
+        // OCR Analytics endpoint
+        group.MapGet("/analytics/ocr-quality", GetOcrQualityAnalytics);
 
         return group;
     }
@@ -96,6 +99,7 @@ public static class AdminEndpoints
     <meta charset=""UTF-8"">
     <meta name=""viewport"" content=""width=device-width, initial-scale=1.0"">
     <title>Admin Portal - JumpChain Search</title>
+    <script src=""https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js""></script>
     <style>
         * {{ margin: 0; padding: 0; box-sizing: border-box; }}
         
@@ -502,6 +506,52 @@ public static class AdminEndpoints
                         <button class=""btn btn-danger"" onclick=""stopBatch()"">Stop</button>
                     </div>
                     <div id=""batch-info"" style=""margin-top: 1rem; color: var(--text-secondary); font-size: 0.85rem;""></div>
+                </div>
+            </section>
+            
+            <section style=""margin-top: 2rem;"">
+                <h2>📊 OCR Quality Analytics</h2>
+                <p style=""color: var(--text-secondary); margin-bottom: 1rem;"">
+                    Analyze text extraction quality and identify documents that may need review or re-processing.
+                </p>
+                
+                <div style=""text-align: center; margin-bottom: 1rem;"">
+                    <button class=""btn btn-primary"" onclick=""loadOcrAnalytics()"">Load Analytics</button>
+                </div>
+                
+                <div id=""analytics-loading"" style=""display: none; text-align: center; color: var(--text-secondary); padding: 2rem;"">
+                    <div class=""spinner"" style=""margin: 0 auto 1rem;""></div>
+                    <p>Loading analytics data...</p>
+                </div>
+                
+                <div id=""analytics-charts"" style=""display: none;"">
+                    <div style=""display: grid; grid-template-columns: repeat(auto-fit, minmax(450px, 1fr)); gap: 2rem;"">
+                        <div class=""action-card"">
+                            <h3>Document Count by Text Length</h3>
+                            <p style=""font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1rem;"">
+                                Distribution of extracted text sizes. Very short text (&lt;100 chars) may indicate extraction failures.
+                            </p>
+                            <canvas id=""text-length-chart"" style=""max-height: 300px;""></canvas>
+                        </div>
+                        
+                        <div class=""action-card"">
+                            <h3>Document Count by OCR Quality</h3>
+                            <p style=""font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1rem;"">
+                                OCR confidence scores. Quality &lt; 0.5 is flagged as low quality and may need review.
+                            </p>
+                            <canvas id=""ocr-quality-chart"" style=""max-height: 300px;""></canvas>
+                        </div>
+                    </div>
+                    
+                    <div style=""margin-top: 1rem; padding: 1rem; background: var(--bg-tertiary); border-radius: 6px;"">
+                        <h4 style=""margin-bottom: 0.5rem; color: var(--text-primary);"">Summary Statistics</h4>
+                        <div style=""display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; font-size: 0.9rem; color: var(--text-secondary);"">
+                            <div>Total Documents: <strong id=""total-docs-stat"">-</strong></div>
+                            <div>Very Short Text (&lt;100 chars): <strong id=""short-text-stat"">-</strong></div>
+                            <div>OCR Documents: <strong id=""ocr-docs-stat"">-</strong></div>
+                            <div>Low Quality OCR (&lt;0.5): <strong id=""low-quality-stat"">-</strong></div>
+                        </div>
+                    </div>
                 </div>
             </section>
         </div>
@@ -1578,6 +1628,196 @@ public static class AdminEndpoints
             }} catch (error) {{
                 alert('❌ Error: ' + error.message);
             }}
+        }}
+        
+        // OCR Analytics Functions
+        let textLengthChart = null;
+        let ocrQualityChart = null;
+        
+        async function loadOcrAnalytics() {{
+            const loadingDiv = document.getElementById('analytics-loading');
+            const chartsDiv = document.getElementById('analytics-charts');
+            
+            loadingDiv.style.display = 'block';
+            chartsDiv.style.display = 'none';
+            
+            try {{
+                const response = await fetch('/admin/analytics/ocr-quality');
+                const data = await response.json();
+                
+                if (!data.success) {{
+                    alert('Error loading analytics: ' + (data.error || 'Unknown error'));
+                    return;
+                }}
+                
+                // Update summary statistics
+                document.getElementById('total-docs-stat').textContent = data.totalDocuments.toLocaleString();
+                document.getElementById('short-text-stat').textContent = data.textLengthDistribution['0-100'].toLocaleString();
+                
+                // Calculate OCR document count (all buckets except ""No OCR"")
+                const ocrDocCount = Object.entries(data.ocrQualityDistribution)
+                    .filter(([key, _]) => key !== 'No OCR')
+                    .reduce((sum, [_, count]) => sum + count, 0);
+                document.getElementById('ocr-docs-stat').textContent = ocrDocCount.toLocaleString();
+                
+                // Calculate low quality OCR count (quality < 0.5)
+                const lowQualityCount = ['0.0-0.1', '0.1-0.2', '0.2-0.3', '0.3-0.4', '0.4-0.5']
+                    .reduce((sum, key) => sum + (data.ocrQualityDistribution[key] || 0), 0);
+                document.getElementById('low-quality-stat').textContent = lowQualityCount.toLocaleString();
+                
+                // Render charts
+                renderTextLengthChart(data.textLengthDistribution);
+                renderOcrQualityChart(data.ocrQualityDistribution);
+                
+                loadingDiv.style.display = 'none';
+                chartsDiv.style.display = 'block';
+            }} catch (error) {{
+                alert('Error loading analytics: ' + error.message);
+                loadingDiv.style.display = 'none';
+            }}
+        }}
+        
+        function renderTextLengthChart(distribution) {{
+            const ctx = document.getElementById('text-length-chart');
+            
+            // Destroy existing chart if it exists
+            if (textLengthChart) {{
+                textLengthChart.destroy();
+            }}
+            
+            const labels = Object.keys(distribution);
+            const values = Object.values(distribution);
+            
+            textLengthChart = new Chart(ctx, {{
+                type: 'bar',
+                data: {{
+                    labels: labels,
+                    datasets: [{{
+                        label: 'Document Count',
+                        data: values,
+                        backgroundColor: 'rgba(233, 69, 96, 0.6)',
+                        borderColor: 'rgba(233, 69, 96, 1)',
+                        borderWidth: 2
+                    }}]
+                }},
+                options: {{
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {{
+                        legend: {{
+                            display: false
+                        }},
+                        tooltip: {{
+                            backgroundColor: 'rgba(22, 33, 62, 0.9)',
+                            titleColor: '#eee',
+                            bodyColor: '#eee',
+                            borderColor: '#e94560',
+                            borderWidth: 1
+                        }}
+                    }},
+                    scales: {{
+                        y: {{
+                            beginAtZero: true,
+                            ticks: {{
+                                color: '#aaa'
+                            }},
+                            grid: {{
+                                color: 'rgba(42, 42, 78, 0.5)'
+                            }}
+                        }},
+                        x: {{
+                            ticks: {{
+                                color: '#aaa',
+                                maxRotation: 45,
+                                minRotation: 45
+                            }},
+                            grid: {{
+                                color: 'rgba(42, 42, 78, 0.5)'
+                            }}
+                        }}
+                    }}
+                }}
+            }});
+        }}
+        
+        function renderOcrQualityChart(distribution) {{
+            const ctx = document.getElementById('ocr-quality-chart');
+            
+            // Destroy existing chart if it exists
+            if (ocrQualityChart) {{
+                ocrQualityChart.destroy();
+            }}
+            
+            const labels = Object.keys(distribution);
+            const values = Object.values(distribution);
+            
+            // Color code: red for low quality (<0.5), yellow for medium (0.5-0.7), green for high (>0.7)
+            const backgroundColors = labels.map(label => {{
+                if (label === 'No OCR') return 'rgba(170, 170, 170, 0.6)';
+                const midpoint = parseFloat(label.split('-')[0]);
+                if (midpoint < 0.5) return 'rgba(231, 76, 60, 0.6)';  // Red
+                if (midpoint < 0.7) return 'rgba(243, 156, 18, 0.6)'; // Yellow
+                return 'rgba(46, 204, 113, 0.6)';  // Green
+            }});
+            
+            const borderColors = labels.map(label => {{
+                if (label === 'No OCR') return 'rgba(170, 170, 170, 1)';
+                const midpoint = parseFloat(label.split('-')[0]);
+                if (midpoint < 0.5) return 'rgba(231, 76, 60, 1)';
+                if (midpoint < 0.7) return 'rgba(243, 156, 18, 1)';
+                return 'rgba(46, 204, 113, 1)';
+            }});
+            
+            ocrQualityChart = new Chart(ctx, {{
+                type: 'bar',
+                data: {{
+                    labels: labels,
+                    datasets: [{{
+                        label: 'Document Count',
+                        data: values,
+                        backgroundColor: backgroundColors,
+                        borderColor: borderColors,
+                        borderWidth: 2
+                    }}]
+                }},
+                options: {{
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {{
+                        legend: {{
+                            display: false
+                        }},
+                        tooltip: {{
+                            backgroundColor: 'rgba(22, 33, 62, 0.9)',
+                            titleColor: '#eee',
+                            bodyColor: '#eee',
+                            borderColor: '#e94560',
+                            borderWidth: 1
+                        }}
+                    }},
+                    scales: {{
+                        y: {{
+                            beginAtZero: true,
+                            ticks: {{
+                                color: '#aaa'
+                            }},
+                            grid: {{
+                                color: 'rgba(42, 42, 78, 0.5)'
+                            }}
+                        }},
+                        x: {{
+                            ticks: {{
+                                color: '#aaa',
+                                maxRotation: 45,
+                                minRotation: 45
+                            }},
+                            grid: {{
+                                color: 'rgba(42, 42, 78, 0.5)'
+                            }}
+                        }}
+                    }}
+                }}
+            }});
         }}
         
         function escapeHtml(text) {{
@@ -4198,6 +4438,141 @@ rm -f drive-scan.pid
                 error = ex.Message 
             });
         }
+    }
+    
+    /// <summary>
+    /// Get OCR quality analytics for charts:
+    /// - Document count vs. text length
+    /// - Document count vs. OCR quality (parsed from ExtractionMethod)
+    /// </summary>
+    private static async Task<IResult> GetOcrQualityAnalytics(
+        HttpContext context,
+        JumpChainDbContext dbContext,
+        AdminAuthService authService)
+    {
+        var (valid, _) = await ValidateSession(context, authService);
+        if (!valid) return Results.Unauthorized();
+
+        try
+        {
+            // Get all documents with extracted text
+            var documents = await dbContext.JumpDocuments
+                .Where(d => !string.IsNullOrEmpty(d.ExtractedText))
+                .Select(d => new
+                {
+                    TextLength = d.ExtractedText!.Length,
+                    ExtractionMethod = d.ExtractionMethod ?? ""
+                })
+                .ToListAsync();
+
+            // Text length distribution (bucket by character count)
+            var textLengthBuckets = new Dictionary<string, int>
+            {
+                ["0-100"] = 0,
+                ["100-500"] = 0,
+                ["500-1000"] = 0,
+                ["1000-2500"] = 0,
+                ["2500-5000"] = 0,
+                ["5000-10000"] = 0,
+                ["10000-25000"] = 0,
+                ["25000-50000"] = 0,
+                ["50000+"] = 0
+            };
+
+            foreach (var doc in documents)
+            {
+                var len = doc.TextLength;
+                if (len < 100) textLengthBuckets["0-100"]++;
+                else if (len < 500) textLengthBuckets["100-500"]++;
+                else if (len < 1000) textLengthBuckets["500-1000"]++;
+                else if (len < 2500) textLengthBuckets["1000-2500"]++;
+                else if (len < 5000) textLengthBuckets["2500-5000"]++;
+                else if (len < 10000) textLengthBuckets["5000-10000"]++;
+                else if (len < 25000) textLengthBuckets["10000-25000"]++;
+                else if (len < 50000) textLengthBuckets["25000-50000"]++;
+                else textLengthBuckets["50000+"]++;
+            }
+
+            // OCR quality distribution (parse from ExtractionMethod)
+            var ocrQualityBuckets = new Dictionary<string, int>
+            {
+                ["0.0-0.1"] = 0,
+                ["0.1-0.2"] = 0,
+                ["0.2-0.3"] = 0,
+                ["0.3-0.4"] = 0,
+                ["0.4-0.5"] = 0,
+                ["0.5-0.6"] = 0,
+                ["0.6-0.7"] = 0,
+                ["0.7-0.8"] = 0,
+                ["0.8-0.9"] = 0,
+                ["0.9-1.0"] = 0,
+                ["No OCR"] = 0
+            };
+
+            foreach (var doc in documents)
+            {
+                var quality = ParseOcrQuality(doc.ExtractionMethod);
+                
+                if (quality.HasValue)
+                {
+                    var q = quality.Value;
+                    if (q < 0.1) ocrQualityBuckets["0.0-0.1"]++;
+                    else if (q < 0.2) ocrQualityBuckets["0.1-0.2"]++;
+                    else if (q < 0.3) ocrQualityBuckets["0.2-0.3"]++;
+                    else if (q < 0.4) ocrQualityBuckets["0.3-0.4"]++;
+                    else if (q < 0.5) ocrQualityBuckets["0.4-0.5"]++;
+                    else if (q < 0.6) ocrQualityBuckets["0.5-0.6"]++;
+                    else if (q < 0.7) ocrQualityBuckets["0.6-0.7"]++;
+                    else if (q < 0.8) ocrQualityBuckets["0.7-0.8"]++;
+                    else if (q < 0.9) ocrQualityBuckets["0.8-0.9"]++;
+                    else ocrQualityBuckets["0.9-1.0"]++;
+                }
+                else
+                {
+                    ocrQualityBuckets["No OCR"]++;
+                }
+            }
+
+            return Results.Ok(new
+            {
+                success = true,
+                totalDocuments = documents.Count,
+                textLengthDistribution = textLengthBuckets,
+                ocrQualityDistribution = ocrQualityBuckets
+            });
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error getting OCR analytics: {ex.Message}");
+            return Results.BadRequest(new { success = false, error = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Parse OCR quality from ExtractionMethod field
+    /// Expected format: "tesseract_ocr_0.85" or "tesseract_ocr_low_quality_0.35"
+    /// </summary>
+    private static double? ParseOcrQuality(string? extractionMethod)
+    {
+        if (string.IsNullOrEmpty(extractionMethod))
+            return null;
+
+        // Check if it's a tesseract OCR method
+        if (!extractionMethod.Contains("tesseract_ocr"))
+            return null;
+
+        // Try to extract the quality number (last part after underscore)
+        var parts = extractionMethod.Split('_');
+        if (parts.Length == 0)
+            return null;
+
+        var lastPart = parts[^1];
+        if (double.TryParse(lastPart, out var quality))
+        {
+            return quality;
+        }
+
+        return null;
     }
     
     // Request models
