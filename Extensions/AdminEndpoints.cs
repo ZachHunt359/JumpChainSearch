@@ -1069,7 +1069,7 @@ public static class AdminEndpoints
         async function startBatch() {{
             if (!confirm('Start batch processing?')) return;
             try {{
-                const resp = await fetch('/admin/batch/start', {{ method: 'POST' }});
+                const resp = await fetch('/api/batch/start', {{ method: 'POST' }});
                 const data = await resp.json();
                 
                 if (!resp.ok) {{
@@ -2013,7 +2013,7 @@ public static class AdminEndpoints
                     
                     // Auto-start batch processing
                     try {{
-                        const batchResp = await fetch('/admin/batch/start', {{ method: 'POST' }});
+                        const batchResp = await fetch('/api/batch/start', {{ method: 'POST' }});
                         const batchData = await batchResp.json();
                         if (!batchData.success) {{
                             statusSpan.textContent = 'Documents queued but failed to start processing. Use Start Processing button manually.';
