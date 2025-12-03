@@ -1155,7 +1155,11 @@
             
             if (hasSearchParams)
             {
-                Console.WriteLine($"[OnAfterRenderAsync] URL has search params, triggering search");
+                Console.WriteLine($"[OnAfterRenderAsync] URL has search params, reloading them now");
+                // Reload parameters into component state since prerender state was lost
+                LoadSearchParametersFromUrl();
+                
+                Console.WriteLine($"[OnAfterRenderAsync] After reload: minTextLength={minTextLength}, maxTextLength={maxTextLength}, triggering search");
                 await JSRuntime.InvokeVoidAsync("console.log", $"[OnAfterRenderAsync] URL has search params, triggering search. Filters: minTextLength={minTextLength}, maxTextLength={maxTextLength}");
                 await PerformSearch();
             }
