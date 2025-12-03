@@ -33,9 +33,6 @@ namespace JumpChainSearch.Models
         
         public string FolderPath { get; set; } = string.Empty;
         
-        // Google Drive folder ID where this file is located
-        public string? GoogleDriveFolderId { get; set; }
-        
         public string WebViewLink { get; set; } = string.Empty;
         
         public string DownloadLink { get; set; } = string.Empty;

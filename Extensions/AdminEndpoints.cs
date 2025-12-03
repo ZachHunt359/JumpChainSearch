@@ -3959,10 +3959,9 @@ rm -f drive-scan.pid
                 
                 if (result.success) {{
                     if (statusDiv) {{
-                        statusDiv.innerHTML = `✅ Scan complete! Found ${{result.documentsFound}} documents (${{result.newDocuments}} new)`;
+                        statusDiv.innerHTML = `✅ Scan complete! Found ${{result.documentsFound}} documents (${{result.newDocuments}} new, ${{result.documentsUpdated}} updated)`;
                         setTimeout(() => statusDiv.classList.remove('active'), 5000);
                     }}
-                    setTimeout(() => location.reload(), 2000);
                 }} else {{
                     if (statusDiv) {{
                         statusDiv.innerHTML = `❌ Scan failed: ${{result.error || 'Unknown error'}}`;
@@ -3996,7 +3995,6 @@ rm -f drive-scan.pid
                         statusDiv.innerHTML = `✅ Folder discovery complete! ${{result.foldersDiscovered}} folders (${{result.foldersCreated}} new, ${{result.foldersUpdated}} updated)`;
                         setTimeout(() => statusDiv.classList.remove('active'), 5000);
                     }}
-                    setTimeout(() => location.reload(), 2000);
                 }} else {{
                     if (statusDiv) {{
                         statusDiv.innerHTML = `❌ Discovery failed: ${{result.error || 'Unknown error'}}`;

@@ -1588,6 +1588,8 @@ namespace JumpChainSearch.Services
         {
             try
             {
+                var folderId = file.Parents?.FirstOrDefault();
+                
                 var document = new JumpDocument
                 {
                     GoogleDriveFileId = file.Id,
@@ -1600,7 +1602,6 @@ namespace JumpChainSearch.Services
                     LastScanned = DateTime.UtcNow,
                     SourceDrive = driveName,
                     FolderPath = folderPath,
-                    GoogleDriveFolderId = file.Parents?.FirstOrDefault(),
                     WebViewLink = file.WebViewLink ?? string.Empty,
                     DownloadLink = file.ExportLinks?.Values.FirstOrDefault() ?? string.Empty,
                     ThumbnailLink = file.ThumbnailLink ?? string.Empty,
@@ -1609,6 +1610,21 @@ namespace JumpChainSearch.Services
 
                 // Generate tags based on filename, folder, and drive
                 document.Tags = GenerateTags(document, folderPath, driveName);
+                
+                // Create DocumentUrl entry for this location
+                if (!string.IsNullOrEmpty(folderId))
+                {
+                    document.Urls.Add(new DocumentUrl
+                    {
+                        GoogleDriveFileId = file.Id,
+                        SourceDrive = driveName,
+                        FolderPath = folderPath,
+                        GoogleDriveFolderId = folderId,
+                        WebViewLink = file.WebViewLink ?? string.Empty,
+                        DownloadLink = file.ExportLinks?.Values.FirstOrDefault() ?? string.Empty,
+                        LastScanned = DateTime.UtcNow
+                    });
+                }
 
                 return Task.FromResult<JumpDocument?>(document);
             }

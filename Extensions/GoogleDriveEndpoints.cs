@@ -175,14 +175,16 @@ public static class GoogleDriveEndpoints
                 var driveFiles = await driveService.ListFilesInFolderAsync(folderId);
                 var driveFileIds = driveFiles.Select(f => f.Id).ToHashSet();
                 
-                // Get files from database using the new GoogleDriveFolderId column
-                var dbDocs = await dbContext.JumpDocuments
-                    .Where(d => d.GoogleDriveFolderId == folderId)
-                    .Select(d => new {
-                        d.GoogleDriveFileId,
-                        d.Name,
-                        d.FolderPath,
-                        d.GoogleDriveFolderId
+                // Get files from database using DocumentUrls table
+                var dbDocs = await dbContext.DocumentUrls
+                    .Include(u => u.JumpDocument)
+                    .Where(u => u.GoogleDriveFolderId == folderId)
+                    .Select(u => new {
+                        u.JumpDocument.GoogleDriveFileId,
+                        u.JumpDocument.Name,
+                        u.FolderPath,
+                        u.GoogleDriveFolderId,
+                        u.SourceDrive
                     })
                     .ToListAsync();
                 
@@ -609,6 +611,7 @@ public static class GoogleDriveEndpoints
             var results = new List<object>();
             var totalDocuments = 0;
             var newDocuments = 0;
+            var updatedDocuments = 0;
             var duplicatesDetected = 0;
 
             foreach (var drive in drives)
@@ -667,11 +670,47 @@ public static class GoogleDriveEndpoints
                                 dbContext.JumpDocuments.Add(doc);
                                 addedInThisBatch.Add(doc.GoogleDriveFileId);
                                 newDocsInDrive++;
+                                // DocumentUrl entry already created in ConvertToJumpDocumentAsync
                             }
                             else if (existingFileIds.ContainsKey(doc.GoogleDriveFileId))
                             {
-                                // Existing document - check if it has a Drive tag for this drive
+                                // Existing document - check if we need to add DocumentUrl for this location
                                 var docId = existingFileIds[doc.GoogleDriveFileId];
+                                
+                                // Get folder ID from the document's Urls (created during conversion)
+                                var newUrl = doc.Urls.FirstOrDefault();
+                                if (newUrl != null && !string.IsNullOrEmpty(newUrl.GoogleDriveFolderId))
+                                {
+                                    // Check if this location already exists in DocumentUrls
+                                    var existingUrl = await dbContext.DocumentUrls
+                                        .FirstOrDefaultAsync(u => u.JumpDocumentId == docId 
+                                                                && u.SourceDrive == drive.DriveName 
+                                                                && u.GoogleDriveFolderId == newUrl.GoogleDriveFolderId);
+                                    
+                                    if (existingUrl == null)
+                                    {
+                                        // Add new location entry
+                                        dbContext.DocumentUrls.Add(new DocumentUrl
+                                        {
+                                            JumpDocumentId = docId,
+                                            GoogleDriveFileId = doc.GoogleDriveFileId,
+                                            SourceDrive = drive.DriveName,
+                                            FolderPath = doc.FolderPath,
+                                            GoogleDriveFolderId = newUrl.GoogleDriveFolderId,
+                                            WebViewLink = doc.WebViewLink,
+                                            DownloadLink = doc.DownloadLink,
+                                            LastScanned = DateTime.UtcNow
+                                        });
+                                        updatedDocs++;
+                                    }
+                                    else
+                                    {
+                                        // Update last scanned time
+                                        existingUrl.LastScanned = DateTime.UtcNow;
+                                    }
+                                }
+                                
+                                // Check if it has a Drive tag for this drive
                                 var hasDriveTag = await dbContext.DocumentTags
                                     .AnyAsync(t => t.JumpDocumentId == docId 
                                                 && t.TagCategory == "Drive" 
@@ -687,7 +726,6 @@ public static class GoogleDriveEndpoints
                                         TagName = drive.DriveName
                                     });
                                     driveTagsAdded++;
-                                    updatedDocs++;
                                 }
                             }
                         }
@@ -827,6 +865,7 @@ public static class GoogleDriveEndpoints
                     
                     totalDocuments += currentCount;
                     newDocuments += newDocsInDrive;
+                    updatedDocuments += updatedDocs;
                     duplicatesDetected += duplicatesInDrive;
                     
                     results.Add(new
@@ -835,6 +874,7 @@ public static class GoogleDriveEndpoints
                         success = true,
                         totalDocuments = currentCount,
                         newDocuments = newDocsInDrive,
+                        updatedDocuments = updatedDocs,
                         duplicatesDetected = duplicatesInDrive,
                         driveTagsAdded = driveTagsAdded
                     });
@@ -888,10 +928,11 @@ public static class GoogleDriveEndpoints
             return Results.Ok(new
             {
                 success = true,
-                message = $"Scanned {drives.Count} drives, found {newDocuments} new documents, detected {duplicatesDetected} duplicates",
+                message = $"Scanned {drives.Count} drives, found {newDocuments} new documents, updated {updatedDocuments} existing documents",
                 drivesScanned = drives.Count,
                 totalDocuments = finalCount,
                 newDocuments,
+                documentsUpdated = updatedDocuments,
                 duplicatesDetected,
                 duplicateMerge = duplicateMergeResults,
                 results
