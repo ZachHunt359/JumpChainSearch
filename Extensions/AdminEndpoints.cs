@@ -4874,10 +4874,16 @@ rm -f drive-scan.pid
 
         try
         {
-            // Count documents with null ExtractedText (queued for processing)
-            var remaining = await dbContext.JumpDocuments
+            // Count documents still needing processing (null ExtractedText OR REPROCESS marker)
+            var nullCount = await dbContext.JumpDocuments
                 .Where(d => d.ExtractedText == null)
                 .CountAsync();
+            
+            var reprocessCount = await dbContext.JumpDocuments
+                .Where(d => d.ExtractionMethod != null && d.ExtractionMethod.StartsWith("REPROCESS|"))
+                .CountAsync();
+            
+            var remaining = nullCount + reprocessCount;
 
             // Get total document count for context
             var total = await dbContext.JumpDocuments.CountAsync();
@@ -4888,6 +4894,8 @@ rm -f drive-scan.pid
                 remaining = remaining,
                 processed = total - remaining,
                 totalQueued = remaining, // For backwards compatibility with UI
+                nullCount = nullCount,
+                reprocessCount = reprocessCount,
                 percentComplete = total > 0 ? Math.Round(((double)(total - remaining) / total) * 100, 1) : 100
             });
         }
@@ -4934,14 +4942,20 @@ rm -f drive-scan.pid
                 .Distinct()
                 .ToList();
             
-            // Clear extracted text to force reprocessing
+            // Mark documents for smart reprocessing
+            // Store original text/method temporarily in ExtractionMethod for comparison
             foreach (var docId in filteredIds)
             {
                 var doc = await dbContext.JumpDocuments.FindAsync(docId);
                 if (doc != null)
                 {
-                    doc.ExtractedText = null;
-                    doc.ExtractionMethod = null;
+                    var originalText = doc.ExtractedText ?? "";
+                    var originalMethod = doc.ExtractionMethod ?? "unknown";
+                    var originalLength = originalText.Length;
+                    
+                    // Format: REPROCESS|originalLength|originalMethod
+                    // We keep ExtractedText intact for comparison later
+                    doc.ExtractionMethod = $"REPROCESS|{originalLength}|{originalMethod}";
                 }
             }
             
@@ -4951,8 +4965,8 @@ rm -f drive-scan.pid
             {
                 success = true,
                 queued = filteredIds.Count,
-                baselineNullCount = baselineNullCount, // Pass this to the UI so it can calculate progress correctly
-                message = "Documents queued for reprocessing. Use 'Start Processing' in Text Extraction Status section to begin."
+                baselineNullCount = baselineNullCount,
+                message = "Documents marked for smart reprocessing. Processing will start automatically and keep whichever extraction is better."
             });
         }
         catch (Exception ex)

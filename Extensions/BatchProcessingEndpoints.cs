@@ -114,10 +114,11 @@ public static class BatchProcessingEndpoints
                         .UseSqlite(connectionString)
                         .Options);
 
-                    // Get next batch of documents that haven't been attempted yet
+                    // Get next batch of documents that need processing
                     // ExtractionMethod IS NULL means we haven't tried extracting yet
+                    // ExtractionMethod starts with "REPROCESS" means smart reprocessing needed
                     var query = batchContext.JumpDocuments
-                        .Where(d => d.ExtractionMethod == null);
+                        .Where(d => d.ExtractionMethod == null || d.ExtractionMethod.StartsWith("REPROCESS|"));
 
                     if (!string.IsNullOrEmpty(mimeTypeFilter))
                     {
@@ -139,12 +140,80 @@ public static class BatchProcessingEndpoints
                     {
                         try
                         {
+                            // Check if this is a smart reprocess
+                            bool isReprocess = doc.ExtractionMethod?.StartsWith("REPROCESS|") == true;
+                            string? originalText = null;
+                            int originalLength = 0;
+                            string? originalMethod = null;
+                            
+                            if (isReprocess && doc.ExtractionMethod != null)
+                            {
+                                var parts = doc.ExtractionMethod.Split('|');
+                                if (parts.Length >= 3)
+                                {
+                                    int.TryParse(parts[1], out originalLength);
+                                    originalMethod = parts[2];
+                                    originalText = doc.ExtractedText; // Original text still intact
+                                }
+                            }
+                            
                             var (text, method) = await driveService.ExtractTextWithMethodAsync(doc.GoogleDriveFileId);
 
                             if (!string.IsNullOrEmpty(text))
                             {
-                                doc.ExtractedText = text;
-                                doc.ExtractionMethod = method;
+                                // Smart comparison logic for reprocess mode
+                                if (isReprocess && originalText != null)
+                                {
+                                    int newLength = text.Length;
+                                    bool useNewExtraction = false;
+                                    string comparisonReason = "";
+                                    
+                                    // Decision logic: prefer longer text, then better method
+                                    if (newLength > originalLength * 1.2) // New text is 20% longer
+                                    {
+                                        useNewExtraction = true;
+                                        comparisonReason = $"new text longer ({newLength} vs {originalLength})";
+                                    }
+                                    else if (newLength < originalLength * 0.5) // New text is half as short
+                                    {
+                                        useNewExtraction = false;
+                                        comparisonReason = $"keeping original (new too short: {newLength} vs {originalLength})";
+                                    }
+                                    else if (!string.IsNullOrEmpty(method) && method.Contains("improved_pdfpig") && originalMethod?.Contains("basic") == true)
+                                    {
+                                        useNewExtraction = true;
+                                        comparisonReason = "better extraction method";
+                                    }
+                                    else if (newLength >= originalLength)
+                                    {
+                                        useNewExtraction = true;
+                                        comparisonReason = $"new text equal/longer ({newLength} vs {originalLength})";
+                                    }
+                                    else
+                                    {
+                                        useNewExtraction = false;
+                                        comparisonReason = $"keeping original ({originalLength} vs {newLength})";
+                                    }
+                                    
+                                    if (useNewExtraction)
+                                    {
+                                        doc.ExtractedText = text;
+                                        doc.ExtractionMethod = method;
+                                        await File.AppendAllTextAsync(logFile, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] REPROCESS UPGRADE: Doc {doc.Id} ({doc.Name}) - {comparisonReason}\n");
+                                    }
+                                    else
+                                    {
+                                        // Keep original text, just update method to show it was checked
+                                        doc.ExtractionMethod = $"{originalMethod}_rechecked";
+                                        await File.AppendAllTextAsync(logFile, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] REPROCESS KEPT ORIGINAL: Doc {doc.Id} ({doc.Name}) - {comparisonReason}\n");
+                                    }
+                                }
+                                else
+                                {
+                                    // Normal first-time extraction
+                                    doc.ExtractedText = text;
+                                    doc.ExtractionMethod = method;
+                                }
                                 
                                 // Add "Has Text" tag
                                 var existingTag = await batchContext.DocumentTags
