@@ -110,6 +110,63 @@ public static class GoogleDriveEndpoints
                 );
             }
         });
+        
+        // Check what documents we have from a specific folder ID (database query only)
+        group.MapGet("/check-folder-db/{folderId}", async (string folderId, JumpChainDbContext dbContext) => {
+            try {
+                // Find all documents that reference this folder ID
+                var docs = await dbContext.JumpDocuments
+                    .Include(d => d.Urls)
+                    .Include(d => d.Tags)
+                    .Where(d => d.FolderPath != null && d.FolderPath.Contains(folderId))
+                    .Select(d => new {
+                        d.Id,
+                        d.GoogleDriveFileId,
+                        d.Name,
+                        d.SourceDrive,
+                        d.FolderPath,
+                        d.MimeType,
+                        d.Size,
+                        d.WebViewLink,
+                        Tags = d.Tags.Select(t => t.TagName).ToList(),
+                        AlternateUrls = d.Urls.Select(u => new {
+                            u.SourceDrive,
+                            u.FolderPath,
+                            u.WebViewLink
+                        }).ToList()
+                    })
+                    .ToListAsync();
+                
+                // Also check DocumentUrls table for documents in this folder
+                var urlDocs = await dbContext.DocumentUrls
+                    .Include(u => u.JumpDocument)
+                    .Where(u => u.FolderPath != null && u.FolderPath.Contains(folderId))
+                    .Select(u => new {
+                        u.JumpDocument.Id,
+                        u.GoogleDriveFileId,
+                        u.JumpDocument.Name,
+                        u.SourceDrive,
+                        u.FolderPath,
+                        u.WebViewLink
+                    })
+                    .ToListAsync();
+                
+                return Results.Ok(new {
+                    success = true,
+                    folderId = folderId,
+                    documentsInFolder = docs.Count,
+                    documents = docs,
+                    alternateUrls = urlDocs.Count,
+                    urlsFound = urlDocs
+                });
+            }
+            catch (Exception ex) {
+                return Results.BadRequest(new {
+                    success = false,
+                    error = ex.Message
+                });
+            }
+        });
 
         return group;
     }
