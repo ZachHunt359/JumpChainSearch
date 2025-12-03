@@ -2836,43 +2836,59 @@ public static class AdminEndpoints
         if (!valid)
             return Results.Unauthorized();
 
-        // Check if batch processing is running (simple file-based approach)
-        var batchPidFile = "batch-process.pid";
-        var isRunning = false;
-        var currentBatch = "";
-        
-        if (File.Exists(batchPidFile))
+        try
         {
-            try
+            // Use the request's host and scheme to build the correct URL
+            var request = context.Request;
+            var baseUrl = $"{request.Scheme}://{request.Host}";
+            
+            using var httpClient = new HttpClient();
+            var response = await httpClient.GetAsync($"{baseUrl}/api/batch/status");
+            
+            if (response.IsSuccessStatusCode)
             {
-                var pidContent = File.ReadAllText(batchPidFile);
-                if (int.TryParse(pidContent, out int pid))
+                var content = await response.Content.ReadAsStringAsync();
+                var batchStatus = System.Text.Json.JsonSerializer.Deserialize<System.Text.Json.JsonElement>(content);
+                
+                var isRunning = batchStatus.GetProperty("isProcessing").GetBoolean();
+                var currentSessionId = batchStatus.TryGetProperty("currentSessionId", out var sessionProp) 
+                    ? sessionProp.GetString() 
+                    : "";
+                
+                return Results.Ok(new
                 {
-                    var process = Process.GetProcessById(pid);
-                    isRunning = !process.HasExited;
-                    currentBatch = $"PID: {pid}";
-                }
+                    success = true,
+                    isRunning,
+                    currentBatch = isRunning ? $"Session: {currentSessionId}" : "",
+                    lastRun = "Check batch logs for details"
+                });
             }
-            catch
+            
+            return Results.Ok(new
             {
-                isRunning = false;
-                File.Delete(batchPidFile); // Clean up stale PID file
-            }
+                success = true,
+                isRunning = false,
+                currentBatch = "",
+                lastRun = "Unknown"
+            });
         }
-
-        var lastRunFile = "batch-last-run.txt";
-        var lastRun = File.Exists(lastRunFile) ? File.ReadAllText(lastRunFile) : "Never";
-
-        return Results.Ok(new
+        catch (Exception ex)
         {
-            success = true,
-            isRunning,
-            currentBatch,
-            lastRun
-        });
+            return Results.Ok(new
+            {
+                success = true,
+                isRunning = false,
+                currentBatch = "",
+                lastRun = "Error: " + ex.Message
+            });
+        }
     }
 
-    private static async Task<IResult> StartBatchProcessing(HttpContext context, JumpChainDbContext dbContext, AdminAuthService authService)
+    private static async Task<IResult> StartBatchProcessing(
+        HttpContext context, 
+        JumpChainDbContext dbContext, 
+        AdminAuthService authService,
+        IGoogleDriveService driveService)
     {
         var (valid, user) = await ValidateSession(context, authService);
         if (!valid)
@@ -2880,9 +2896,12 @@ public static class AdminEndpoints
 
         try
         {
-            // Call the batch processing endpoint directly
+            // Use the request's host and scheme to build the correct URL
+            var request = context.Request;
+            var baseUrl = $"{request.Scheme}://{request.Host}";
+            
             using var httpClient = new HttpClient();
-            var response = await httpClient.PostAsync("http://localhost:5248/api/batch/start?batchSize=10", null);
+            var response = await httpClient.PostAsync($"{baseUrl}/api/batch/start?batchSize=10", null);
             var content = await response.Content.ReadAsStringAsync();
             
             if (response.IsSuccessStatusCode)
@@ -2916,9 +2935,12 @@ public static class AdminEndpoints
 
         try
         {
-            // Call the batch processing stop API endpoint
+            // Use the request's host and scheme to build the correct URL
+            var request = context.Request;
+            var baseUrl = $"{request.Scheme}://{request.Host}";
+            
             using var httpClient = new HttpClient();
-            var response = await httpClient.PostAsync("http://localhost:5248/api/batch/stop", null);
+            var response = await httpClient.PostAsync($"{baseUrl}/api/batch/stop", null);
             var content = await response.Content.ReadAsStringAsync();
             
             if (response.IsSuccessStatusCode)
