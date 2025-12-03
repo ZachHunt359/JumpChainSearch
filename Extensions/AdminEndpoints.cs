@@ -2035,14 +2035,14 @@ public static class AdminEndpoints
                             const progressResp = await fetch('/admin/batch/reprocess-progress');
                             const progress = await progressResp.json();
                             
-                            const currentNullCount = progress.remaining || 0;
-                            // Calculate how many of OUR documents are still null
-                            const ourRemaining = Math.max(0, currentNullCount - baselineNullCount);
+                            // Track REPROCESS marker count, not null count difference
+                            // Documents marked with REPROCESS| still have their text intact
+                            const ourRemaining = progress.reprocessCount || 0;
                             const total = initialQueuedCount;
                             const processed = Math.max(0, total - ourRemaining);
                             
-                            if (ourRemaining === 0 || total === 0) {{
-                                statusSpan.textContent = '✅ Reprocessing complete! Processed ' + total + ' documents. Click Calculate to see updated counts.';
+                            if (ourRemaining === 0) {{
+                                statusSpan.textContent = '✅ Reprocessing complete! Processed ' + processed + ' documents. Click Calculate to see updated counts.';
                                 statusSpan.style.color = 'var(--success)';
                                 clearInterval(reprocessProgressInterval);
                                 reprocessProgressInterval = null;
@@ -2051,7 +2051,7 @@ public static class AdminEndpoints
                                 return;
                             }}
                             
-                            const percent = Math.round((processed / total) * 100);
+                            const percent = total > 0 ? Math.round((processed / total) * 100) : 100;
                             statusSpan.textContent = `Processing: ${{processed}}/${{total}} complete (${{percent}}%) - ${{ourRemaining}} remaining`;
                             statusSpan.style.color = 'var(--accent)';
                         }} catch (e) {{
