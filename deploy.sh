@@ -116,6 +116,13 @@ echo "Step 6.5: Manually copying critical config files..."
 cp -f "$APP_DIR/series-mappings.json" "$PUBLISH_DIR/" 2>/dev/null && echo "✓ Copied series-mappings.json" || echo "⚠ Failed to copy series-mappings.json"
 cp -f "$APP_DIR/genre-mappings-scraped.json" "$PUBLISH_DIR/" 2>/dev/null && echo "✓ Copied genre-mappings-scraped.json" || echo "⚠ Failed to copy genre-mappings-scraped.json"
 cp -f "$APP_DIR/appsettings.json" "$PUBLISH_DIR/" 2>/dev/null && echo "✓ Copied appsettings.json" || echo "⚠ Failed to copy appsettings.json"
+
+# Copy service-account.json if it exists (required for Google Drive API, not in git)
+if [ -f "$APP_DIR/service-account.json" ]; then
+    cp -f "$APP_DIR/service-account.json" "$PUBLISH_DIR/" 2>/dev/null && echo "✓ Copied service-account.json" || echo "⚠ Failed to copy service-account.json"
+else
+    echo "⚠ service-account.json not found (Google Drive features will not work)"
+fi
 echo ""
 
 echo "Step 6.6: Validating deployment files..."
