@@ -979,11 +979,14 @@
             return;
         }
             
+        Console.WriteLine($"[PerformSearch] ENTRY - Starting search with filters: minTextLength={minTextLength}, maxTextLength={maxTextLength}, hasOcr={hasOcr}");
+        await JSRuntime.InvokeVoidAsync("console.log", $"[PerformSearch] ENTRY - Starting search");
+        
         isSearching = true;
         showNoResultsMessage = false;
         StateHasChanged();
         
-        Console.WriteLine($"[PerformSearch] Starting search with filters: minTextLength={minTextLength}, maxTextLength={maxTextLength}, hasOcr={hasOcr}");
+        Console.WriteLine($"[PerformSearch] State updated, building URL");
         
         try
         {
@@ -1069,8 +1072,13 @@
                 showNoResultsMessage = true;
             }
         }
-        catch (Exception)
+        catch (Exception ex)
         {
+            Console.WriteLine($"[PerformSearch] ERROR: {ex.Message}");
+            Console.WriteLine($"[PerformSearch] Stack trace: {ex.StackTrace}");
+            try {
+                await JSRuntime.InvokeVoidAsync("console.error", $"[PerformSearch] ERROR: {ex.Message}");
+            } catch { }
             searchResults.Clear();
             showNoResultsMessage = true;
         }
@@ -1124,29 +1132,37 @@
     
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        Console.WriteLine($"[OnAfterRenderAsync] Called with firstRender={firstRender}, shouldTriggerSearchOnLoad={shouldTriggerSearchOnLoad}");
-        
         if (firstRender)
         {
             // Setup event listener for NavMenu to open documents
             var dotNetRef = DotNetObjectReference.Create(this);
             await JSRuntime.InvokeVoidAsync("setupIndexListener", dotNetRef);
             
-            // Log to browser console for visibility
-            await JSRuntime.InvokeVoidAsync("console.log", $"[OnAfterRenderAsync] firstRender=true, shouldTriggerSearchOnLoad={shouldTriggerSearchOnLoad}");
+            // Check if URL has search parameters and trigger search if needed
+            // We check the URL directly here because the component state from OnInitializedAsync
+            // doesn't survive the prerender -> interactive transition in Blazor Server
+            var uri = new Uri(NavigationManager.Uri);
+            var queryParams = System.Web.HttpUtility.ParseQueryString(uri.Query);
             
-            // Trigger search if URL had filter parameters
-            if (shouldTriggerSearchOnLoad)
+            bool hasSearchParams = !string.IsNullOrEmpty(queryParams["q"]) ||
+                                  !string.IsNullOrEmpty(queryParams["include"]) ||
+                                  !string.IsNullOrEmpty(queryParams["exclude"]) ||
+                                  !string.IsNullOrEmpty(queryParams["minTextLength"]) ||
+                                  !string.IsNullOrEmpty(queryParams["maxTextLength"]) ||
+                                  !string.IsNullOrEmpty(queryParams["minOcrQuality"]) ||
+                                  !string.IsNullOrEmpty(queryParams["maxOcrQuality"]) ||
+                                  !string.IsNullOrEmpty(queryParams["hasOcr"]);
+            
+            if (hasSearchParams)
             {
-                Console.WriteLine($"[OnAfterRenderAsync] Triggering search NOW");
-                await JSRuntime.InvokeVoidAsync("console.log", $"[OnAfterRenderAsync] Triggering search with filters: minTextLength={minTextLength}, maxTextLength={maxTextLength}, minOcrQuality={minOcrQuality}, maxOcrQuality={maxOcrQuality}, hasOcr={hasOcr}");
-                shouldTriggerSearchOnLoad = false;
+                Console.WriteLine($"[OnAfterRenderAsync] URL has search params, triggering search");
+                await JSRuntime.InvokeVoidAsync("console.log", $"[OnAfterRenderAsync] URL has search params, triggering search. Filters: minTextLength={minTextLength}, maxTextLength={maxTextLength}");
                 await PerformSearch();
             }
             else
             {
-                Console.WriteLine("[OnAfterRenderAsync] NOT triggering search - flag is false");
-                await JSRuntime.InvokeVoidAsync("console.log", "[OnAfterRenderAsync] NOT triggering search - no filters detected");
+                Console.WriteLine("[OnAfterRenderAsync] No search params in URL");
+                await JSRuntime.InvokeVoidAsync("console.log", "[OnAfterRenderAsync] No search params in URL");
             }
         }
     }
