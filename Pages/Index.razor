@@ -970,8 +970,8 @@
     
     private async Task PerformSearch()
     {
-        // If no query and no tags, clear results
-        if (string.IsNullOrWhiteSpace(searchQuery) && !HasAnyTagFilters())
+        // If no query and no filters, clear results
+        if (string.IsNullOrWhiteSpace(searchQuery) && !HasAnyFilters())
         {
             searchResults.Clear();
             showNoResultsMessage = false;
@@ -1698,6 +1698,16 @@
     private bool HasAnyTagFilters()
     {
         return includedTags.Any() || excludedTags.Any();
+    }
+    
+    private bool HasAnyFilters()
+    {
+        return HasAnyTagFilters() || 
+               minTextLength.HasValue || 
+               maxTextLength.HasValue || 
+               minOcrQuality.HasValue || 
+               maxOcrQuality.HasValue || 
+               hasOcr.HasValue;
     }
 
     private void TriggerDebouncedSearch()
