@@ -1976,6 +1976,7 @@ public static class AdminEndpoints
         
         let reprocessProgressInterval = null;
         let initialQueuedCount = 0;
+        let baselineNullCount = 0; // Baseline of null documents before we started
         
         async function startReprocessing() {{
             const textThreshold = parseInt(document.getElementById('reprocess-text-threshold').value);
@@ -2006,6 +2007,7 @@ public static class AdminEndpoints
                 
                 if (data.success) {{
                     initialQueuedCount = data.queued; // Store initial count
+                    baselineNullCount = data.baselineNullCount || 0; // Store baseline
                     statusSpan.textContent = 'Queued ' + data.queued + ' documents. Monitoring progress...';
                     statusSpan.style.color = 'var(--accent)';
                     
@@ -2019,11 +2021,13 @@ public static class AdminEndpoints
                             const progressResp = await fetch('/admin/batch/reprocess-progress');
                             const progress = await progressResp.json();
                             
-                            const remaining = progress.remaining || 0;
-                            const total = initialQueuedCount; // Use the initial count we stored
-                            const processed = total - remaining;
+                            const currentNullCount = progress.remaining || 0;
+                            // Calculate how many of OUR documents are still null
+                            const ourRemaining = Math.max(0, currentNullCount - baselineNullCount);
+                            const total = initialQueuedCount;
+                            const processed = Math.max(0, total - ourRemaining);
                             
-                            if (remaining === 0 || total === 0) {{
+                            if (ourRemaining === 0 || total === 0) {{
                                 statusSpan.textContent = '✅ Reprocessing complete! Processed ' + total + ' documents. Click Calculate to see updated counts.';
                                 statusSpan.style.color = 'var(--success)';
                                 clearInterval(reprocessProgressInterval);
@@ -2034,7 +2038,7 @@ public static class AdminEndpoints
                             }}
                             
                             const percent = Math.round((processed / total) * 100);
-                            statusSpan.textContent = `Processing: ${{processed}}/${{total}} complete (${{percent}}%) - ${{remaining}} remaining`;
+                            statusSpan.textContent = `Processing: ${{processed}}/${{total}} complete (${{percent}}%) - ${{ourRemaining}} remaining`;
                             statusSpan.style.color = 'var(--accent)';
                         }} catch (e) {{
                             console.error('Failed to check reprocessing progress:', e);
@@ -4905,6 +4909,11 @@ rm -f drive-scan.pid
 
         try
         {
+            // Count baseline of documents with null ExtractedText BEFORE we clear any
+            var baselineNullCount = await dbContext.JumpDocuments
+                .Where(d => d.ExtractedText == null)
+                .CountAsync();
+            
             // Find documents matching criteria
             var query = dbContext.JumpDocuments.AsQueryable();
             
@@ -4942,6 +4951,7 @@ rm -f drive-scan.pid
             {
                 success = true,
                 queued = filteredIds.Count,
+                baselineNullCount = baselineNullCount, // Pass this to the UI so it can calculate progress correctly
                 message = "Documents queued for reprocessing. Use 'Start Processing' in Text Extraction Status section to begin."
             });
         }
