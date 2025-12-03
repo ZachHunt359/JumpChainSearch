@@ -220,6 +220,14 @@ else
 fi
 echo ""
 
+echo "Step 7.5: Setting up logs directory..."
+LOGS_DIR="$APP_DIR/logs"
+sudo mkdir -p "$LOGS_DIR"
+sudo chown www-data:www-data "$LOGS_DIR"
+sudo chmod 755 "$LOGS_DIR"
+echo "✓ Logs directory ready: $LOGS_DIR"
+echo ""
+
 echo "Step 8: Starting the service..."
 sudo systemctl start $SERVICE_NAME
 echo "✓ Service started"
