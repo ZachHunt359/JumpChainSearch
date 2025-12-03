@@ -92,7 +92,7 @@ public static class BatchProcessingEndpoints
 
         var sessionId = _currentSessionId!;
         var connectionString = context.Database.GetConnectionString();
-        var logDir = Path.Combine(Directory.GetCurrentDirectory(), "logs");
+        var logDir = Path.Combine(AppContext.BaseDirectory, "logs");
         Directory.CreateDirectory(logDir);
         var logFile = Path.Combine(logDir, $"batch-extraction-{sessionId}.log");
 

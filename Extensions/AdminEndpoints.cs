@@ -3018,7 +3018,7 @@ sudo systemctl restart jumpchain
         try
         {
             // Check for both old batch-processing and new batch-extraction logs
-            var logsDir = Path.Combine(Directory.GetCurrentDirectory(), "logs");
+            var logsDir = Path.Combine(AppContext.BaseDirectory, "logs");
             
             // Ensure logs directory exists
             if (!Directory.Exists(logsDir))
