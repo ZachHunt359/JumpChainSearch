@@ -20,6 +20,9 @@ namespace JumpChainSearch.Migrations
                 DROP TRIGGER IF EXISTS DocumentTags_au;
                 DROP TRIGGER IF EXISTS DocumentTags_ad;
                 
+                -- Drop temp table if it exists (from failed migration)
+                DROP TABLE IF EXISTS ef_temp_JumpDocuments;
+                
                 -- Create temp table without GoogleDriveFolderId
                 CREATE TABLE ef_temp_JumpDocuments (
                     Id INTEGER NOT NULL CONSTRAINT PK_JumpDocuments PRIMARY KEY AUTOINCREMENT,
