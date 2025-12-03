@@ -70,6 +70,7 @@ public static class AdminEndpoints
         
         // Batch reprocessing endpoints
         group.MapGet("/batch/reprocess-count", CalculateReprocessCount);
+        group.MapGet("/batch/reprocess-progress", GetReprocessProgress);
         group.MapPost("/batch/start-reprocess", StartBatchReprocess);
 
         return group;
@@ -1973,6 +1974,8 @@ public static class AdminEndpoints
             }}
         }}
         
+        let reprocessProgressInterval = null;
+        
         async function startReprocessing() {{
             const textThreshold = parseInt(document.getElementById('reprocess-text-threshold').value);
             const qualityThreshold = parseFloat(document.getElementById('reprocess-quality-threshold').value);
@@ -2001,21 +2004,48 @@ public static class AdminEndpoints
                 const data = await response.json();
                 
                 if (data.success) {{
-                    statusSpan.textContent = 'Successfully queued ' + data.queued + ' documents for reprocessing! Refreshing analytics...';
-                    statusSpan.style.color = 'var(--success)';
+                    statusSpan.textContent = 'Queued ' + data.queued + ' documents. Monitoring progress...';
+                    statusSpan.style.color = 'var(--accent)';
                     
-                    // Wait 3 seconds then refresh analytics
-                    setTimeout(async () => {{
+                    // Start polling for progress
+                    if (reprocessProgressInterval) {{
+                        clearInterval(reprocessProgressInterval);
+                    }}
+                    
+                    reprocessProgressInterval = setInterval(async () => {{
                         try {{
-                            await loadOcrAnalytics();
-                            statusSpan.textContent = '✅ Reprocessed ' + data.queued + ' documents. Analytics refreshed. Monitor batch processing above.';
-                            statusSpan.style.color = 'var(--success)';
+                            const progressResp = await fetch('/admin/batch/reprocess-progress');
+                            const progress = await progressResp.json();
+                            
+                            const remaining = progress.remaining || 0;
+                            const processed = progress.totalQueued - remaining;
+                            const total = progress.totalQueued || 0;
+                            
+                            if (total === 0) {{
+                                statusSpan.textContent = '✅ Reprocessing complete! Click Calculate to see updated counts.';
+                                statusSpan.style.color = 'var(--success)';
+                                clearInterval(reprocessProgressInterval);
+                                btn.disabled = false;
+                                calcBtn.disabled = false;
+                                return;
+                            }}
+                            
+                            const percent = Math.round((processed / total) * 100);
+                            statusSpan.textContent = `Processing: ${{processed}}/${{total}} complete (${{percent}}%) - ${{remaining}} remaining`;
+                            statusSpan.style.color = 'var(--accent)';
+                            
+                            // Check if complete
+                            if (remaining === 0) {{
+                                statusSpan.textContent = '✅ Reprocessing complete! Processed ' + total + ' documents. Click Calculate to see updated counts.';
+                                statusSpan.style.color = 'var(--success)';
+                                clearInterval(reprocessProgressInterval);
+                                btn.disabled = false;
+                                calcBtn.disabled = false;
+                            }}
                         }} catch (e) {{
-                            statusSpan.textContent = '✅ Reprocessed ' + data.queued + ' documents. (Failed to refresh analytics)';
+                            console.error('Failed to check reprocessing progress:', e);
                         }}
-                        btn.disabled = false;
-                        calcBtn.disabled = false;
-                    }}, 3000);
+                    }}, 3000); // Poll every 3 seconds
                 }} else {{
                     statusSpan.textContent = 'Error: ' + (data.error || 'Failed to start reprocessing');
                     statusSpan.style.color = 'var(--error)';
@@ -4826,6 +4856,44 @@ rm -f drive-scan.pid
         catch (Exception ex)
         {
             Console.WriteLine($"Error calculating reprocess count: {ex.Message}");
+            return Results.BadRequest(new { success = false, error = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Get progress of ongoing reprocessing operation
+    /// Returns count of documents still needing text extraction (ExtractedText is null)
+    /// </summary>
+    private static async Task<IResult> GetReprocessProgress(
+        HttpContext context,
+        JumpChainDbContext dbContext,
+        AdminAuthService authService)
+    {
+        var (valid, _) = await ValidateSession(context, authService);
+        if (!valid) return Results.Unauthorized();
+
+        try
+        {
+            // Count documents with null ExtractedText (queued for processing)
+            var remaining = await dbContext.JumpDocuments
+                .Where(d => d.ExtractedText == null)
+                .CountAsync();
+
+            // Get total document count for context
+            var total = await dbContext.JumpDocuments.CountAsync();
+
+            return Results.Ok(new
+            {
+                success = true,
+                remaining = remaining,
+                processed = total - remaining,
+                totalQueued = remaining, // For backwards compatibility with UI
+                percentComplete = total > 0 ? Math.Round(((double)(total - remaining) / total) * 100, 1) : 100
+            });
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error getting reprocess progress: {ex.Message}");
             return Results.BadRequest(new { success = false, error = ex.Message });
         }
     }
