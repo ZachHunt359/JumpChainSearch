@@ -2008,8 +2008,22 @@ public static class AdminEndpoints
                 if (data.success) {{
                     initialQueuedCount = data.queued; // Store initial count
                     baselineNullCount = data.baselineNullCount || 0; // Store baseline
-                    statusSpan.textContent = 'Queued ' + data.queued + ' documents. Monitoring progress...';
+                    statusSpan.textContent = 'Queued ' + data.queued + ' documents. Starting batch processing...';
                     statusSpan.style.color = 'var(--accent)';
+                    
+                    // Auto-start batch processing
+                    try {{
+                        const batchResp = await fetch('/admin/batch/start', {{ method: 'POST' }});
+                        const batchData = await batchResp.json();
+                        if (!batchData.success) {{
+                            statusSpan.textContent = 'Documents queued but failed to start processing. Use Start Processing button manually.';
+                            statusSpan.style.color = 'var(--warning)';
+                        }}
+                    }} catch (e) {{
+                        console.error('Failed to auto-start batch processing:', e);
+                        statusSpan.textContent = 'Documents queued but failed to start processing. Use Start Processing button manually.';
+                        statusSpan.style.color = 'var(--warning)';
+                    }}
                     
                     // Start polling for progress
                     if (reprocessProgressInterval) {{
