@@ -175,13 +175,14 @@ public static class GoogleDriveEndpoints
                 var driveFiles = await driveService.ListFilesInFolderAsync(folderId);
                 var driveFileIds = driveFiles.Select(f => f.Id).ToHashSet();
                 
-                // Get files from database for this folder path
+                // Get files from database using the new GoogleDriveFolderId column
                 var dbDocs = await dbContext.JumpDocuments
-                    .Where(d => d.FolderPath != null && d.FolderPath.Contains(folderId))
+                    .Where(d => d.GoogleDriveFolderId == folderId)
                     .Select(d => new {
                         d.GoogleDriveFileId,
                         d.Name,
-                        d.FolderPath
+                        d.FolderPath,
+                        d.GoogleDriveFolderId
                     })
                     .ToListAsync();
                 

@@ -1600,6 +1600,7 @@ namespace JumpChainSearch.Services
                     LastScanned = DateTime.UtcNow,
                     SourceDrive = driveName,
                     FolderPath = folderPath,
+                    GoogleDriveFolderId = file.Parents?.FirstOrDefault(),
                     WebViewLink = file.WebViewLink ?? string.Empty,
                     DownloadLink = file.ExportLinks?.Values.FirstOrDefault() ?? string.Empty,
                     ThumbnailLink = file.ThumbnailLink ?? string.Empty,
