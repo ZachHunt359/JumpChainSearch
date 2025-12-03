@@ -167,6 +167,58 @@ public static class GoogleDriveEndpoints
                 });
             }
         });
+        
+        // Compare Google Drive API files against database for a specific folder
+        group.MapGet("/verify-folder/{folderId}", async (string folderId, IGoogleDriveService driveService, JumpChainDbContext dbContext) => {
+            try {
+                // Get files from Google Drive API
+                var driveFiles = await driveService.ListFilesInFolderAsync(folderId);
+                var driveFileIds = driveFiles.Select(f => f.Id).ToHashSet();
+                
+                // Get files from database for this folder path
+                var dbDocs = await dbContext.JumpDocuments
+                    .Where(d => d.FolderPath != null && d.FolderPath.Contains(folderId))
+                    .Select(d => new {
+                        d.GoogleDriveFileId,
+                        d.Name,
+                        d.FolderPath
+                    })
+                    .ToListAsync();
+                
+                var dbFileIds = dbDocs.Select(d => d.GoogleDriveFileId).ToHashSet();
+                
+                // Find differences
+                var inDriveNotDb = driveFiles.Where(f => !dbFileIds.Contains(f.Id)).ToList();
+                var inDbNotDrive = dbDocs.Where(d => !driveFileIds.Contains(d.GoogleDriveFileId)).ToList();
+                
+                return Results.Ok(new {
+                    success = true,
+                    folderId = folderId,
+                    totalInDrive = driveFiles.Count(),
+                    totalInDatabase = dbDocs.Count,
+                    inDriveButNotDatabase = new {
+                        count = inDriveNotDb.Count,
+                        files = inDriveNotDb.Select(f => new {
+                            f.Id,
+                            f.Name,
+                            f.MimeType,
+                            f.WebViewLink
+                        }).ToList()
+                    },
+                    inDatabaseButNotDrive = new {
+                        count = inDbNotDrive.Count,
+                        files = inDbNotDrive
+                    }
+                });
+            }
+            catch (Exception ex) {
+                return Results.BadRequest(new {
+                    success = false,
+                    error = ex.Message,
+                    stackTrace = ex.StackTrace
+                });
+            }
+        });
 
         return group;
     }

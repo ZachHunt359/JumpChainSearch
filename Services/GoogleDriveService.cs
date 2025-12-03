@@ -30,6 +30,7 @@ namespace JumpChainSearch.Services
         Task<IEnumerable<DriveData>> GetAvailableDrivesAsync();
         Task<object> DebugFilePropertiesAsync(string fileId);
         Task<List<(string folderId, string folderName, string? resourceKey)>> DiscoverFolderHierarchyAsync(string rootFolderId, string? rootResourceKey = null);
+        Task<IEnumerable<Google.Apis.Drive.v3.Data.File>> ListFilesInFolderAsync(string folderId, string? resourceKey = null);
     }
 
     public record DriveData(string Id, string Name, string? Description);
@@ -1960,6 +1961,45 @@ namespace JumpChainSearch.Services
             {
                 _logger.LogError(ex, $"Error discovering folders in {folderId}: {ex.Message}");
             }
+        }
+        
+        /// <summary>
+        /// List all files in a specific folder using the Google Drive API
+        /// </summary>
+        public async Task<IEnumerable<Google.Apis.Drive.v3.Data.File>> ListFilesInFolderAsync(string folderId, string? resourceKey = null)
+        {
+            var files = new List<Google.Apis.Drive.v3.Data.File>();
+            
+            try
+            {
+                var request = _driveService.Files.List();
+                request.Q = $"'{folderId}' in parents and trashed=false";
+                request.Fields = "nextPageToken, files(id, name, mimeType, size, createdTime, modifiedTime, webViewLink, parents)";
+                request.PageSize = 1000;
+
+                string? pageToken = null;
+                do
+                {
+                    request.PageToken = pageToken;
+                    var response = await request.ExecuteAsync();
+
+                    if (response.Files != null)
+                    {
+                        files.AddRange(response.Files);
+                    }
+
+                    pageToken = response.NextPageToken;
+                } while (pageToken != null);
+                
+                _logger.LogInformation($"Found {files.Count} files in folder {folderId}");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error listing files in folder {folderId}: {ex.Message}");
+                throw;
+            }
+            
+            return files;
         }
     }
 }
