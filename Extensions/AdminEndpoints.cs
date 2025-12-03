@@ -2887,8 +2887,7 @@ public static class AdminEndpoints
     private static async Task<IResult> StartBatchProcessing(
         HttpContext context, 
         JumpChainDbContext dbContext, 
-        AdminAuthService authService,
-        IGoogleDriveService driveService)
+        AdminAuthService authService)
     {
         var (valid, user) = await ValidateSession(context, authService);
         if (!valid)
