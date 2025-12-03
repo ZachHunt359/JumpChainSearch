@@ -586,7 +586,7 @@ public static class AdminEndpoints
                         </div>
                         
                         <div style=""margin-top: 1.5rem; display: flex; gap: 1rem; align-items: center; flex-wrap: wrap;"">
-                            <button class=""btn btn-warning"" onclick=""calculateReprocessCount()"">Calculate Affected Documents</button>
+                            <button class=""btn btn-warning"" id=""calculate-reprocess-btn"" onclick=""calculateReprocessCount()"">Calculate Affected Documents</button>
                             <button class=""btn btn-danger"" id=""start-reprocess-btn"" onclick=""startReprocessing()"" disabled>
                                 Start Reprocessing (<span id=""reprocess-count"">?</span> documents)
                             </button>
@@ -1975,11 +1975,12 @@ public static class AdminEndpoints
         }}
         
         let reprocessProgressInterval = null;
+        let initialQueuedCount = 0;
         
         async function startReprocessing() {{
             const textThreshold = parseInt(document.getElementById('reprocess-text-threshold').value);
             const qualityThreshold = parseFloat(document.getElementById('reprocess-quality-threshold').value);
-            const count = document.getElementById('reprocess-count').textContent;
+            const count = parseInt(document.getElementById('reprocess-count').textContent);
             
             if (!confirm('Start reprocessing ' + count + ' documents?\\n\\nThis will queue them for text extraction with OCR. The process may take a while.')) {{
                 return;
@@ -2004,6 +2005,7 @@ public static class AdminEndpoints
                 const data = await response.json();
                 
                 if (data.success) {{
+                    initialQueuedCount = data.queued; // Store initial count
                     statusSpan.textContent = 'Queued ' + data.queued + ' documents. Monitoring progress...';
                     statusSpan.style.color = 'var(--accent)';
                     
@@ -2018,13 +2020,14 @@ public static class AdminEndpoints
                             const progress = await progressResp.json();
                             
                             const remaining = progress.remaining || 0;
-                            const processed = progress.totalQueued - remaining;
-                            const total = progress.totalQueued || 0;
+                            const total = initialQueuedCount; // Use the initial count we stored
+                            const processed = total - remaining;
                             
-                            if (total === 0) {{
-                                statusSpan.textContent = '✅ Reprocessing complete! Click Calculate to see updated counts.';
+                            if (remaining === 0 || total === 0) {{
+                                statusSpan.textContent = '✅ Reprocessing complete! Processed ' + total + ' documents. Click Calculate to see updated counts.';
                                 statusSpan.style.color = 'var(--success)';
                                 clearInterval(reprocessProgressInterval);
+                                reprocessProgressInterval = null;
                                 btn.disabled = false;
                                 calcBtn.disabled = false;
                                 return;
@@ -2033,17 +2036,10 @@ public static class AdminEndpoints
                             const percent = Math.round((processed / total) * 100);
                             statusSpan.textContent = `Processing: ${{processed}}/${{total}} complete (${{percent}}%) - ${{remaining}} remaining`;
                             statusSpan.style.color = 'var(--accent)';
-                            
-                            // Check if complete
-                            if (remaining === 0) {{
-                                statusSpan.textContent = '✅ Reprocessing complete! Processed ' + total + ' documents. Click Calculate to see updated counts.';
-                                statusSpan.style.color = 'var(--success)';
-                                clearInterval(reprocessProgressInterval);
-                                btn.disabled = false;
-                                calcBtn.disabled = false;
-                            }}
                         }} catch (e) {{
                             console.error('Failed to check reprocessing progress:', e);
+                            statusSpan.textContent = 'Error checking progress: ' + e.message;
+                            statusSpan.style.color = 'var(--error)';
                         }}
                     }}, 3000); // Poll every 3 seconds
                 }} else {{
