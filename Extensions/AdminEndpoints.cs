@@ -3083,7 +3083,7 @@ sudo systemctl restart jumpchain
                 .Select(d => d.LastScanTime)
                 .FirstOrDefaultAsync();
 
-            var scanPidFile = "drive-scan.pid";
+            var scanPidFile = Path.Combine(AppContext.BaseDirectory, "drive-scan.pid");
             var isScanning = File.Exists(scanPidFile);
 
             // Get new documents since last hour (approximate)
@@ -3118,7 +3118,7 @@ sudo systemctl restart jumpchain
             await UpdateLastScanTime(DateTime.UtcNow);
             
             // Check if scan is already running
-            var scanPidFile = "drive-scan.pid";
+            var scanPidFile = Path.Combine(AppContext.BaseDirectory, "drive-scan.pid");
             if (File.Exists(scanPidFile))
             {
                 var existingPidText = File.ReadAllText(scanPidFile);
@@ -3156,7 +3156,7 @@ sudo systemctl restart jumpchain
             {
                 // Windows: PowerShell script
                 var scanScript = @"
-$scriptPath = '" + Directory.GetCurrentDirectory() + @"'
+$scriptPath = '" + AppContext.BaseDirectory + @"'
 Set-Location $scriptPath
 
 $timestamp = Get-Date -Format 'yyyy-MM-dd_HH-mm-ss'
@@ -3175,7 +3175,7 @@ try {
 }
 ";
 
-                scriptPath = Path.Combine(Directory.GetCurrentDirectory(), "drive-scan.ps1");
+                scriptPath = Path.Combine(AppContext.BaseDirectory, "drive-scan.ps1");
                 File.WriteAllText(scriptPath, scanScript);
 
                 startInfo = new ProcessStartInfo
@@ -3196,7 +3196,7 @@ try {
                             ?? "http://localhost:5000";  // Kestrel default
                 
                 var scanScript = @"#!/bin/bash
-cd " + Directory.GetCurrentDirectory() + $@"
+cd " + AppContext.BaseDirectory + $@"
 
 timestamp=$(date +'%Y-%m-%d_%H-%M-%S')
 logFile=""logs/drive-scan-$timestamp.log""
@@ -3212,7 +3212,7 @@ echo ""Scan completed at $(date)"" >> ""$logFile""
 rm -f drive-scan.pid
 ";
 
-                scriptPath = Path.Combine(Directory.GetCurrentDirectory(), "drive-scan.sh");
+                scriptPath = Path.Combine(AppContext.BaseDirectory, "drive-scan.sh");
                 File.WriteAllText(scriptPath, scanScript);
                 
                 // Make script executable on Linux
@@ -3232,8 +3232,8 @@ rm -f drive-scan.pid
             var process = Process.Start(startInfo);
             if (process != null)
             {
-                File.WriteAllText("drive-scan.pid", process.Id.ToString());
-                var logsDir = Path.Combine(Directory.GetCurrentDirectory(), "logs");
+                File.WriteAllText(Path.Combine(AppContext.BaseDirectory, "drive-scan.pid"), process.Id.ToString());
+                var logsDir = Path.Combine(AppContext.BaseDirectory, "logs");
                 if (!Directory.Exists(logsDir))
                 {
                     Directory.CreateDirectory(logsDir);
@@ -3259,7 +3259,7 @@ rm -f drive-scan.pid
 
         try
         {
-            var scanPidFile = "drive-scan.pid";
+            var scanPidFile = Path.Combine(AppContext.BaseDirectory, "drive-scan.pid");
             if (File.Exists(scanPidFile))
             {
                 var pidContent = File.ReadAllText(scanPidFile);
