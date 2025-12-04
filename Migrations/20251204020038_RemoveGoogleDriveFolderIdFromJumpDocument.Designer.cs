@@ -11,7 +11,7 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace JumpChainSearch.Migrations
 {
     [DbContext(typeof(JumpChainDbContext))]
-    [Migration("20251203211912_RemoveGoogleDriveFolderIdFromJumpDocument")]
+    [Migration("20251204020038_RemoveGoogleDriveFolderIdFromJumpDocument")]
     partial class RemoveGoogleDriveFolderIdFromJumpDocument
     {
         /// <inheritdoc />
