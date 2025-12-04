@@ -230,8 +230,8 @@ echo ""
 
 echo "Step 7.6: Setting publish directory permissions for www-data..."
 # Make publish directory group-writable so www-data can create script/PID files
-sudo chown -R $USER:www-data "$DEPLOY_TO/publish"
-sudo chmod -R g+w "$DEPLOY_TO/publish"
+sudo chown -R $USER:www-data "$PUBLISH_DIR"
+sudo chmod -R g+w "$PUBLISH_DIR"
 echo "✓ Publish directory writable by www-data group"
 echo ""
 
