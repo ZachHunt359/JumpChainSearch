@@ -30,10 +30,7 @@ public static class SearchEndpoints
         int offset = 0,
         string? includeTags = null, 
         string? excludeTags = null,
-        int? docId = null,
-        int? minTextLength = null,
-        int? maxTextLength = null,
-        bool? hasOcr = null)
+        int? docId = null)
     {
         try
         {
@@ -44,29 +41,6 @@ public static class SearchEndpoints
             {
                 query = query.Where(d => d.Id == docId.Value);
                 Console.WriteLine($"[DEBUG] Filtering by docId={docId.Value}");
-            }
-            
-            // Filter by text length if provided
-            if (minTextLength.HasValue)
-            {
-                query = query.Where(d => d.ExtractedText != null && d.ExtractedText.Length >= minTextLength.Value);
-            }
-            if (maxTextLength.HasValue)
-            {
-                query = query.Where(d => d.ExtractedText != null && d.ExtractedText.Length <= maxTextLength.Value);
-            }
-            
-            // Filter by hasOcr flag
-            if (hasOcr.HasValue)
-            {
-                if (hasOcr.Value)
-                {
-                    query = query.Where(d => d.ExtractionMethod != null && d.ExtractionMethod.Contains("tesseract_ocr"));
-                }
-                else
-                {
-                    query = query.Where(d => d.ExtractionMethod == null || !d.ExtractionMethod.Contains("tesseract_ocr"));
-                }
             }
             
             // Apply include tag filters if specified

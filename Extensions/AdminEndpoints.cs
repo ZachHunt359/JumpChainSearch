@@ -3147,6 +3147,30 @@ sudo systemctl restart jumpchain
                 return Results.BadRequest(new { success = false, error = "No drives configured. Please configure drives first." });
             }
 
+            // Detect the server's actual listening URL from the current request
+            var scheme = context.Request.Scheme;
+            var host = context.Request.Host.Host;
+            var port = context.Request.Host.Port ?? (scheme == "https" ? 443 : 80);
+            var baseUrl = $"{scheme}://{host}:{port}";
+            
+            // If running behind a reverse proxy (nginx), use localhost with the app's port
+            // Check if we're being proxied (X-Forwarded-For header present)
+            if (context.Request.Headers.ContainsKey("X-Forwarded-For"))
+            {
+                // We're behind a reverse proxy - use localhost with the actual app port
+                // Try to get from environment variable first
+                var aspnetUrls = Environment.GetEnvironmentVariable("ASPNETCORE_URLS");
+                if (!string.IsNullOrEmpty(aspnetUrls))
+                {
+                    baseUrl = aspnetUrls.Split(';').FirstOrDefault() ?? "http://localhost:5248";
+                }
+                else
+                {
+                    // Default to common port
+                    baseUrl = "http://localhost:5248";
+                }
+            }
+            
             // Detect platform and create appropriate script
             bool isWindows = OperatingSystem.IsWindows();
             string scriptPath;
@@ -3163,13 +3187,15 @@ $timestamp = Get-Date -Format 'yyyy-MM-dd_HH-mm-ss'
 $logFile = ""logs\drive-scan-$timestamp.log""
 
 Write-Output ""Starting drive scan at $(Get-Date)"" | Out-File $logFile -Append
+Write-Output ""Using API URL: " + baseUrl + @""" | Out-File $logFile -Append
 
 try {
     # Call the scan endpoint directly
-    $response = Invoke-RestMethod -Uri 'http://localhost:5248/api/google-drive/scan-all' -Method POST
+    $response = Invoke-RestMethod -Uri '" + baseUrl + @"/api/google-drive/scan-all' -Method POST -TimeoutSec 300
     Write-Output ""Scan completed: $($response | ConvertTo-Json)"" | Out-File $logFile -Append
 } catch {
     Write-Output ""Error during scan: $($_.Exception.Message)"" | Out-File $logFile -Append
+    Write-Output ""Error details: $($_.ErrorDetails.Message)"" | Out-File $logFile -Append
 } finally {
     Remove-Item 'drive-scan.pid' -ErrorAction SilentlyContinue
 }
@@ -3191,10 +3217,6 @@ try {
             else
             {
                 // Linux: Bash script
-                // Try to detect the actual listening URL, fallback to common defaults
-                var apiUrl = Environment.GetEnvironmentVariable("ASPNETCORE_URLS")?.Split(';').FirstOrDefault()
-                            ?? "http://localhost:5000";  // Kestrel default
-                
                 var scanScript = @"#!/bin/bash
 cd " + AppContext.BaseDirectory + $@"
 
@@ -3202,12 +3224,16 @@ timestamp=$(date +'%Y-%m-%d_%H-%M-%S')
 logFile=""logs/drive-scan-$timestamp.log""
 
 echo ""Starting drive scan at $(date)"" >> ""$logFile""
+echo ""Using API URL: " + baseUrl + @""" >> ""$logFile""
 
-# Try the configured URL first, then fallback to common ports
-curl -X POST {apiUrl}/api/google-drive/scan-all \
+# Call the scan endpoint
+curl -X POST -v " + baseUrl + @"/api/google-drive/scan-all \
      -H 'Content-Type: application/json' \
+     --max-time 300 \
      >> ""$logFile"" 2>&1
 
+exit_code=$?
+echo ""Curl exit code: $exit_code"" >> ""$logFile""
 echo ""Scan completed at $(date)"" >> ""$logFile""
 rm -f drive-scan.pid
 ";
@@ -3397,7 +3423,7 @@ rm -f drive-scan.pid
 
         try
         {
-            // Get drive configuration to get driveId
+            // Get drive configuration
             var drive = await dbContext.DriveConfigurations
                 .FirstOrDefaultAsync(d => d.DriveName == driveName);
 
@@ -3406,17 +3432,28 @@ rm -f drive-scan.pid
                 return Results.NotFound(new { success = false, error = "Drive not found" });
             }
 
-            var result = await driveService.ScanDriveAsync(drive.DriveId, driveName);
+            // Use the unified scan method that properly handles authentication
+            var (documents, successfulMethod) = await driveService.ScanDriveUnifiedAsync(drive);
+            var documentsList = documents.ToList();
+            
+            // Update preferred auth method if it worked
+            if (successfulMethod != "None" && drive.PreferredAuthMethod != successfulMethod)
+            {
+                drive.PreferredAuthMethod = successfulMethod;
+                await dbContext.SaveChangesAsync();
+            }
+            
             return Results.Ok(new
             {
                 success = true,
                 message = $"Scan completed for {driveName}",
-                newDocuments = result.Count()
+                newDocuments = documentsList.Count,
+                authMethod = successfulMethod
             });
         }
         catch (Exception ex)
         {
-            return Results.BadRequest(new { success = false, error = ex.Message });
+            return Results.BadRequest(new { success = false, error = ex.Message, details = ex.InnerException?.Message });
         }
     }
 

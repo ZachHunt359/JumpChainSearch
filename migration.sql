@@ -1,0 +1,113 @@
+﻿PRAGMA foreign_keys = OFF;
+
+DROP TRIGGER IF EXISTS JumpDocuments_ai;
+DROP TRIGGER IF EXISTS JumpDocuments_au;
+DROP TRIGGER IF EXISTS JumpDocuments_ad;
+DROP TRIGGER IF EXISTS DocumentTags_ai;
+DROP TRIGGER IF EXISTS DocumentTags_au;
+DROP TRIGGER IF EXISTS DocumentTags_ad;
+
+CREATE TABLE JumpDocuments_new (
+    Id INTEGER NOT NULL CONSTRAINT PK_JumpDocuments PRIMARY KEY AUTOINCREMENT,
+    CreatedTime TEXT NOT NULL,
+    Description TEXT NOT NULL,
+    DownloadLink TEXT NOT NULL,
+    ExtractedText TEXT NULL,
+    ExtractionMethod TEXT NULL,
+    FolderPath TEXT NOT NULL,
+    GoogleDriveFileId TEXT NOT NULL,
+    HasThumbnail INTEGER NOT NULL,
+    LastModified TEXT NOT NULL,
+    LastScanned TEXT NOT NULL,
+    MimeType TEXT NOT NULL,
+    ModifiedTime TEXT NOT NULL,
+    Name TEXT NOT NULL,
+    OcrQuality REAL NULL,
+    Size INTEGER NOT NULL,
+    SourceDrive TEXT NOT NULL,
+    TextLastEditedAt TEXT NULL,
+    TextLastEditedBy TEXT NULL,
+    TextNeedsReview INTEGER NOT NULL,
+    TextReviewFlaggedAt TEXT NULL,
+    TextReviewFlaggedBy TEXT NULL,
+    ThumbnailLink TEXT NOT NULL,
+    WebViewLink TEXT NOT NULL
+);
+
+INSERT INTO JumpDocuments_new SELECT Id, CreatedTime, Description, DownloadLink, ExtractedText, ExtractionMethod, FolderPath, GoogleDriveFileId, HasThumbnail, LastModified, LastScanned, MimeType, ModifiedTime, Name, OcrQuality, Size, SourceDrive, TextLastEditedAt, TextLastEditedBy, TextNeedsReview, TextReviewFlaggedAt, TextReviewFlaggedBy, ThumbnailLink, WebViewLink FROM JumpDocuments;
+
+DROP TABLE JumpDocuments;
+ALTER TABLE JumpDocuments_new RENAME TO JumpDocuments;
+
+CREATE UNIQUE INDEX IX_JumpDocuments_GoogleDriveFileId ON JumpDocuments (GoogleDriveFileId);
+CREATE INDEX IX_JumpDocuments_FolderPath ON JumpDocuments (FolderPath);
+CREATE INDEX IX_JumpDocuments_Name ON JumpDocuments (Name);
+CREATE INDEX IX_JumpDocuments_SourceDrive_Name ON JumpDocuments (SourceDrive, Name);
+
+PRAGMA foreign_keys = ON;
+
+CREATE TRIGGER JumpDocuments_ai AFTER INSERT ON JumpDocuments BEGIN
+    INSERT INTO JumpDocuments_fts(rowid, Name, FolderPath, Tags, ExtractedText)
+    SELECT new.Id, new.Name, new.FolderPath,
+           (SELECT GROUP_CONCAT(TagName, ' ') FROM DocumentTags WHERE JumpDocumentId = new.Id),
+           new.ExtractedText;
+END;
+
+CREATE TRIGGER JumpDocuments_au AFTER UPDATE ON JumpDocuments BEGIN
+    INSERT INTO JumpDocuments_fts(JumpDocuments_fts, rowid, Name, FolderPath, Tags, ExtractedText)
+    SELECT 'delete', old.Id, old.Name, old.FolderPath,
+           (SELECT GROUP_CONCAT(TagName, ' ') FROM DocumentTags WHERE JumpDocumentId = old.Id),
+           old.ExtractedText;
+    INSERT INTO JumpDocuments_fts(rowid, Name, FolderPath, Tags, ExtractedText)
+    SELECT new.Id, new.Name, new.FolderPath,
+           (SELECT GROUP_CONCAT(TagName, ' ') FROM DocumentTags WHERE JumpDocumentId = new.Id),
+           new.ExtractedText;
+END;
+
+CREATE TRIGGER JumpDocuments_ad AFTER DELETE ON JumpDocuments BEGIN
+    INSERT INTO JumpDocuments_fts(JumpDocuments_fts, rowid, Name, FolderPath, Tags, ExtractedText)
+    SELECT 'delete', old.Id, old.Name, old.FolderPath,
+           (SELECT GROUP_CONCAT(TagName, ' ') FROM DocumentTags WHERE JumpDocumentId = old.Id),
+           old.ExtractedText;
+END;
+
+CREATE TRIGGER DocumentTags_ai AFTER INSERT ON DocumentTags BEGIN
+    INSERT INTO JumpDocuments_fts(JumpDocuments_fts, rowid, Name, FolderPath, Tags, ExtractedText)
+    SELECT 'delete', d.Id, d.Name, d.FolderPath,
+           (SELECT GROUP_CONCAT(TagName, ' ') FROM DocumentTags WHERE JumpDocumentId = d.Id),
+           d.ExtractedText
+    FROM JumpDocuments d WHERE d.Id = new.JumpDocumentId;
+    INSERT INTO JumpDocuments_fts(rowid, Name, FolderPath, Tags, ExtractedText)
+    SELECT d.Id, d.Name, d.FolderPath,
+           (SELECT GROUP_CONCAT(TagName, ' ') FROM DocumentTags WHERE JumpDocumentId = d.Id),
+           d.ExtractedText
+    FROM JumpDocuments d WHERE d.Id = new.JumpDocumentId;
+END;
+
+CREATE TRIGGER DocumentTags_au AFTER UPDATE ON DocumentTags BEGIN
+    INSERT INTO JumpDocuments_fts(JumpDocuments_fts, rowid, Name, FolderPath, Tags, ExtractedText)
+    SELECT 'delete', d.Id, d.Name, d.FolderPath,
+           (SELECT GROUP_CONCAT(TagName, ' ') FROM DocumentTags WHERE JumpDocumentId = d.Id),
+           d.ExtractedText
+    FROM JumpDocuments d WHERE d.Id = old.JumpDocumentId;
+    INSERT INTO JumpDocuments_fts(rowid, Name, FolderPath, Tags, ExtractedText)
+    SELECT d.Id, d.Name, d.FolderPath,
+           (SELECT GROUP_CONCAT(TagName, ' ') FROM DocumentTags WHERE JumpDocumentId = d.Id),
+           d.ExtractedText
+    FROM JumpDocuments d WHERE d.Id = new.JumpDocumentId;
+END;
+
+CREATE TRIGGER DocumentTags_ad AFTER DELETE ON DocumentTags BEGIN
+    INSERT INTO JumpDocuments_fts(JumpDocuments_fts, rowid, Name, FolderPath, Tags, ExtractedText)
+    SELECT 'delete', d.Id, d.Name, d.FolderPath,
+           (SELECT GROUP_CONCAT(TagName, ' ') FROM DocumentTags WHERE JumpDocumentId = d.Id),
+           d.ExtractedText
+    FROM JumpDocuments d WHERE d.Id = old.JumpDocumentId;
+    INSERT INTO JumpDocuments_fts(rowid, Name, FolderPath, Tags, ExtractedText)
+    SELECT d.Id, d.Name, d.FolderPath,
+           (SELECT GROUP_CONCAT(TagName, ' ') FROM DocumentTags WHERE JumpDocumentId = d.Id),
+           d.ExtractedText
+    FROM JumpDocuments d WHERE d.Id = old.JumpDocumentId;
+END;
+
+INSERT INTO __EFMigrationsHistory (MigrationId, ProductVersion) VALUES ('20251204020038_RemoveGoogleDriveFolderIdFromJumpDocument', '8.0.10');
