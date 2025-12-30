@@ -155,7 +155,7 @@ public class Fts5SearchService
             while (await reader.ReadAsync())
             {
                 var id = reader.GetInt32(0);
-                var name = reader.GetString(1);
+                var name = reader.IsDBNull(1) ? "" : reader.GetString(1);
                 var bm25Score = reader.GetDouble(2);
                 rawResults.Add((id, name, bm25Score));
             }
