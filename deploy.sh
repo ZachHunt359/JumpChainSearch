@@ -56,6 +56,7 @@ fi
 APP_DIR=$(pwd)
 PUBLISH_DIR="$DEPLOY_DIR/publish"
 BRANCH="main"
+DEPLOY_LOG="/var/lib/jumpchain/deployment.log"
 
 # Database connection
 DB_CONNECTION="Data Source=$DB_PATH;Mode=ReadWrite"
@@ -70,6 +71,10 @@ if [ ! -f "JumpChainSearch.csproj" ]; then
     echo "Error: JumpChainSearch.csproj not found. Are you in the project directory?"
     exit 1
 fi
+
+# Log deployment attempt
+sudo mkdir -p $(dirname "$DEPLOY_LOG")
+echo "$(date '+%Y-%m-%d %H:%M:%S %Z') | $ENVIRONMENT | $(whoami) | STARTED" | sudo tee -a "$DEPLOY_LOG" > /dev/null
 
 echo "Step 1: Stopping the service..."
 sudo systemctl stop $SERVICE_NAME
@@ -89,10 +94,40 @@ sudo chown $USER:$USER "$DEPLOY_DIR"
 echo "✓ Deployment directory ready"
 echo ""
 
-echo "Step 4: Pulling latest changes from Git..."
+echo "Step 4: Pre-deployment verification..."
+# Get current and remote commit info
+CURRENT_COMMIT=$(git rev-parse HEAD 2>/dev/null || echo "none")
+CURRENT_DATE=$(git log -1 --format=%ct HEAD 2>/dev/null || echo "0")
 git fetch origin
+REMOTE_COMMIT=$(git rev-parse origin/$BRANCH)
+REMOTE_DATE=$(git log -1 --format=%ct origin/$BRANCH)
+
+# Check if we're going backwards in time (potential rollback)
+if [ "$CURRENT_COMMIT" != "none" ] && [ "$CURRENT_COMMIT" != "$REMOTE_COMMIT" ]; then
+    if [ "$REMOTE_DATE" -lt "$CURRENT_DATE" ]; then
+        echo "⚠️  WARNING: TIME TRAVEL DETECTED!"
+        echo ""
+        echo "Current commit: $CURRENT_COMMIT ($(git log -1 --format='%ai' HEAD))"
+        echo "Remote commit:  $REMOTE_COMMIT ($(git log -1 --format='%ai' origin/$BRANCH))"
+        echo ""
+        echo "You're about to deploy an OLDER commit than what's currently running."
+        echo "This may cause features to disappear or regressions to occur."
+        echo ""
+        read -p "Are you SURE you want to continue? (yes/NO) " -r
+        echo
+        if [[ ! $REPLY =~ ^[Yy][Ee][Ss]$ ]]; then
+            echo "Deployment cancelled - staying on current commit."
+            exit 0
+        fi
+        echo "⚠️  Proceeding with rollback as requested..."
+        echo ""
+    fi
+fi
+
+echo "Pulling latest changes from Git..."
 git reset --hard origin/$BRANCH
-echo "✓ Code updated to latest commit"
+NEW_COMMIT=$(git rev-parse HEAD)
+echo "✓ Code updated to commit: $NEW_COMMIT"
 echo ""
 
 echo "Step 5: Backing up database..."
@@ -282,6 +317,20 @@ echo "======================================"
 echo "Deployment completed successfully!"
 echo "======================================"
 echo ""
+
+# Log successful deployment
+sudo mkdir -p $(dirname "$DEPLOY_LOG")
+DEPLOY_TIMESTAMP=$(date '+%Y-%m-%d %H:%M:%S %Z')
+DEPLOY_USER=$(whoami)
+DEPLOY_COMMIT=$(git rev-parse HEAD)
+DEPLOY_COMMIT_MSG=$(git log -1 --format='%s' HEAD | tr '\n' ' ')
+DEPLOY_COMMIT_DATE=$(git log -1 --format='%ai' HEAD)
+DLL_SIZE=$(stat -f%z "$PUBLISH_DIR/JumpChainSearch.dll" 2>/dev/null || stat -c%s "$PUBLISH_DIR/JumpChainSearch.dll" 2>/dev/null)
+
+echo "$DEPLOY_TIMESTAMP | $ENVIRONMENT | $DEPLOY_USER | $DEPLOY_COMMIT | DLL:${DLL_SIZE}b | $DEPLOY_COMMIT_MSG" | sudo tee -a "$DEPLOY_LOG" > /dev/null
+echo "✓ Deployment logged to $DEPLOY_LOG"
+echo ""
+
 echo "Useful commands:"
 echo "  View logs:    sudo journalctl -u $SERVICE_NAME -f"
 echo "  Stop service: sudo systemctl stop $SERVICE_NAME"

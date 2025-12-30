@@ -148,7 +148,7 @@ public static class SearchEndpointsOptimized
                     var fetchOffset = offset; // Start at the requested offset
                     
                     Console.WriteLine($"[SEARCH] Tag filters detected, fetching {fetchLimit} FTS5 results starting at {fetchOffset}");
-                    fts5Results = await fts5Service.SearchFts5Async(fts5Query, fetchLimit, fetchOffset);
+                    fts5Results = await fts5Service.SearchFts5Async(fts5Query, fetchLimit, fetchOffset, searchTerms, phrases);
                     
                     if (fts5Results.Count == 0)
                     {
@@ -195,7 +195,7 @@ public static class SearchEndpointsOptimized
                 {
                     // No tag filters - use original pagination logic
                     totalCount = await fts5Service.GetFts5CountAsync(fts5Query);
-                    fts5Results = await fts5Service.SearchFts5Async(fts5Query, limit, offset);
+                    fts5Results = await fts5Service.SearchFts5Async(fts5Query, limit, offset, searchTerms, phrases);
                     
                     if (fts5Results.Count == 0)
                     {
