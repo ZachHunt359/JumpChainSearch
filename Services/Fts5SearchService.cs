@@ -124,13 +124,14 @@ public class Fts5SearchService
         }
         
         // Use parameterized query to prevent SQL injection
-        // Fetch Name column along with scores for title boost calculation
+        // Join with main table to get Name column (FTS5 is contentless so doesn't store actual text)
         var sql = @"
             SELECT 
-                rowid as Id,
-                Name,
+                fts.rowid as Id,
+                jd.Name,
                 bm25(JumpDocuments_fts, 10.0, 5.0, 3.0, 1.0) as BM25Score
-            FROM JumpDocuments_fts
+            FROM JumpDocuments_fts fts
+            INNER JOIN JumpDocuments jd ON fts.rowid = jd.Id
             WHERE JumpDocuments_fts MATCH {0}
             ORDER BY BM25Score
             LIMIT {1} OFFSET {2}";
@@ -165,20 +166,16 @@ public class Fts5SearchService
             if (shouldApplyBoost && rawResults.Any())
             {
                 // Calculate title boost and combine with BM25 score for ALL results in pool
-                var boostedResults = rawResults.Select(r => 
+                var boostedResults = new List<(int Id, double Score)>();
+                
+                foreach (var r in rawResults)
                 {
                     var titleBoost = CalculateTitleBoost(r.Name, searchTerms ?? new List<string>(), phrases ?? new List<string>());
                     var finalScore = r.BM25Score + titleBoost;
-                    
-                    if (titleBoost < 0) // Only log actual boosts (negative is better)
-                    {
-                        Console.WriteLine($"[FTS5] Title boost for '{r.Name}': {titleBoost:F1} (BM25: {r.BM25Score:F2}, Final: {finalScore:F2})");
-                    }
-                    
-                    return (r.Id, finalScore);
-                })
-                .OrderBy(r => r.finalScore) // Lower (more negative) is better - boosts push results up
-                .ToList();
+                    boostedResults.Add((r.Id, finalScore));
+                }
+                
+                boostedResults = boostedResults.OrderBy(r => r.Score).ToList();
                 
                 // NOW apply pagination to the consistently-sorted boosted results
                 var paginatedResults = boostedResults.Skip(offset).Take(limit).ToList();
@@ -223,7 +220,6 @@ public class Fts5SearchService
                 {
                     // Exact phrase in title - massive boost
                     boost -= 1000;
-                    Console.WriteLine($"[TITLE BOOST] Exact phrase '{phrase}' found in title '{title}': -1000");
                 }
             }
         }
@@ -231,20 +227,19 @@ public class Fts5SearchService
         // If we have search terms, analyze them
         if (searchTerms.Count > 0)
         {
-            var termsLower = searchTerms.Select(t => t.ToLowerInvariant()).ToList();
+            // Strip asterisks from search terms (FTS5 prefix matching)
+            var termsLower = searchTerms.Select(t => t.ToLowerInvariant().TrimEnd('*')).ToList();
             
             // Check if ALL search terms appear in title
             var allTermsPresent = termsLower.All(term => titleLower.Contains(term));
             if (allTermsPresent)
             {
                 boost -= 100;
-                Console.WriteLine($"[TITLE BOOST] All terms present in title '{title}': -100");
                 
                 // Additional boost if terms appear in the same order as searched
                 if (AreTermsInOrder(titleLower, termsLower))
                 {
                     boost -= 50;
-                    Console.WriteLine($"[TITLE BOOST] Terms in correct order in title '{title}': -50");
                 }
             }
             else
@@ -255,7 +250,6 @@ public class Fts5SearchService
                 {
                     var partialBoost = matchCount * -10;
                     boost += partialBoost;
-                    Console.WriteLine($"[TITLE BOOST] {matchCount}/{termsLower.Count} terms in title '{title}': {partialBoost}");
                 }
             }
         }
