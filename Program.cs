@@ -92,6 +92,14 @@ builder.Services.AddScoped(sp =>
     return new System.Net.Http.HttpClient { BaseAddress = new Uri(baseUri) };
 });
 
+// Configure Kestrel with longer timeouts for drive scanning
+builder.Services.Configure<Microsoft.AspNetCore.Server.Kestrel.Core.KestrelServerOptions>(options =>
+{
+    // Allow up to 10 minutes for drive scanning requests
+    options.Limits.KeepAliveTimeout = TimeSpan.FromMinutes(10);
+    options.Limits.RequestHeadersTimeout = TimeSpan.FromMinutes(10);
+});
+
 builder.Services.AddRazorPages();
 builder.Services.AddServerSideBlazor(options =>
 {

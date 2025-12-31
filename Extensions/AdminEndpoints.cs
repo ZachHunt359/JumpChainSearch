@@ -1052,15 +1052,34 @@ public static class AdminEndpoints
                 if (driveData.isScanning) {{
                     driveStatus.className = 'status status-running';
                     driveStatus.innerHTML = '<span class=""spinner""></span> Scanning';
+                    
+                    // Show detailed progress
+                    let progressText = `Last scan: ${{driveData.lastScan}}<br>`;
+                    
+                    if (driveData.currentDrive) {{
+                        progressText += `Current: ${{driveData.currentDrive}}<br>`;
+                    }}
+                    
+                    if (driveData.scanTotalDrives > 0) {{
+                        progressText += `Progress: ${{driveData.drivesScanned}}/${{driveData.scanTotalDrives}} drives<br>`;
+                    }}
+                    
+                    progressText += `New documents found: ${{driveData.newDocuments || 0}}`;
+                    
+                    if (driveData.lastError) {{
+                        progressText += `<br><span style=""color: var(--danger)"">Last error: ${{driveData.lastError}}</span>`;
+                    }}
+                    
+                    driveInfo.innerHTML = progressText;
                 }} else {{
                     driveStatus.className = 'status status-idle';
                     driveStatus.textContent = 'Idle';
+                    
+                    driveInfo.innerHTML = `
+                        Last scan: ${{driveData.lastScan}}<br>
+                        New documents: ${{driveData.newDocuments || 0}}
+                    `;
                 }}
-                
-                driveInfo.innerHTML = `
-                    Last scan: ${{driveData.lastScan}}<br>
-                    New documents: ${{driveData.newDocuments}}
-                `;
             }} catch (e) {{
                 console.error('Failed to update drive status:', e);
             }}
@@ -2642,25 +2661,42 @@ public static class AdminEndpoints
             statusDiv.innerHTML = '<span class=""spinner""></span> Scanning drive...';
             
             try {{
+                // Use longer timeout for drive scanning (10 minutes)
+                const controller = new AbortController();
+                const timeout = setTimeout(() => controller.abort(), 600000);
+                
                 const response = await fetch('/admin/drives/' + encodeURIComponent(driveName) + '/scan', {{
-                    method: 'POST'
+                    method: 'POST',
+                    signal: controller.signal
                 }});
+                clearTimeout(timeout);
+                
+                // Check if response is OK before trying to parse JSON
+                if (!response.ok) {{
+                    const text = await response.text();
+                    statusDiv.style.color = 'var(--danger)';
+                    statusDiv.innerHTML = `✗ Server error (${{response.status}}): ${{text.substring(0, 100)}}`;
+                    return;
+                }}
+                
                 const data = await response.json();
                 
                 if (data.success) {{
                     statusDiv.style.color = 'var(--success)';
-                    statusDiv.innerHTML = `✓ Scan complete! Found ${{data.newDocuments}} new documents`;
-                    setTimeout(() => {{
-                        statusDiv.style.display = 'none';
-                        loadDriveList();
-                    }}, 3000);
+                    statusDiv.innerHTML = `✓ Scan complete! Found ${{data.newDocuments}} new documents (Auth: ${{data.authMethod}})`;
+                    // Don't auto-hide or reload - let user see the result
                 }} else {{
                     statusDiv.style.color = 'var(--danger)';
                     statusDiv.innerHTML = `✗ Error: ${{data.error}}`;
                 }}
             }} catch (error) {{
                 statusDiv.style.color = 'var(--danger)';
-                statusDiv.innerHTML = `✗ Error: ${{error.message}}`;
+                if (error.name === 'AbortError') {{
+                    statusDiv.innerHTML = `✗ Timeout: Scan took longer than 10 minutes`;
+                }} else {{
+                    statusDiv.innerHTML = `✗ Error: ${{error.message}}`;
+                }}
+                console.error('Scan error:', error);
             }}
         }}
         
@@ -2674,6 +2710,15 @@ public static class AdminEndpoints
                 const response = await fetch('/admin/drives/' + encodeURIComponent(driveName) + '/refresh-folders', {{
                     method: 'POST'
                 }});
+                
+                // Check if response is OK before trying to parse JSON
+                if (!response.ok) {{
+                    const text = await response.text();
+                    statusDiv.style.color = 'var(--danger)';
+                    statusDiv.innerHTML = `✗ Server error (${{response.status}}): ${{text.substring(0, 100)}}`;
+                    return;
+                }}
+                
                 const data = await response.json();
                 
                 if (data.success) {{
@@ -2684,11 +2729,7 @@ public static class AdminEndpoints
                     if (container.style.display === 'block') {{
                         await loadDriveFolders(index, driveName);
                     }}
-                    
-                    setTimeout(() => {{
-                        statusDiv.style.display = 'none';
-                        loadDriveList();
-                    }}, 3000);
+                    // Don't auto-hide or reload - let user see the result
                 }} else {{
                     statusDiv.style.color = 'var(--danger)';
                     statusDiv.innerHTML = `✗ Error: ${{data.error}}`;
@@ -2696,6 +2737,7 @@ public static class AdminEndpoints
             }} catch (error) {{
                 statusDiv.style.color = 'var(--danger)';
                 statusDiv.innerHTML = `✗ Error: ${{error.message}}`;
+                console.error('Refresh folders error:', error);
             }}
         }}
         
@@ -3083,21 +3125,24 @@ sudo systemctl restart jumpchain
                 .Select(d => d.LastScanTime)
                 .FirstOrDefaultAsync();
 
-            var scanPidFile = Path.Combine(AppContext.BaseDirectory, "drive-scan.pid");
-            var isScanning = File.Exists(scanPidFile);
-
-            // Get new documents since last hour (approximate)
-            var oneHourAgo = DateTime.Now.AddHours(-1);
-            var newDocuments = await dbContext.JumpDocuments
-                .Where(d => d.LastScanned > oneHourAgo)
-                .CountAsync();
+            // Use background service status instead of PID file
+            var isScanning = DriveScanBackgroundService.IsScanning;
+            var currentDrive = DriveScanBackgroundService.CurrentDrive;
+            var drivesScanned = DriveScanBackgroundService.DrivesScanned;
+            var scanTotalDrives = DriveScanBackgroundService.TotalDrives;
+            var newDocuments = DriveScanBackgroundService.NewDocuments;
+            var lastError = DriveScanBackgroundService.LastError;
 
             return Results.Ok(new
             {
                 isScanning,
                 totalDrives,
                 lastScan = lastScan != default(DateTime) ? lastScan.ToString("g") : "Never",
-                newDocuments
+                newDocuments,
+                currentDrive,
+                drivesScanned,
+                scanTotalDrives,
+                lastError
             });
         }
         catch (Exception ex)
@@ -3106,7 +3151,12 @@ sudo systemctl restart jumpchain
         }
     }
 
-    private static async Task<IResult> StartDriveScan(HttpContext context, JumpChainDbContext dbContext, AdminAuthService authService, IConfiguration configuration)
+    private static async Task<IResult> StartDriveScan(
+        HttpContext context, 
+        JumpChainDbContext dbContext, 
+        AdminAuthService authService, 
+        IServiceScopeFactory serviceScopeFactory,
+        ILogger<AdminAuthService> logger)
     {
         var (valid, user) = await ValidateSession(context, authService);
         if (!valid)
@@ -3114,29 +3164,17 @@ sudo systemctl restart jumpchain
 
         try
         {
-            // Update last scan time in configuration
-            await UpdateLastScanTime(DateTime.UtcNow);
-            
             // Check if scan is already running
-            var scanPidFile = Path.Combine(AppContext.BaseDirectory, "drive-scan.pid");
-            if (File.Exists(scanPidFile))
+            if (DriveScanBackgroundService.IsScanning)
             {
-                var existingPidText = File.ReadAllText(scanPidFile);
-                if (int.TryParse(existingPidText, out int existingPid))
-                {
-                    try
-                    {
-                        var existingProcess = Process.GetProcessById(existingPid);
-                        if (!existingProcess.HasExited)
-                        {
-                            return Results.Ok(new { success = false, message = "Drive scan is already running", pid = existingPid });
-                        }
-                    }
-                    catch
-                    {
-                        File.Delete(scanPidFile);
-                    }
-                }
+                return Results.Ok(new 
+                { 
+                    success = false, 
+                    message = "Drive scan is already running",
+                    currentDrive = DriveScanBackgroundService.CurrentDrive,
+                    drivesScanned = DriveScanBackgroundService.DrivesScanned,
+                    totalDrives = DriveScanBackgroundService.TotalDrives
+                });
             }
 
             // Get drive count
@@ -3147,129 +3185,19 @@ sudo systemctl restart jumpchain
                 return Results.BadRequest(new { success = false, error = "No drives configured. Please configure drives first." });
             }
 
-            // Detect the server's actual listening URL from the current request
-            var scheme = context.Request.Scheme;
-            var host = context.Request.Host.Host;
-            var port = context.Request.Host.Port ?? (scheme == "https" ? 443 : 80);
-            var baseUrl = $"{scheme}://{host}:{port}";
-            
-            // If running behind a reverse proxy (nginx), use localhost with the app's port
-            // Check if we're being proxied (X-Forwarded-For header present)
-            if (context.Request.Headers.ContainsKey("X-Forwarded-For"))
+            // Start the background scan
+            var started = await DriveScanBackgroundService.StartScanAsync(
+                serviceScopeFactory,
+                logger);
+
+            if (started)
             {
-                // We're behind a reverse proxy - use localhost with the actual app port
-                // Try to get from environment variable first
-                var aspnetUrls = Environment.GetEnvironmentVariable("ASPNETCORE_URLS");
-                if (!string.IsNullOrEmpty(aspnetUrls))
-                {
-                    baseUrl = aspnetUrls.Split(';').FirstOrDefault() ?? "http://localhost:5248";
-                }
-                else
-                {
-                    // Default to common port
-                    baseUrl = "http://localhost:5248";
-                }
-            }
-            
-            // Detect platform and create appropriate script
-            bool isWindows = OperatingSystem.IsWindows();
-            string scriptPath;
-            ProcessStartInfo startInfo;
-
-            if (isWindows)
-            {
-                // Windows: PowerShell script
-                var scanScript = @"
-$scriptPath = '" + AppContext.BaseDirectory + @"'
-Set-Location $scriptPath
-
-$timestamp = Get-Date -Format 'yyyy-MM-dd_HH-mm-ss'
-$logFile = ""logs\drive-scan-$timestamp.log""
-
-Write-Output ""Starting drive scan at $(Get-Date)"" | Out-File $logFile -Append
-Write-Output ""Using API URL: " + baseUrl + @""" | Out-File $logFile -Append
-
-try {
-    # Call the scan endpoint directly
-    $response = Invoke-RestMethod -Uri '" + baseUrl + @"/api/google-drive/scan-all' -Method POST -TimeoutSec 300
-    Write-Output ""Scan completed: $($response | ConvertTo-Json)"" | Out-File $logFile -Append
-} catch {
-    Write-Output ""Error during scan: $($_.Exception.Message)"" | Out-File $logFile -Append
-    Write-Output ""Error details: $($_.ErrorDetails.Message)"" | Out-File $logFile -Append
-} finally {
-    Remove-Item 'drive-scan.pid' -ErrorAction SilentlyContinue
-}
-";
-
-                scriptPath = Path.Combine(AppContext.BaseDirectory, "drive-scan.ps1");
-                File.WriteAllText(scriptPath, scanScript);
-
-                startInfo = new ProcessStartInfo
-                {
-                    FileName = "powershell.exe",
-                    Arguments = $"-ExecutionPolicy Bypass -File \"{scriptPath}\"",
-                    UseShellExecute = false,
-                    CreateNoWindow = true,
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true
-                };
+                return Results.Ok(new { success = true, message = "Drive scan started in background", drivesCount });
             }
             else
             {
-                // Linux: Bash script
-                var scanScript = @"#!/bin/bash
-cd " + AppContext.BaseDirectory + $@"
-
-timestamp=$(date +'%Y-%m-%d_%H-%M-%S')
-logFile=""logs/drive-scan-$timestamp.log""
-
-echo ""Starting drive scan at $(date)"" >> ""$logFile""
-echo ""Using API URL: " + baseUrl + @""" >> ""$logFile""
-
-# Call the scan endpoint
-curl -X POST -v " + baseUrl + @"/api/google-drive/scan-all \
-     -H 'Content-Type: application/json' \
-     --max-time 300 \
-     >> ""$logFile"" 2>&1
-
-exit_code=$?
-echo ""Curl exit code: $exit_code"" >> ""$logFile""
-echo ""Scan completed at $(date)"" >> ""$logFile""
-rm -f drive-scan.pid
-";
-
-                scriptPath = Path.Combine(AppContext.BaseDirectory, "drive-scan.sh");
-                File.WriteAllText(scriptPath, scanScript);
-                
-                // Make script executable on Linux
-                Process.Start("chmod", $"+x \"{scriptPath}\"")?.WaitForExit();
-
-                startInfo = new ProcessStartInfo
-                {
-                    FileName = "/bin/bash",
-                    Arguments = $"\"{scriptPath}\"",
-                    UseShellExecute = false,
-                    CreateNoWindow = true,
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true
-                };
+                return Results.BadRequest(new { success = false, error = "Failed to start scan - already running" });
             }
-
-            var process = Process.Start(startInfo);
-            if (process != null)
-            {
-                File.WriteAllText(Path.Combine(AppContext.BaseDirectory, "drive-scan.pid"), process.Id.ToString());
-                var logsDir = Path.Combine(AppContext.BaseDirectory, "logs");
-                if (!Directory.Exists(logsDir))
-                {
-                    Directory.CreateDirectory(logsDir);
-                }
-                File.WriteAllText(Path.Combine(logsDir, "drive-scan-last-run.txt"), DateTime.Now.ToString());
-
-                return Results.Ok(new { success = true, message = "Drive scan started", pid = process.Id, drivesCount });
-            }
-
-            return Results.BadRequest(new { success = false, error = "Failed to start scan process" });
         }
         catch (Exception ex)
         {
