@@ -719,10 +719,10 @@
                                             Category
                                             @if (categoryAutoSelected)
                                             {
-                                                <small class="text-success"><i class="fas fa-check me-1"></i>Auto-selected</small>
+                                                <small class="text-success"><i class="fas fa-check me-1"></i>Locked to existing tag's category</small>
                                             }
                                         </label>
-                                        <select class="form-select" @bind="newTagCategory">
+                                        <select class="form-select" @bind="newTagCategory" disabled="@categoryAutoSelected">
                                             <option value="Genre">Genre (e.g., Fantasy, Sci-Fi, Horror)</option>
                                             <option value="Series">Series (e.g., Marvel, DC, Worm)</option>
                                             <option value="Content">Content (e.g., NSFW)</option>
@@ -2151,6 +2151,14 @@
                 .ToList();
             
             showTagSuggestions = filteredTagSuggestions.Any();
+
+            // Enforce single category per tag name even without clicking a suggestion
+            var exactMatch = availableTags.FirstOrDefault(t => t.Name.Equals(newTagName, StringComparison.OrdinalIgnoreCase));
+            if (exactMatch != null)
+            {
+                newTagCategory = exactMatch.Category;
+                categoryAutoSelected = true;
+            }
         }
         
         StateHasChanged();

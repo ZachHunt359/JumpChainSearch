@@ -66,11 +66,24 @@ public static class TagVotingEndpoints
             if (document == null)
                 return Results.NotFound(new { success = false, message = "Document not found" });
 
+            // Enforce single category per tag name: if this tag name already exists anywhere
+            // (approved or pending), use its established category instead of the submitted one
+            var canonicalCategory = await context.DocumentTags
+                .Where(t => t.TagName == request.TagName)
+                .Select(t => t.TagCategory)
+                .FirstOrDefaultAsync()
+                ?? await context.TagSuggestions
+                .Where(s => s.TagName == request.TagName && s.Status == "Pending")
+                .Select(s => s.TagCategory)
+                .FirstOrDefaultAsync();
+
+            var tagCategory = canonicalCategory ?? request.TagCategory;
+
             // Check if tag already exists on document
             var existingTag = await context.DocumentTags
                 .FirstOrDefaultAsync(t => t.JumpDocumentId == request.DocumentId && 
                                         t.TagName == request.TagName && 
-                                        t.TagCategory == request.TagCategory);
+                                        t.TagCategory == tagCategory);
             
             if (existingTag != null)
                 return Results.BadRequest(new { success = false, message = "Tag already exists on this document" });
@@ -79,7 +92,7 @@ public static class TagVotingEndpoints
             var existingSuggestion = await context.TagSuggestions
                 .FirstOrDefaultAsync(s => s.JumpDocumentId == request.DocumentId && 
                                         s.TagName == request.TagName && 
-                                        s.TagCategory == request.TagCategory &&
+                                        s.TagCategory == tagCategory &&
                                         s.Status == "Pending");
             
             if (existingSuggestion != null)
@@ -90,7 +103,7 @@ public static class TagVotingEndpoints
             {
                 JumpDocumentId = request.DocumentId,
                 TagName = request.TagName,
-                TagCategory = request.TagCategory,
+                TagCategory = tagCategory,
                 SuggestedByUserId = request.UserId,
                 CreatedAt = DateTime.UtcNow,
                 Status = "Pending"
@@ -105,7 +118,7 @@ public static class TagVotingEndpoints
                 UserId = request.UserId,
                 JumpDocumentId = request.DocumentId,
                 TagName = request.TagName,
-                TagCategory = request.TagCategory,
+                TagCategory = tagCategory,
                 IsAdded = true,
                 CreatedAt = DateTime.UtcNow
             };
@@ -130,6 +143,8 @@ public static class TagVotingEndpoints
                 success = true, 
                 message = "Tag suggestion created", 
                 suggestionId = suggestion.Id,
+                category = tagCategory,
+                categoryOverridden = canonicalCategory != null && !string.Equals(canonicalCategory, request.TagCategory, StringComparison.Ordinal),
                 userOverrideCreated = true,
                 autoVoteCreated = true
             });
