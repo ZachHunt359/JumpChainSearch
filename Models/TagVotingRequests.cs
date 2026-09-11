@@ -71,3 +71,15 @@ public class TagCategoryResolutionRequest
     public string TagName { get; set; } = string.Empty;
     public string TagCategory { get; set; } = string.Empty;
 }
+
+public class BulkTagSuggestionActionRequest
+{
+    public string Action { get; set; } = string.Empty;
+    public List<BulkTagSuggestionItemRequest> Items { get; set; } = new();
+}
+
+public class BulkTagSuggestionItemRequest
+{
+    public int Id { get; set; }
+    public string? TagCategory { get; set; }
+}

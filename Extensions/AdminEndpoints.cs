@@ -386,6 +386,14 @@ public static class AdminEndpoints
             border-color: var(--success);
             background: rgba(46, 204, 113, 0.14);
         }}
+
+        .suggestion-row {{
+            cursor: pointer;
+        }}
+
+        .suggestion-row.selected {{
+            background: rgba(233, 69, 96, 0.16);
+        }}
         
         .status {{
             display: inline-block;
@@ -2184,6 +2192,9 @@ public static class AdminEndpoints
         
         // Tag Voting Functions
         let tagCategoryConflicts = [];
+        let pendingTagSuggestions = [];
+        const selectedSuggestionIds = new Set();
+        let lastSelectedSuggestionIndex = null;
 
         async function openCategoryConflictResolver() {{
             const dialog = document.getElementById('category-conflict-dialog');
@@ -2283,6 +2294,9 @@ public static class AdminEndpoints
                 
                 const suggestions = data.pendingSuggestions || [];
                 const removals = data.pendingRemovalRequests || [];
+                pendingTagSuggestions = suggestions;
+                selectedSuggestionIds.clear();
+                lastSelectedSuggestionIndex = null;
                 
                 if (suggestions.length === 0 && removals.length === 0) {{
                     container.innerHTML = '<div style=""color: var(--success); padding: 1rem;"">✅ No pending tag actions!</div>';
@@ -2293,10 +2307,18 @@ public static class AdminEndpoints
                 
                 if (suggestions.length > 0) {{
                     html += `
-                        <h4 style=""margin-top: 1rem; color: var(--accent);"">Tag Suggestions (${{suggestions.length}})</h4>
+                        <div style=""display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 0.75rem; margin-top: 1rem;"">
+                            <h4 style=""margin: 0; color: var(--accent);"">Tag Suggestions (${{suggestions.length}})</h4>
+                            <div style=""display: flex; align-items: center; gap: 0.5rem;"">
+                                <span id=""selected-suggestion-count"" style=""color: var(--text-secondary); font-size: 0.85rem;"">0 selected</span>
+                                <button id=""bulk-approve-suggestions"" class=""btn btn-success"" onclick=""bulkProcessSuggestions('approve')"" disabled>Approve Selected</button>
+                                <button id=""bulk-reject-suggestions"" class=""btn btn-danger"" onclick=""bulkProcessSuggestions('reject')"" disabled>Reject Selected</button>
+                            </div>
+                        </div>
                         <table style=""width: 100%; border-collapse: collapse; margin-top: 0.5rem;"">
                             <thead>
                                 <tr style=""border-bottom: 2px solid var(--border); text-align: left;"">
+                                    <th style=""padding: 0.5rem; width: 2.5rem;""><input id=""select-all-suggestions"" type=""checkbox"" onclick=""toggleAllSuggestions(this.checked)"" aria-label=""Select all suggestions"" /></th>
                                     <th style=""padding: 0.5rem;"">Document</th>
                                     <th style=""padding: 0.5rem;"">Drive Link</th>
                                     <th style=""padding: 0.5rem;"">Tag</th>
@@ -2306,8 +2328,9 @@ public static class AdminEndpoints
                                 </tr>
                             </thead>
                             <tbody>
-                                ${{suggestions.map(s => `
-                                    <tr style=""border-bottom: 1px solid var(--border);"">
+                                ${{suggestions.map((s, index) => `
+                                    <tr id=""suggestion-row-${{s.id}}"" class=""suggestion-row"" onclick=""handleSuggestionRowClick(event, ${{index}}, ${{s.id}})"" style=""border-bottom: 1px solid var(--border);"">
+                                        <td style=""padding: 0.5rem;""><input id=""suggestion-checkbox-${{s.id}}"" type=""checkbox"" onclick=""handleSuggestionCheckboxClick(event, ${{index}}, ${{s.id}})"" aria-label=""Select tag suggestion"" /></td>
                                         <td style=""padding: 0.5rem;""><a href=""/?docId=${{s.jumpDocumentId}}"" target=""_blank"" style=""color: var(--accent); text-decoration: none;"">${{escapeHtml(s.documentName || 'Doc #' + s.jumpDocumentId)}}</a></td>
                                         <td style=""padding: 0.5rem;""><a href=""${{s.googleDriveLink || '#'}}"" target=""_blank"" style=""color: var(--accent); text-decoration: none;"" title=""Open in Google Drive"">🔗 Drive</a></td>
                                         <td style=""padding: 0.5rem;""><strong>${{escapeHtml(s.tagName)}}</strong></td>
@@ -2372,8 +2395,112 @@ public static class AdminEndpoints
                 }}
                 
                 container.innerHTML = html;
+                updateSuggestionSelectionUi();
             }} catch (error) {{
                 container.innerHTML = `<div style=""color: var(--danger);"">Error: ${{error.message}}</div>`;
+            }}
+        }}
+
+        function handleSuggestionCheckboxClick(event, index, id) {{
+            event.stopPropagation();
+            const checked = event.currentTarget.checked;
+            if (event.shiftKey && lastSelectedSuggestionIndex !== null) {{
+                selectSuggestionRange(lastSelectedSuggestionIndex, index, checked);
+            }} else if (checked) {{
+                selectedSuggestionIds.add(id);
+            }} else {{
+                selectedSuggestionIds.delete(id);
+            }}
+            lastSelectedSuggestionIndex = index;
+            updateSuggestionSelectionUi();
+        }}
+
+        function handleSuggestionRowClick(event, index, id) {{
+            if (event.target.closest('a, button, select, input')) return;
+
+            if (event.shiftKey && lastSelectedSuggestionIndex !== null) {{
+                selectSuggestionRange(lastSelectedSuggestionIndex, index, true);
+            }} else if (event.ctrlKey || event.metaKey) {{
+                if (selectedSuggestionIds.has(id)) selectedSuggestionIds.delete(id);
+                else selectedSuggestionIds.add(id);
+            }} else {{
+                selectedSuggestionIds.clear();
+                selectedSuggestionIds.add(id);
+            }}
+            lastSelectedSuggestionIndex = index;
+            updateSuggestionSelectionUi();
+        }}
+
+        function selectSuggestionRange(startIndex, endIndex, selected) {{
+            const start = Math.min(startIndex, endIndex);
+            const end = Math.max(startIndex, endIndex);
+            for (let index = start; index <= end; index++) {{
+                const id = pendingTagSuggestions[index]?.id;
+                if (id === undefined) continue;
+                if (selected) selectedSuggestionIds.add(id);
+                else selectedSuggestionIds.delete(id);
+            }}
+        }}
+
+        function toggleAllSuggestions(selected) {{
+            selectedSuggestionIds.clear();
+            if (selected) pendingTagSuggestions.forEach(suggestion => selectedSuggestionIds.add(suggestion.id));
+            lastSelectedSuggestionIndex = null;
+            updateSuggestionSelectionUi();
+        }}
+
+        function updateSuggestionSelectionUi() {{
+            pendingTagSuggestions.forEach(suggestion => {{
+                const selected = selectedSuggestionIds.has(suggestion.id);
+                const checkbox = document.getElementById('suggestion-checkbox-' + suggestion.id);
+                if (checkbox) checkbox.checked = selected;
+                document.getElementById('suggestion-row-' + suggestion.id)?.classList.toggle('selected', selected);
+            }});
+
+            const count = selectedSuggestionIds.size;
+            const countLabel = document.getElementById('selected-suggestion-count');
+            if (countLabel) countLabel.textContent = count + ' selected';
+            const approveButton = document.getElementById('bulk-approve-suggestions');
+            const rejectButton = document.getElementById('bulk-reject-suggestions');
+            if (approveButton) approveButton.disabled = count === 0;
+            if (rejectButton) rejectButton.disabled = count === 0;
+
+            const selectAll = document.getElementById('select-all-suggestions');
+            if (selectAll) {{
+                selectAll.checked = count > 0 && count === pendingTagSuggestions.length;
+                selectAll.indeterminate = count > 0 && count < pendingTagSuggestions.length;
+            }}
+        }}
+
+        async function bulkProcessSuggestions(action) {{
+            const selected = pendingTagSuggestions.filter(suggestion => selectedSuggestionIds.has(suggestion.id));
+            if (selected.length === 0) return;
+
+            const actionLabel = action === 'approve' ? 'approve' : 'reject';
+            if (!confirm(`${{actionLabel.charAt(0).toUpperCase() + actionLabel.slice(1)}} ${{selected.length}} selected suggestion${{selected.length === 1 ? '' : 's'}}?`)) return;
+
+            const items = selected.map(suggestion => ({{
+                id: suggestion.id,
+                tagCategory: document.getElementById('category-' + suggestion.id)?.value || suggestion.tagCategory
+            }}));
+            const buttons = [document.getElementById('bulk-approve-suggestions'), document.getElementById('bulk-reject-suggestions')];
+            buttons.forEach(button => {{ if (button) button.disabled = true; }});
+
+            try {{
+                const response = await fetch('/api/voting/admin/bulk-suggestions', {{
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers: {{ 'Content-Type': 'application/json' }},
+                    body: JSON.stringify({{ action, items }})
+                }});
+                const data = await response.json();
+                if (!response.ok || !data.success) throw new Error(data.message || `Failed to ${{actionLabel}} suggestions`);
+
+                alert(`${{data.processed}} suggestion${{data.processed === 1 ? '' : 's'}} ${{action === 'approve' ? 'approved' : 'rejected'}}.`);
+                await loadPendingTags();
+            }} catch (error) {{
+                alert('Error: ' + error.message);
+                updateSuggestionSelectionUi();
             }}
         }}
         

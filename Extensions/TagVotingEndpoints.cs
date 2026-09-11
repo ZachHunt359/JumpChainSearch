@@ -35,6 +35,7 @@ public static class TagVotingEndpoints
         // Manually approve/reject suggestion (admin only)
         group.MapPost("/admin/approve-suggestion/{id}", ApproveTagSuggestion);
         group.MapPost("/admin/reject-suggestion/{id}", RejectTagSuggestion);
+        group.MapPost("/admin/bulk-suggestions", BulkProcessTagSuggestions);
         group.MapPost("/admin/approve-removal/{id}", ApproveTagRemoval);
         group.MapPost("/admin/reject-removal/{id}", RejectTagRemoval);
         group.MapGet("/admin/category-conflicts", GetTagCategoryConflicts);
@@ -686,101 +687,24 @@ public static class TagVotingEndpoints
 
         try
         {
-            var suggestion = await context.TagSuggestions
-                .Include(s => s.JumpDocument)
-                .Include(s => s.Votes)
-                .FirstOrDefaultAsync(s => s.Id == id);
-                
-            if (suggestion == null)
-                return Results.NotFound(new { success = false, message = "Suggestion not found" });
-
-            var normalizedName = suggestion.TagName.ToUpperInvariant();
-            var establishedCategories = (await context.DocumentTags
-                    .Where(tag => tag.TagName.ToUpper() == normalizedName)
-                    .Select(tag => tag.TagCategory)
-                    .ToListAsync())
-                .Concat(await context.TagSuggestions
-                    .Where(tag => tag.Id != suggestion.Id && tag.TagName.ToUpper() == normalizedName)
-                    .Select(tag => tag.TagCategory)
-                    .ToListAsync())
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .ToList();
-
-            if (establishedCategories.Count > 1)
-            {
-                return Results.Conflict(new
-                {
-                    success = false,
-                    message = $"Tag '{suggestion.TagName}' has unresolved category conflicts. Resolve them before approval."
-                });
-            }
-
-            var requestedCategory = !string.IsNullOrWhiteSpace(categoryOverride) ? categoryOverride : suggestion.TagCategory;
-            var finalCategory = establishedCategories.SingleOrDefault() ?? requestedCategory;
-
-            // Check if tag already exists
-            var existingTag = await context.DocumentTags
-                .FirstOrDefaultAsync(t => t.JumpDocumentId == suggestion.JumpDocumentId && 
-                                        t.TagName.ToUpper() == normalizedName);
-
-            if (existingTag == null)
-            {
-                // Add the tag with the final category
-                var newTag = new DocumentTag
-                {
-                    JumpDocumentId = suggestion.JumpDocumentId,
-                    TagName = suggestion.TagName,
-                    TagCategory = finalCategory
-                };
-
-                context.DocumentTags.Add(newTag);
-            }
-            else
-            {
-                existingTag.TagCategory = finalCategory;
-            }
-
-            suggestion.TagCategory = finalCategory;
-            suggestion.Status = "Applied";
-            suggestion.AppliedAt = DateTime.UtcNow;
-
-            // Create ApprovedTagRule for persistence across regenerations
-            var rule = new ApprovedTagRule
-            {
-                GoogleDriveFileId = suggestion.JumpDocument.GoogleDriveFileId,
-                DocumentName = suggestion.JumpDocument.Name,
-                TagName = suggestion.TagName,
-                TagCategory = finalCategory,
-                RuleType = "Add",
-                ApprovalSource = "AdminApproval",
-                ApprovedByUserId = user?.Username ?? "admin",
-                TagSuggestionId = suggestion.Id,
-                VotesInFavor = suggestion.Votes.Where(v => v.IsInFavor).Sum(v => (int)v.Weight),
-                TotalVotes = suggestion.Votes.Sum(v => (int)v.Weight),
-                IsActive = true,
-                CreatedAt = DateTime.UtcNow
-            };
-
-            context.ApprovedTagRules.Add(rule);
-
-            // Remove all user overrides for this tag (it's now official)
-            var overrides = await context.UserTagOverrides
-                .Where(o => o.JumpDocumentId == suggestion.JumpDocumentId && 
-                          o.TagName.ToUpper() == normalizedName &&
-                          o.IsAdded == true)
-                .ToListAsync();
-
-            context.UserTagOverrides.RemoveRange(overrides);
-
+            var result = await ApplySuggestionApproval(context, user, id, categoryOverride);
             await context.SaveChangesAsync();
 
             return Results.Ok(new { 
                 success = true, 
                 message = "Tag suggestion approved and applied", 
-                overridesRemoved = overrides.Count,
+                overridesRemoved = result.OverridesRemoved,
                 ruleCreated = true,
-                ruleId = rule.Id
+                ruleId = result.Rule.Id
             });
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return Results.NotFound(new { success = false, message = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Results.Conflict(new { success = false, message = ex.Message });
         }
         catch (Exception ex)
         {
@@ -796,32 +720,178 @@ public static class TagVotingEndpoints
 
         try
         {
-            var suggestion = await context.TagSuggestions.FindAsync(id);
-            if (suggestion == null)
-                return Results.NotFound(new { success = false, message = "Suggestion not found" });
-
-            suggestion.Status = "Rejected";
-            suggestion.RejectionReason = null;
-
-            // Remove user overrides for this tag
-            var overrides = await context.UserTagOverrides
-                .Where(o => o.JumpDocumentId == suggestion.JumpDocumentId && 
-                          o.TagName == suggestion.TagName && 
-                          o.TagCategory == suggestion.TagCategory &&
-                          o.IsAdded == true)
-                .ToListAsync();
-
-            context.UserTagOverrides.RemoveRange(overrides);
-
+            var overridesRemoved = await ApplySuggestionRejection(context, id);
             await context.SaveChangesAsync();
 
-            return Results.Ok(new { success = true, message = "Tag suggestion rejected", overridesRemoved = overrides.Count });
+            return Results.Ok(new { success = true, message = "Tag suggestion rejected", overridesRemoved });
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return Results.NotFound(new { success = false, message = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Results.Conflict(new { success = false, message = ex.Message });
         }
         catch (Exception ex)
         {
             return Results.Problem($"Error rejecting suggestion: {ex.Message}");
         }
     }
+
+    private static async Task<IResult> BulkProcessTagSuggestions(
+        HttpContext httpContext,
+        JumpChainDbContext context,
+        AdminAuthService authService,
+        BulkTagSuggestionActionRequest request)
+    {
+        var (valid, user) = await ValidateSession(httpContext, authService);
+        if (!valid)
+            return Results.Unauthorized();
+
+        var action = (request.Action ?? string.Empty).Trim().ToLowerInvariant();
+        var items = (request.Items ?? new List<BulkTagSuggestionItemRequest>())
+            .Where(item => item.Id > 0)
+            .GroupBy(item => item.Id)
+            .Select(group => group.Last())
+            .ToList();
+
+        if (action is not ("approve" or "reject"))
+            return Results.BadRequest(new { success = false, message = "Action must be 'approve' or 'reject'." });
+        if (items.Count == 0)
+            return Results.BadRequest(new { success = false, message = "Select at least one suggestion." });
+        if (items.Count > 500)
+            return Results.BadRequest(new { success = false, message = "A maximum of 500 suggestions can be processed at once." });
+
+        await using var transaction = await context.Database.BeginTransactionAsync();
+        try
+        {
+            foreach (var item in items)
+            {
+                if (action == "approve")
+                    await ApplySuggestionApproval(context, user, item.Id, item.TagCategory);
+                else
+                    await ApplySuggestionRejection(context, item.Id);
+            }
+
+            await context.SaveChangesAsync();
+            await transaction.CommitAsync();
+            return Results.Ok(new { success = true, action, processed = items.Count });
+        }
+        catch (Exception ex) when (ex is KeyNotFoundException or InvalidOperationException)
+        {
+            await transaction.RollbackAsync();
+            return Results.Conflict(new { success = false, message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            await transaction.RollbackAsync();
+            return Results.Problem($"Error processing tag suggestions: {ex.Message}");
+        }
+    }
+
+    private static async Task<SuggestionApprovalResult> ApplySuggestionApproval(
+        JumpChainDbContext context,
+        AdminUser? user,
+        int id,
+        string? categoryOverride)
+    {
+        var suggestion = await context.TagSuggestions
+            .Include(s => s.JumpDocument)
+            .Include(s => s.Votes)
+            .FirstOrDefaultAsync(s => s.Id == id)
+            ?? throw new KeyNotFoundException($"Suggestion {id} was not found.");
+
+        if (suggestion.Status != "Pending")
+            throw new InvalidOperationException($"Suggestion {id} is no longer pending.");
+
+        var normalizedName = suggestion.TagName.ToUpperInvariant();
+        var establishedCategories = (await context.DocumentTags
+                .Where(tag => tag.TagName.ToUpper() == normalizedName)
+                .Select(tag => tag.TagCategory)
+                .ToListAsync())
+            .Concat(await context.TagSuggestions
+                .Where(tag => tag.Id != suggestion.Id && tag.TagName.ToUpper() == normalizedName)
+                .Select(tag => tag.TagCategory)
+                .ToListAsync())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        if (establishedCategories.Count > 1)
+            throw new InvalidOperationException($"Tag '{suggestion.TagName}' has unresolved category conflicts. Resolve them before approval.");
+
+        var requestedCategory = !string.IsNullOrWhiteSpace(categoryOverride) ? categoryOverride : suggestion.TagCategory;
+        var finalCategory = establishedCategories.SingleOrDefault() ?? requestedCategory;
+        var existingTag = context.DocumentTags.Local
+            .FirstOrDefault(tag => tag.JumpDocumentId == suggestion.JumpDocumentId && tag.TagName.Equals(suggestion.TagName, StringComparison.OrdinalIgnoreCase))
+            ?? await context.DocumentTags
+                .FirstOrDefaultAsync(tag => tag.JumpDocumentId == suggestion.JumpDocumentId && tag.TagName.ToUpper() == normalizedName);
+
+        if (existingTag == null)
+        {
+            context.DocumentTags.Add(new DocumentTag
+            {
+                JumpDocumentId = suggestion.JumpDocumentId,
+                TagName = suggestion.TagName,
+                TagCategory = finalCategory
+            });
+        }
+        else
+        {
+            existingTag.TagCategory = finalCategory;
+        }
+
+        suggestion.TagCategory = finalCategory;
+        suggestion.Status = "Applied";
+        suggestion.AppliedAt = DateTime.UtcNow;
+
+        var rule = new ApprovedTagRule
+        {
+            GoogleDriveFileId = suggestion.JumpDocument.GoogleDriveFileId,
+            DocumentName = suggestion.JumpDocument.Name,
+            TagName = suggestion.TagName,
+            TagCategory = finalCategory,
+            RuleType = "Add",
+            ApprovalSource = "AdminApproval",
+            ApprovedByUserId = user?.Username ?? "admin",
+            TagSuggestionId = suggestion.Id,
+            VotesInFavor = suggestion.Votes.Where(v => v.IsInFavor).Sum(v => (int)v.Weight),
+            TotalVotes = suggestion.Votes.Sum(v => (int)v.Weight),
+            IsActive = true,
+            CreatedAt = DateTime.UtcNow
+        };
+        context.ApprovedTagRules.Add(rule);
+
+        var overrides = await context.UserTagOverrides
+            .Where(o => o.JumpDocumentId == suggestion.JumpDocumentId && o.TagName.ToUpper() == normalizedName && o.IsAdded)
+            .ToListAsync();
+        context.UserTagOverrides.RemoveRange(overrides);
+
+        return new SuggestionApprovalResult(overrides.Count, rule);
+    }
+
+    private static async Task<int> ApplySuggestionRejection(JumpChainDbContext context, int id)
+    {
+        var suggestion = await context.TagSuggestions.FindAsync(id)
+            ?? throw new KeyNotFoundException($"Suggestion {id} was not found.");
+
+        if (suggestion.Status != "Pending")
+            throw new InvalidOperationException($"Suggestion {id} is no longer pending.");
+
+        suggestion.Status = "Rejected";
+        suggestion.RejectionReason = null;
+        var normalizedName = suggestion.TagName.ToUpperInvariant();
+        var overrides = await context.UserTagOverrides
+            .Where(o => o.JumpDocumentId == suggestion.JumpDocumentId &&
+                        o.TagName.ToUpper() == normalizedName &&
+                        o.TagCategory == suggestion.TagCategory &&
+                        o.IsAdded)
+            .ToListAsync();
+        context.UserTagOverrides.RemoveRange(overrides);
+        return overrides.Count;
+    }
+
+    private sealed record SuggestionApprovalResult(int OverridesRemoved, ApprovedTagRule Rule);
 
     private static async Task<IResult> ApproveTagRemoval(HttpContext httpContext, JumpChainDbContext context, AdminAuthService authService, int id)
     {
