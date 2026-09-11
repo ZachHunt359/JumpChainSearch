@@ -37,6 +37,8 @@ public static class TagVotingEndpoints
         group.MapPost("/admin/reject-suggestion/{id}", RejectTagSuggestion);
         group.MapPost("/admin/approve-removal/{id}", ApproveTagRemoval);
         group.MapPost("/admin/reject-removal/{id}", RejectTagRemoval);
+        group.MapGet("/admin/category-conflicts", GetTagCategoryConflicts);
+        group.MapPost("/admin/category-conflicts/resolve", ResolveTagCategoryConflicts);
         
         // Check if threshold met and auto-apply
         group.MapPost("/check-thresholds", CheckAndApplyThresholds);
@@ -432,6 +434,174 @@ public static class TagVotingEndpoints
         }
     }
 
+    private static async Task<IResult> GetTagCategoryConflicts(
+        HttpContext context,
+        JumpChainDbContext dbContext,
+        AdminAuthService authService)
+    {
+        var (valid, _) = await ValidateSession(context, authService);
+        if (!valid)
+            return Results.Unauthorized();
+
+        var approvedPairs = await dbContext.DocumentTags
+            .AsNoTracking()
+            .Select(tag => new { tag.TagName, tag.TagCategory, Source = "Approved" })
+            .ToListAsync();
+        var suggestionPairs = await dbContext.TagSuggestions
+            .AsNoTracking()
+            .Select(tag => new { tag.TagName, tag.TagCategory, Source = "Suggestion" })
+            .ToListAsync();
+
+        var conflicts = approvedPairs
+            .Concat(suggestionPairs)
+            .Where(tag => !string.IsNullOrWhiteSpace(tag.TagName) && !string.IsNullOrWhiteSpace(tag.TagCategory))
+            .GroupBy(tag => tag.TagName.Trim(), StringComparer.OrdinalIgnoreCase)
+            .Select(group => new
+            {
+                TagName = group
+                    .GroupBy(tag => tag.TagName.Trim(), StringComparer.Ordinal)
+                    .OrderByDescending(nameGroup => nameGroup.Count())
+                    .ThenBy(nameGroup => nameGroup.Key, StringComparer.OrdinalIgnoreCase)
+                    .First().Key,
+                Categories = group
+                    .GroupBy(tag => tag.TagCategory, StringComparer.OrdinalIgnoreCase)
+                    .Select(categoryGroup => new
+                    {
+                        Category = categoryGroup.First().TagCategory,
+                        ApprovedCount = categoryGroup.Count(tag => tag.Source == "Approved"),
+                        SuggestionCount = categoryGroup.Count(tag => tag.Source == "Suggestion")
+                    })
+                    .OrderBy(category => category.Category, StringComparer.OrdinalIgnoreCase)
+                    .ToList()
+            })
+            .Where(group => group.Categories.Count > 1)
+            .OrderBy(group => group.TagName, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        return Results.Ok(new { success = true, conflicts });
+    }
+
+    private static async Task<IResult> ResolveTagCategoryConflicts(
+        HttpContext context,
+        JumpChainDbContext dbContext,
+        AdminAuthService authService,
+        ResolveTagCategoryConflictsRequest request)
+    {
+        var (valid, _) = await ValidateSession(context, authService);
+        if (!valid)
+            return Results.Unauthorized();
+
+        var resolutions = (request.Resolutions ?? new List<TagCategoryResolutionRequest>())
+            .Where(resolution => !string.IsNullOrWhiteSpace(resolution.TagName) && !string.IsNullOrWhiteSpace(resolution.TagCategory))
+            .GroupBy(resolution => resolution.TagName.Trim(), StringComparer.OrdinalIgnoreCase)
+            .Select(group => new
+            {
+                TagName = group.Key,
+                TagCategory = group.Last().TagCategory.Trim()
+            })
+            .ToList();
+
+        if (resolutions.Count == 0)
+            return Results.BadRequest(new { success = false, message = "Select at least one category resolution." });
+
+        await using var transaction = await dbContext.Database.BeginTransactionAsync();
+        try
+        {
+            var results = new List<object>();
+
+            foreach (var resolution in resolutions)
+            {
+                var normalizedName = resolution.TagName.ToUpperInvariant();
+                var existingCategories = (await dbContext.DocumentTags
+                        .Where(tag => tag.TagName.ToUpper() == normalizedName)
+                        .Select(tag => tag.TagCategory)
+                        .ToListAsync())
+                    .Concat(await dbContext.TagSuggestions
+                        .Where(tag => tag.TagName.ToUpper() == normalizedName)
+                        .Select(tag => tag.TagCategory)
+                        .ToListAsync())
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+
+                if (existingCategories.Count == 0)
+                {
+                    await transaction.RollbackAsync();
+                    return Results.BadRequest(new { success = false, message = $"Tag '{resolution.TagName}' no longer exists." });
+                }
+
+                if (!existingCategories.Contains(resolution.TagCategory, StringComparer.OrdinalIgnoreCase) &&
+                    !TagCategory.All.Contains(resolution.TagCategory, StringComparer.OrdinalIgnoreCase))
+                {
+                    await transaction.RollbackAsync();
+                    return Results.BadRequest(new { success = false, message = $"Category '{resolution.TagCategory}' is not valid for '{resolution.TagName}'." });
+                }
+
+                var documentTags = await dbContext.DocumentTags
+                    .Where(tag => tag.TagName.ToUpper() == normalizedName)
+                    .ToListAsync();
+                var suggestions = await dbContext.TagSuggestions
+                    .Where(tag => tag.TagName.ToUpper() == normalizedName)
+                    .ToListAsync();
+                var removalRequests = await dbContext.TagRemovalRequests
+                    .Where(tag => tag.TagName.ToUpper() == normalizedName)
+                    .ToListAsync();
+                var overrides = await dbContext.UserTagOverrides
+                    .Where(tag => tag.TagName.ToUpper() == normalizedName)
+                    .ToListAsync();
+                var approvedRules = await dbContext.ApprovedTagRules
+                    .Where(tag => tag.TagName.ToUpper() == normalizedName)
+                    .ToListAsync();
+
+                var duplicateOverrides = overrides
+                    .GroupBy(tag => (tag.UserId, tag.JumpDocumentId, tag.TagName))
+                    .SelectMany(group => group
+                        .OrderByDescending(tag => tag.CreatedAt)
+                        .ThenByDescending(tag => tag.Id)
+                        .Skip(1))
+                    .ToList();
+
+                if (duplicateOverrides.Count > 0)
+                {
+                    dbContext.UserTagOverrides.RemoveRange(duplicateOverrides);
+                    await dbContext.SaveChangesAsync();
+                }
+
+                foreach (var tag in documentTags)
+                    tag.TagCategory = resolution.TagCategory;
+                foreach (var tag in suggestions)
+                    tag.TagCategory = resolution.TagCategory;
+                foreach (var tag in removalRequests)
+                    tag.TagCategory = resolution.TagCategory;
+                foreach (var tag in overrides.Except(duplicateOverrides))
+                    tag.TagCategory = resolution.TagCategory;
+                foreach (var tag in approvedRules)
+                    tag.TagCategory = resolution.TagCategory;
+
+                results.Add(new
+                {
+                    resolution.TagName,
+                    resolution.TagCategory,
+                    ApprovedTags = documentTags.Count,
+                    Suggestions = suggestions.Count,
+                    RemovalRequests = removalRequests.Count,
+                    UserOverrides = overrides.Count - duplicateOverrides.Count,
+                    ApprovedRules = approvedRules.Count,
+                    RemovedDuplicateOverrides = duplicateOverrides.Count
+                });
+            }
+
+            await dbContext.SaveChangesAsync();
+            await transaction.CommitAsync();
+
+            return Results.Ok(new { success = true, resolved = results.Count, results });
+        }
+        catch (Exception ex)
+        {
+            await transaction.RollbackAsync();
+            return Results.Problem($"Error resolving tag category conflicts: {ex.Message}");
+        }
+    }
+
     private static async Task<IResult> GetVotingConfig(JumpChainDbContext context)
     {
         try
@@ -524,14 +694,34 @@ public static class TagVotingEndpoints
             if (suggestion == null)
                 return Results.NotFound(new { success = false, message = "Suggestion not found" });
 
-            // Use override category if provided, otherwise use suggestion's category
-            var finalCategory = !string.IsNullOrWhiteSpace(categoryOverride) ? categoryOverride : suggestion.TagCategory;
+            var normalizedName = suggestion.TagName.ToUpperInvariant();
+            var establishedCategories = (await context.DocumentTags
+                    .Where(tag => tag.TagName.ToUpper() == normalizedName)
+                    .Select(tag => tag.TagCategory)
+                    .ToListAsync())
+                .Concat(await context.TagSuggestions
+                    .Where(tag => tag.Id != suggestion.Id && tag.TagName.ToUpper() == normalizedName)
+                    .Select(tag => tag.TagCategory)
+                    .ToListAsync())
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            if (establishedCategories.Count > 1)
+            {
+                return Results.Conflict(new
+                {
+                    success = false,
+                    message = $"Tag '{suggestion.TagName}' has unresolved category conflicts. Resolve them before approval."
+                });
+            }
+
+            var requestedCategory = !string.IsNullOrWhiteSpace(categoryOverride) ? categoryOverride : suggestion.TagCategory;
+            var finalCategory = establishedCategories.SingleOrDefault() ?? requestedCategory;
 
             // Check if tag already exists
             var existingTag = await context.DocumentTags
                 .FirstOrDefaultAsync(t => t.JumpDocumentId == suggestion.JumpDocumentId && 
-                                        t.TagName == suggestion.TagName && 
-                                        t.TagCategory == finalCategory);
+                                        t.TagName.ToUpper() == normalizedName);
 
             if (existingTag == null)
             {
@@ -545,7 +735,12 @@ public static class TagVotingEndpoints
 
                 context.DocumentTags.Add(newTag);
             }
+            else
+            {
+                existingTag.TagCategory = finalCategory;
+            }
 
+            suggestion.TagCategory = finalCategory;
             suggestion.Status = "Applied";
             suggestion.AppliedAt = DateTime.UtcNow;
 
@@ -571,8 +766,7 @@ public static class TagVotingEndpoints
             // Remove all user overrides for this tag (it's now official)
             var overrides = await context.UserTagOverrides
                 .Where(o => o.JumpDocumentId == suggestion.JumpDocumentId && 
-                          o.TagName == suggestion.TagName && 
-                          o.TagCategory == finalCategory &&
+                          o.TagName.ToUpper() == normalizedName &&
                           o.IsAdded == true)
                 .ToListAsync();
 

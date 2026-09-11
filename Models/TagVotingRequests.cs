@@ -60,3 +60,14 @@ public class CreateManualRuleRequest
     public string RuleType { get; set; } = string.Empty; // "Add" or "Remove"
     public string? Notes { get; set; }
 }
+
+public class ResolveTagCategoryConflictsRequest
+{
+    public List<TagCategoryResolutionRequest> Resolutions { get; set; } = new();
+}
+
+public class TagCategoryResolutionRequest
+{
+    public string TagName { get; set; } = string.Empty;
+    public string TagCategory { get; set; } = string.Empty;
+}

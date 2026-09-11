@@ -355,6 +355,37 @@ public static class AdminEndpoints
             font-size: 0.85rem;
             margin-bottom: 0.8rem;
         }}
+
+        .category-conflict-dialog {{
+            width: min(900px, calc(100vw - 2rem));
+            max-height: 85vh;
+            overflow: auto;
+            padding: 0;
+            color: var(--text-primary);
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+        }}
+
+        .category-conflict-dialog::backdrop {{
+            background: rgba(0, 0, 0, 0.72);
+        }}
+
+        .category-choice {{
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            margin: 0.25rem 0.4rem 0.25rem 0;
+            padding: 0.4rem 0.65rem;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            cursor: pointer;
+        }}
+
+        .category-choice:has(input:checked) {{
+            border-color: var(--success);
+            background: rgba(46, 204, 113, 0.14);
+        }}
         
         .status {{
             display: inline-block;
@@ -682,6 +713,7 @@ public static class AdminEndpoints
                         <h3>Pending Tag Suggestions</h3>
                         <p>Review and approve/reject community tag suggestions.</p>
                         <button class=""btn btn-primary"" onclick=""loadPendingTags()"">Load Pending Tags</button>
+                        <button class=""btn btn-secondary"" onclick=""openCategoryConflictResolver()"">Resolve Category Conflicts</button>
                     </div>
                     <div class=""action-card"">
                         <h3>Voting Configuration</h3>
@@ -690,6 +722,12 @@ public static class AdminEndpoints
                     </div>
                 </div>
                 <div id=""pending-tags-info"" style=""margin-top: 1rem;""></div>
+
+                <dialog id=""category-conflict-dialog"" class=""category-conflict-dialog"">
+                    <div style=""display: flex; justify-content: space-between; align-items: center; padding: 1rem 1.25rem; border-bottom: 1px solid var(--border);""><h3 style=""margin: 0;"">Resolve Tag Categories</h3><button class=""btn btn-secondary"" onclick=""closeCategoryConflictResolver()"" aria-label=""Close"">Close</button></div>
+                    <div style=""padding: 1rem 1.25rem;""><p style=""color: var(--text-secondary); margin-bottom: 1rem;"">Select one canonical category for each tag you want to correct. Unselected tags will not be changed.</p><div id=""category-conflict-list""></div></div>
+                    <div style=""display: flex; justify-content: flex-end; gap: 0.75rem; padding: 1rem 1.25rem; border-top: 1px solid var(--border);""><button class=""btn btn-secondary"" onclick=""closeCategoryConflictResolver()"">Cancel</button><button id=""apply-category-resolutions"" class=""btn btn-success"" onclick=""applyCategoryConflictResolutions()"">Apply Selected</button></div>
+                </dialog>
             </section>
             
             <section style=""margin-top: 2rem; border-top: 2px solid var(--border); padding-top: 2rem;"">
@@ -2145,6 +2183,91 @@ public static class AdminEndpoints
         }}
         
         // Tag Voting Functions
+        let tagCategoryConflicts = [];
+
+        async function openCategoryConflictResolver() {{
+            const dialog = document.getElementById('category-conflict-dialog');
+            const container = document.getElementById('category-conflict-list');
+            if (!dialog.open) dialog.showModal();
+            container.innerHTML = '<div style=""color: var(--text-secondary);"">Loading category conflicts...</div>';
+
+            try {{
+                const response = await fetch('/api/voting/admin/category-conflicts', {{ credentials: 'same-origin' }});
+                const data = await response.json();
+                if (!response.ok || !data.success) {{
+                    throw new Error(data.message || 'Failed to load category conflicts');
+                }}
+
+                tagCategoryConflicts = data.conflicts || [];
+                if (tagCategoryConflicts.length === 0) {{
+                    container.innerHTML = '<div style=""color: var(--success); padding: 1rem 0;"">No tag names currently use multiple categories.</div>';
+                    return;
+                }}
+
+                container.innerHTML = tagCategoryConflicts.map((conflict, conflictIndex) => `
+                    <div style=""padding: 1rem 0; border-bottom: 1px solid var(--border);"">
+                        <strong>${{escapeHtml(conflict.tagName)}}</strong>
+                        <div style=""margin-top: 0.5rem;"">
+                            ${{conflict.categories.map((category, categoryIndex) => `
+                                <label class=""category-choice"">
+                                    <input type=""radio"" name=""category-conflict-${{conflictIndex}}"" value=""${{categoryIndex}}"" />
+                                    <span>${{escapeHtml(category.category)}}</span>
+                                    <small style=""color: var(--text-secondary);"">${{category.approvedCount}} approved, ${{category.suggestionCount}} suggestions</small>
+                                </label>
+                            `).join('')}}
+                        </div>
+                    </div>
+                `).join('');
+            }} catch (error) {{
+                container.innerHTML = `<div style=""color: var(--danger);"">Error: ${{escapeHtml(error.message)}}</div>`;
+            }}
+        }}
+
+        function closeCategoryConflictResolver() {{
+            document.getElementById('category-conflict-dialog').close();
+        }}
+
+        async function applyCategoryConflictResolutions() {{
+            const resolutions = tagCategoryConflicts.flatMap((conflict, conflictIndex) => {{
+                const selected = document.querySelector(`input[name=""category-conflict-${{conflictIndex}}""]:checked`);
+                if (!selected) return [];
+                return [{{
+                    tagName: conflict.tagName,
+                    tagCategory: conflict.categories[Number(selected.value)].category
+                }}];
+            }});
+
+            if (resolutions.length === 0) {{
+                alert('Select a category for at least one tag.');
+                return;
+            }}
+
+            if (!confirm(`Apply the selected category to every stored instance of ${{resolutions.length}} tag${{resolutions.length === 1 ? '' : 's'}}?`)) return;
+
+            const button = document.getElementById('apply-category-resolutions');
+            button.disabled = true;
+            try {{
+                const response = await fetch('/api/voting/admin/category-conflicts/resolve', {{
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers: {{ 'Content-Type': 'application/json' }},
+                    body: JSON.stringify({{ resolutions }})
+                }});
+                const data = await response.json();
+                if (!response.ok || !data.success) {{
+                    throw new Error(data.message || 'Failed to resolve category conflicts');
+                }}
+
+                alert(`Resolved ${{data.resolved}} tag category conflict${{data.resolved === 1 ? '' : 's'}}.`);
+                await openCategoryConflictResolver();
+                await loadPendingTags();
+            }} catch (error) {{
+                alert('Error: ' + error.message);
+            }} finally {{
+                button.disabled = false;
+            }}
+        }}
+
         async function loadPendingTags() {{
             const container = document.getElementById('pending-tags-info');
             container.innerHTML = '<div style=""color: var(--text-secondary);"">Loading pending tags...</div>';
