@@ -323,6 +323,7 @@ public static class DatabaseManagementEndpoints
     private static async Task<IResult> MergeDuplicates(JumpChainDbContext context, IDocumentCountService documentCountService, int? groupIndex = null)
     {
         Console.WriteLine($"[MergeDuplicates] Called with groupIndex: {groupIndex}");
+        await using var transaction = await context.Database.BeginTransactionAsync();
         try
         {
             // Find potential duplicates again (same logic as analyze)
@@ -352,10 +353,14 @@ public static class DatabaseManagementEndpoints
             int totalMergedGroups = 0;
             int totalDocumentsMerged = 0;
             var mergeResults = new List<object>();
+            var duplicateTagsToRemove = new List<DocumentTag>();
+            var duplicateDocumentsToRemove = new List<JumpDocument>();
 
-            // Get ALL existing DocumentUrls globally to avoid UNIQUE constraint violations
-            var allExistingUrls = await context.DocumentUrls.ToListAsync();
-            var existingGoogleDriveFileIds = allExistingUrls.Select(u => u.GoogleDriveFileId).ToHashSet();
+            // Get all existing URL IDs globally to avoid UNIQUE constraint violations.
+            var existingGoogleDriveFileIds = (await context.DocumentUrls
+                .Select(url => url.GoogleDriveFileId)
+                .ToListAsync())
+                .ToHashSet(StringComparer.Ordinal);
 
             // If specific group index provided, merge only that group
             var groupsToProcess = groupIndex.HasValue && groupIndex.Value < duplicateGroups.Count
@@ -367,79 +372,40 @@ public static class DatabaseManagementEndpoints
                 var documents = group.OrderBy(d => d.Id).ToList();
                 var primaryDocument = documents.First(); // Keep the first document as primary
                 var duplicates = documents.Skip(1).ToList();
-
-                // Collect all unique URLs from duplicates (excluding primary document's URL)
-                var urlsToAdd = new List<DocumentUrl>();
-                
-                // Add URLs from duplicate documents only (primary document keeps its URL in main properties)
-                foreach (var duplicate in duplicates)
-                {
-                    // Skip if this GoogleDriveFileId already exists in DocumentUrls table
-                    if (existingGoogleDriveFileIds.Contains(duplicate.GoogleDriveFileId))
-                    {
-                        continue;
-                    }
-                    
-                    // Skip if this is the same GoogleDriveFileId as the primary document itself
-                    if (duplicate.GoogleDriveFileId == primaryDocument.GoogleDriveFileId)
-                    {
-                        continue;
-                    }
-
-                    urlsToAdd.Add(new DocumentUrl
-                    {
-                        JumpDocumentId = primaryDocument.Id,
-                        GoogleDriveFileId = duplicate.GoogleDriveFileId,
-                        SourceDrive = duplicate.SourceDrive,
-                        FolderPath = duplicate.FolderPath,
-                        WebViewLink = duplicate.WebViewLink,
-                        DownloadLink = duplicate.DownloadLink,
-                        LastScanned = duplicate.LastScanned
-                    });
-
-                    // Merge tags from duplicates to primary document
-                    foreach (var tag in duplicate.Tags)
-                    {
-                        // Check if primary document already has this tag
-                        var existingTag = primaryDocument.Tags
-                            .FirstOrDefault(t => t.TagName == tag.TagName && t.TagCategory == tag.TagCategory);
-                        
-                        if (existingTag == null)
-                        {
-                            // Add unique tag to primary document
-                            primaryDocument.Tags.Add(new DocumentTag
-                            {
-                                JumpDocumentId = primaryDocument.Id,
-                                TagName = tag.TagName,
-                                TagCategory = tag.TagCategory
-                            });
-                        }
-                    }
-                }
-
-                // Add all URLs to the primary document
-                if (urlsToAdd.Any())
-                {
-                    context.DocumentUrls.AddRange(urlsToAdd);
-                }
-
-                // Remove duplicate documents (this will cascade delete their tags)
-                context.JumpDocuments.RemoveRange(duplicates);
+                var duplicateIds = duplicates.Select(document => document.Id).ToList();
+                var mergeStats = await ReparentDuplicateDependents(
+                    context,
+                    primaryDocument,
+                    duplicates,
+                    duplicateIds,
+                    existingGoogleDriveFileIds);
+                duplicateTagsToRemove.AddRange(mergeStats.TagsToRemove);
+                duplicateDocumentsToRemove.AddRange(duplicates);
 
                 mergeResults.Add(new {
                     primaryDocumentId = primaryDocument.Id,
                     primaryDocumentName = primaryDocument.Name,
                     duplicatesRemoved = duplicates.Count,
-                    urlsAdded = urlsToAdd.Count,
-                    uniqueSourceDrives = urlsToAdd.Select(u => u.SourceDrive).Distinct().Count()
+                    urlsAdded = mergeStats.UrlsAdded,
+                    urlsReparented = mergeStats.UrlsReparented,
+                    tagsReparented = mergeStats.TagsReparented,
+                    duplicateTagsRemoved = mergeStats.DuplicateTagsRemoved,
+                    relatedRowsReparented = mergeStats.RelatedRowsReparented
                 });
 
                 totalMergedGroups++;
                 totalDocumentsMerged += duplicates.Count;
             }
 
-            // Save all changes
+            // Persist foreign-key reparenting before deleting referenced tags or documents.
             await context.SaveChangesAsync();
+
+            context.DocumentTags.RemoveRange(duplicateTagsToRemove);
+            await context.SaveChangesAsync();
+
+            context.JumpDocuments.RemoveRange(duplicateDocumentsToRemove);
+            await context.SaveChangesAsync();
+            await transaction.CommitAsync();
             
             // Refresh document count after merge
             await documentCountService.RefreshCountAsync();
@@ -456,6 +422,7 @@ public static class DatabaseManagementEndpoints
         }
         catch (Exception ex)
         {
+            await transaction.RollbackAsync();
             return Results.BadRequest(new { 
                 success = false, 
                 error = ex.Message,
@@ -463,6 +430,148 @@ public static class DatabaseManagementEndpoints
             });
         }
     }
+
+    private static async Task<DuplicateMergeStats> ReparentDuplicateDependents(
+        JumpChainDbContext context,
+        JumpDocument primaryDocument,
+        List<JumpDocument> duplicates,
+        List<int> duplicateIds,
+        HashSet<string> existingGoogleDriveFileIds)
+    {
+        var mergedDocumentIds = duplicateIds.Append(primaryDocument.Id).ToList();
+        var urls = await context.DocumentUrls
+            .Where(url => duplicateIds.Contains(url.JumpDocumentId))
+            .ToListAsync();
+        foreach (var url in urls)
+            url.JumpDocumentId = primaryDocument.Id;
+
+        var urlsAdded = 0;
+        foreach (var duplicate in duplicates)
+        {
+            if (string.IsNullOrWhiteSpace(duplicate.GoogleDriveFileId) ||
+                duplicate.GoogleDriveFileId == primaryDocument.GoogleDriveFileId ||
+                !existingGoogleDriveFileIds.Add(duplicate.GoogleDriveFileId))
+            {
+                continue;
+            }
+
+            context.DocumentUrls.Add(new DocumentUrl
+            {
+                JumpDocumentId = primaryDocument.Id,
+                GoogleDriveFileId = duplicate.GoogleDriveFileId,
+                SourceDrive = duplicate.SourceDrive,
+                FolderPath = duplicate.FolderPath,
+                WebViewLink = duplicate.WebViewLink,
+                DownloadLink = duplicate.DownloadLink,
+                LastScanned = duplicate.LastScanned
+            });
+            urlsAdded++;
+        }
+
+        var duplicateTagIds = duplicates
+            .SelectMany(document => document.Tags)
+            .Select(tag => tag.Id)
+            .ToList();
+        var removalRequests = await context.TagRemovalRequests
+            .Where(request => duplicateIds.Contains(request.JumpDocumentId) ||
+                              (request.DocumentTagId.HasValue && duplicateTagIds.Contains(request.DocumentTagId.Value)))
+            .ToListAsync();
+        var primaryTags = primaryDocument.Tags.ToList();
+        var tagsToRemove = new List<DocumentTag>();
+        var tagsReparented = 0;
+        var duplicateTagsRemoved = 0;
+
+        foreach (var duplicate in duplicates)
+        {
+            foreach (var duplicateTag in duplicate.Tags.ToList())
+            {
+                var primaryTag = primaryTags.FirstOrDefault(tag =>
+                    tag.TagName.Equals(duplicateTag.TagName, StringComparison.OrdinalIgnoreCase));
+                var referencingRequests = removalRequests
+                    .Where(request => request.DocumentTagId == duplicateTag.Id)
+                    .ToList();
+
+                if (primaryTag != null)
+                {
+                    foreach (var request in referencingRequests)
+                        request.DocumentTagId = primaryTag.Id;
+                    tagsToRemove.Add(duplicateTag);
+                    duplicateTagsRemoved++;
+                }
+                else
+                {
+                    duplicateTag.JumpDocumentId = primaryDocument.Id;
+                    duplicateTag.JumpDocument = primaryDocument;
+                    primaryTags.Add(duplicateTag);
+                    tagsReparented++;
+                }
+            }
+        }
+
+        foreach (var request in removalRequests)
+            request.JumpDocumentId = primaryDocument.Id;
+
+        var suggestions = await context.TagSuggestions
+            .Where(suggestion => duplicateIds.Contains(suggestion.JumpDocumentId))
+            .ToListAsync();
+        foreach (var suggestion in suggestions)
+            suggestion.JumpDocumentId = primaryDocument.Id;
+
+        var purchasables = await context.DocumentPurchasables
+            .Where(purchasable => duplicateIds.Contains(purchasable.JumpDocumentId))
+            .ToListAsync();
+        foreach (var purchasable in purchasables)
+            purchasable.JumpDocumentId = primaryDocument.Id;
+
+        var overrides = await context.UserTagOverrides
+            .Where(tagOverride => mergedDocumentIds.Contains(tagOverride.JumpDocumentId))
+            .ToListAsync();
+        var duplicateOverrides = overrides
+            .GroupBy(tagOverride => new
+            {
+                tagOverride.UserId,
+                TagName = tagOverride.TagName.ToUpperInvariant(),
+                TagCategory = tagOverride.TagCategory.ToUpperInvariant()
+            })
+            .SelectMany(group => group
+                .OrderByDescending(tagOverride => tagOverride.CreatedAt)
+                .ThenByDescending(tagOverride => tagOverride.Id)
+                .Skip(1))
+            .ToHashSet();
+        context.UserTagOverrides.RemoveRange(duplicateOverrides);
+        foreach (var tagOverride in overrides.Where(tagOverride => !duplicateOverrides.Contains(tagOverride)))
+            tagOverride.JumpDocumentId = primaryDocument.Id;
+
+        var viewCounts = await context.DocumentViewCounts
+            .Where(view => mergedDocumentIds.Contains(view.JumpDocumentId))
+            .ToListAsync();
+        if (viewCounts.Count > 0)
+        {
+            var primaryView = viewCounts.FirstOrDefault(view => view.JumpDocumentId == primaryDocument.Id)
+                ?? viewCounts.OrderByDescending(view => view.LastViewed).First();
+            primaryView.JumpDocumentId = primaryDocument.Id;
+            primaryView.ViewCount = viewCounts.Sum(view => view.ViewCount);
+            primaryView.UniqueViewCount = viewCounts.Sum(view => view.UniqueViewCount);
+            primaryView.LastViewed = viewCounts.Max(view => view.LastViewed);
+            context.DocumentViewCounts.RemoveRange(viewCounts.Where(view => view != primaryView));
+        }
+
+        return new DuplicateMergeStats(
+            urlsAdded,
+            urls.Count,
+            tagsReparented,
+            duplicateTagsRemoved,
+            removalRequests.Count + suggestions.Count + purchasables.Count + overrides.Count + viewCounts.Count,
+            tagsToRemove);
+    }
+
+    private sealed record DuplicateMergeStats(
+        int UrlsAdded,
+        int UrlsReparented,
+        int TagsReparented,
+        int DuplicateTagsRemoved,
+        int RelatedRowsReparented,
+        IReadOnlyList<DocumentTag> TagsToRemove);
 
     private static async Task<IResult> CleanupDuplicateUrls(JumpChainDbContext context)
     {
