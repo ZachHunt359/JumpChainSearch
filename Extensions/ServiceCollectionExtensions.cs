@@ -21,6 +21,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<SeriesTagService>();
         services.AddScoped<AdminAuthService>();
         services.AddSingleton<SearchCacheInvalidationService>();
+        services.AddSingleton<DriveScanCoordinator>();
         services.AddScoped<Fts5SetupService>();
         services.AddScoped<Fts5SearchService>();
         services.AddSingleton<IDocumentCountService, DocumentCountService>();

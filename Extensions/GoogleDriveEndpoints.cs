@@ -589,9 +589,21 @@ public static class GoogleDriveEndpoints
         }
     }
 
-    private static async Task<IResult> ScanAllDrives(JumpChainDbContext dbContext, IGoogleDriveService driveService, IDocumentCountService documentCountService)
+    private static async Task<IResult> ScanAllDrives(JumpChainDbContext dbContext, IGoogleDriveService driveService, IDocumentCountService documentCountService, DriveScanCoordinator scanCoordinator)
     {
         Console.WriteLine("===== ScanAllDrives ENDPOINT INVOKED =====");
+
+        if (!scanCoordinator.TryAcquire("Google Drive scan-all request", out var scanLease))
+        {
+            return Results.Conflict(new
+            {
+                success = false,
+                error = "Another drive scan or folder refresh is already running.",
+                activeOperation = scanCoordinator.ActiveOperation
+            });
+        }
+
+        using var activeScan = scanLease;
         try
         {
             Console.WriteLine("Starting scan - checking database for active drives...");
@@ -1014,9 +1026,21 @@ public static class GoogleDriveEndpoints
         return (mergedGroups, documentsMerged);
     }
 
-    private static async Task<IResult> TestScanSingleDrive(string driveName, JumpChainDbContext dbContext, IGoogleDriveService driveService)
+    private static async Task<IResult> TestScanSingleDrive(string driveName, JumpChainDbContext dbContext, IGoogleDriveService driveService, DriveScanCoordinator scanCoordinator)
     {
         Console.WriteLine($"===== TestScanSingleDrive ENDPOINT INVOKED for {driveName} =====");
+
+        if (!scanCoordinator.TryAcquire($"test scan of {driveName}", out var scanLease))
+        {
+            return Results.Conflict(new
+            {
+                success = false,
+                error = "Another drive scan or folder refresh is already running.",
+                activeOperation = scanCoordinator.ActiveOperation
+            });
+        }
+
+        using var activeScan = scanLease;
         try
         {
             var drive = await dbContext.DriveConfigurations
@@ -1436,9 +1460,21 @@ Text Preview: {text?.Substring(0, Math.Min(200, text?.Length ?? 0))}
     /// <summary>
     /// Save discovered folders to FolderConfigurations table for hierarchical management
     /// </summary>
-    private static async Task<IResult> SaveDiscoveredFolders(string driveName, JumpChainDbContext dbContext, IGoogleDriveService driveService, ILogger<Program> logger)
+    private static async Task<IResult> SaveDiscoveredFolders(string driveName, JumpChainDbContext dbContext, IGoogleDriveService driveService, ILogger<Program> logger, DriveScanCoordinator scanCoordinator)
     {
         logger.LogInformation("🚀🚀🚀 FOLDER SAVE ENDPOINT CALLED - NEW CODE VERSION a933d86 🚀🚀🚀");
+
+        if (!scanCoordinator.TryAcquire($"folder save for {driveName}", out var scanLease))
+        {
+            return Results.Conflict(new
+            {
+                success = false,
+                error = "Another drive scan or folder refresh is already running.",
+                activeOperation = scanCoordinator.ActiveOperation
+            });
+        }
+
+        using var activeScan = scanLease;
         
         try
         {
@@ -1453,14 +1489,18 @@ Text Preview: {text?.Substring(0, Math.Min(200, text?.Length ?? 0))}
             logger.LogInformation($"===== SAVING FOLDERS FOR {driveName} =====");
             
             // Discover folders
-            var discoveredFolders = await driveService.DiscoverFolderHierarchyAsync(drive.DriveId, drive.ResourceKey);
+            var discoveredFolders = (await driveService.DiscoverFolderHierarchyAsync(drive.DriveId, drive.ResourceKey))
+                .Where(folder => !string.IsNullOrWhiteSpace(folder.folderId) && !string.IsNullOrWhiteSpace(folder.folderName))
+                .GroupBy(folder => folder.folderId, StringComparer.Ordinal)
+                .Select(group => group.First())
+                .ToList();
             logger.LogInformation($"Discovered {discoveredFolders.Count} folders");
             
-            // Get existing folders for this drive
+            var discoveredFolderIds = discoveredFolders.Select(folder => folder.folderId).ToList();
             var existingFolders = await dbContext.FolderConfigurations
-                .Where(f => f.ParentDriveId == drive.Id)
+                .Where(folder => discoveredFolderIds.Contains(folder.FolderId))
                 .ToListAsync();
-            var existingFolderIds = existingFolders.Select(f => f.FolderId).ToHashSet();
+            var existingFoldersById = existingFolders.ToDictionary(folder => folder.FolderId, StringComparer.Ordinal);
             
             logger.LogInformation($"Found {existingFolders.Count} existing folder configurations");
             
@@ -1469,18 +1509,24 @@ Text Preview: {text?.Substring(0, Math.Min(200, text?.Length ?? 0))}
             
             foreach (var folder in discoveredFolders)
             {
+                var folderId = folder.folderId;
+                var folderName = folder.folderName;
+                if (string.IsNullOrWhiteSpace(folderId) || string.IsNullOrWhiteSpace(folderName))
+                {
+                    continue;
+                }
+
                 // Debug: Log what we're getting from the tuple
                 logger.LogInformation($"📊 Processing folder - ID: {folder.folderId}, Name: '{folder.folderName}', NameIsNull: {folder.folderName == null}, NameLength: {folder.folderName?.Length ?? -1}");
                 
-                if (existingFolderIds.Contains(folder.folderId))
+                if (existingFoldersById.TryGetValue(folderId, out var existing))
                 {
                     // Update existing folder
-                    var existing = existingFolders.First(f => f.FolderId == folder.folderId);
                     var changed = false;
                     
                     if (existing.FolderName != folder.folderName)
                     {
-                        existing.FolderName = folder.folderName;
+                        existing.FolderName = folderName;
                         changed = true;
                     }
                     
@@ -1510,8 +1556,8 @@ Text Preview: {text?.Substring(0, Math.Min(200, text?.Length ?? 0))}
                     // Create new folder configuration
                     var newFolder = new FolderConfiguration
                     {
-                        FolderId = folder.folderId,
-                        FolderName = folder.folderName,
+                        FolderId = folderId,
+                        FolderName = folderName,
                         ParentDriveId = drive.Id,
                         ResourceKey = folder.resourceKey,
                         FolderPath = folder.folderName ?? string.Empty, // Explicitly handle null with coalescing
@@ -1524,6 +1570,7 @@ Text Preview: {text?.Substring(0, Math.Min(200, text?.Length ?? 0))}
                     logger.LogInformation($"✅ Created FolderConfiguration: ID={newFolder.FolderId}, Name={newFolder.FolderName}, Path={newFolder.FolderPath ?? "NULL"}");
                     
                     dbContext.FolderConfigurations.Add(newFolder);
+                    existingFoldersById.Add(folderId, newFolder);
                     newCount++;
                 }
             }

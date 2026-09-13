@@ -23,8 +23,20 @@ public static class DatabaseManagementEndpoints
 
     private static async Task<IResult> PopulateDatabase(
         IGoogleDriveService driveService, 
-        JumpChainDbContext context)
+        JumpChainDbContext context,
+        DriveScanCoordinator scanCoordinator)
     {
+        if (!scanCoordinator.TryAcquire("database population scan", out var scanLease))
+        {
+            return Results.Conflict(new
+            {
+                success = false,
+                error = "Another drive scan or folder refresh is already running.",
+                activeOperation = scanCoordinator.ActiveOperation
+            });
+        }
+
+        using var activeScan = scanLease;
         try
         {
             var drivesConfig = Environment.GetEnvironmentVariable("JUMPCHAIN_DRIVES_CONFIG");
@@ -175,8 +187,20 @@ public static class DatabaseManagementEndpoints
 
     private static async Task<IResult> PopulateSimple(
         IGoogleDriveService driveService, 
-        JumpChainDbContext context)
+        JumpChainDbContext context,
+        DriveScanCoordinator scanCoordinator)
     {
+        if (!scanCoordinator.TryAcquire("simple database population scan", out var scanLease))
+        {
+            return Results.Conflict(new
+            {
+                success = false,
+                error = "Another drive scan or folder refresh is already running.",
+                activeOperation = scanCoordinator.ActiveOperation
+            });
+        }
+
+        using var activeScan = scanLease;
         try
         {
             var drivesConfig = Environment.GetEnvironmentVariable("JUMPCHAIN_DRIVES_CONFIG");

@@ -3593,7 +3593,7 @@ sudo systemctl restart jumpchain
     /// <summary>
     /// Scan a single drive
     /// </summary>
-    private static async Task<IResult> ScanSingleDrive(string driveName, HttpContext context, IGoogleDriveService driveService, JumpChainDbContext dbContext, AdminAuthService authService)
+    private static async Task<IResult> ScanSingleDrive(string driveName, HttpContext context, IGoogleDriveService driveService, JumpChainDbContext dbContext, AdminAuthService authService, DriveScanCoordinator scanCoordinator)
     {
         var (valid, user) = await ValidateSession(context, authService);
         if (!valid)
@@ -3610,24 +3610,38 @@ sudo systemctl restart jumpchain
                 return Results.NotFound(new { success = false, error = "Drive not found" });
             }
 
-            // Use the unified scan method that properly handles authentication
-            var (documents, successfulMethod) = await driveService.ScanDriveUnifiedAsync(drive);
-            var documentsList = documents.ToList();
-            
-            // Update preferred auth method if it worked
-            if (successfulMethod != "None" && drive.PreferredAuthMethod != successfulMethod)
+            if (!scanCoordinator.TryAcquire($"individual scan of {drive.DriveName}", out var scanLease))
             {
-                drive.PreferredAuthMethod = successfulMethod;
-                await dbContext.SaveChangesAsync();
+                return Results.Conflict(new
+                {
+                    success = false,
+                    error = "Another drive scan or folder refresh is already running.",
+                    activeOperation = scanCoordinator.ActiveOperation
+                });
             }
-            
-            return Results.Ok(new
+
+            using (scanLease)
             {
-                success = true,
-                message = $"Scan completed for {driveName}",
-                newDocuments = documentsList.Count,
-                authMethod = successfulMethod
-            });
+
+                // Use the unified scan method that properly handles authentication
+                var (documents, successfulMethod) = await driveService.ScanDriveUnifiedAsync(drive);
+                var documentsList = documents.ToList();
+
+                // Update preferred auth method if it worked
+                if (successfulMethod != "None" && drive.PreferredAuthMethod != successfulMethod)
+                {
+                    drive.PreferredAuthMethod = successfulMethod;
+                    await dbContext.SaveChangesAsync();
+                }
+
+                return Results.Ok(new
+                {
+                    success = true,
+                    message = $"Scan completed for {driveName}",
+                    newDocuments = documentsList.Count,
+                    authMethod = successfulMethod
+                });
+            }
         }
         catch (Exception ex)
         {
@@ -3638,7 +3652,7 @@ sudo systemctl restart jumpchain
     /// <summary>
     /// Refresh folder list for a drive
     /// </summary>
-    private static async Task<IResult> RefreshDriveFolders(string driveName, HttpContext context, IGoogleDriveService driveService, JumpChainDbContext dbContext, AdminAuthService authService)
+    private static async Task<IResult> RefreshDriveFolders(string driveName, HttpContext context, IGoogleDriveService driveService, JumpChainDbContext dbContext, AdminAuthService authService, DriveScanCoordinator scanCoordinator)
     {
         var (valid, user) = await ValidateSession(context, authService);
         if (!valid)
@@ -3654,58 +3668,81 @@ sudo systemctl restart jumpchain
                 return Results.NotFound(new { success = false, error = "Drive not found" });
             }
 
-            var folders = await driveService.DiscoverFolderHierarchyAsync(drive.DriveId, drive.ResourceKey);
-            
-            int created = 0;
-            int updated = 0;
-
-            foreach (var folder in folders)
+            if (!scanCoordinator.TryAcquire($"folder refresh for {drive.DriveName}", out var scanLease))
             {
-                // Skip folders with null/empty names to prevent database constraint violations
-                if (string.IsNullOrWhiteSpace(folder.folderName))
+                return Results.Conflict(new
                 {
-                    continue;
-                }
-
-                var existing = await dbContext.FolderConfigurations
-                    .FirstOrDefaultAsync(f => f.FolderId == folder.folderId && f.ParentDriveId == drive.Id);
-
-                if (existing == null)
-                {
-                    dbContext.FolderConfigurations.Add(new FolderConfiguration
-                    {
-                        FolderId = folder.folderId,
-                        FolderName = folder.folderName,
-                        ParentDriveId = drive.Id,
-                        ResourceKey = folder.resourceKey,
-                        FolderPath = folder.folderName ?? string.Empty,
-                        IsActive = true,
-                        IsAutoDiscovered = true,
-                        CreatedAt = DateTime.UtcNow,
-                        UpdatedAt = DateTime.UtcNow
-                    });
-                    created++;
-                }
-                else
-                {
-                    existing.FolderName = folder.folderName;
-                    existing.ResourceKey = folder.resourceKey;
-                    existing.FolderPath = folder.folderName ?? string.Empty;
-                    existing.UpdatedAt = DateTime.UtcNow;
-                    updated++;
-                }
+                    success = false,
+                    error = "Another drive scan or folder refresh is already running.",
+                    activeOperation = scanCoordinator.ActiveOperation
+                });
             }
 
-            await dbContext.SaveChangesAsync();
-
-            return Results.Ok(new
+            using (scanLease)
             {
-                success = true,
-                message = $"Discovered {folders.Count} folders",
-                foldersDiscovered = folders.Count,
-                foldersCreated = created,
-                foldersUpdated = updated
-            });
+
+                var folders = (await driveService.DiscoverFolderHierarchyAsync(drive.DriveId, drive.ResourceKey))
+                    .Where(folder => !string.IsNullOrWhiteSpace(folder.folderId) && !string.IsNullOrWhiteSpace(folder.folderName))
+                    .GroupBy(folder => folder.folderId, StringComparer.Ordinal)
+                    .Select(group => group.First())
+                    .ToList();
+
+                var folderIds = folders.Select(folder => folder.folderId).ToList();
+                var existingFolders = await dbContext.FolderConfigurations
+                    .Where(folder => folderIds.Contains(folder.FolderId))
+                    .ToDictionaryAsync(folder => folder.FolderId, StringComparer.Ordinal);
+
+                int created = 0;
+                int updated = 0;
+
+                foreach (var folder in folders)
+                {
+                    var folderId = folder.folderId;
+                    var folderName = folder.folderName;
+                    if (string.IsNullOrWhiteSpace(folderId) || string.IsNullOrWhiteSpace(folderName))
+                    {
+                        continue;
+                    }
+
+                    if (!existingFolders.TryGetValue(folderId, out var existing))
+                    {
+                        var newFolder = new FolderConfiguration
+                        {
+                            FolderId = folderId,
+                            FolderName = folderName,
+                            ParentDriveId = drive.Id,
+                            ResourceKey = folder.resourceKey,
+                            FolderPath = folder.folderName ?? string.Empty,
+                            IsActive = true,
+                            IsAutoDiscovered = true,
+                            CreatedAt = DateTime.UtcNow,
+                            UpdatedAt = DateTime.UtcNow
+                        };
+                        dbContext.FolderConfigurations.Add(newFolder);
+                        existingFolders.Add(folderId, newFolder);
+                        created++;
+                    }
+                    else
+                    {
+                        existing.FolderName = folderName;
+                        existing.ResourceKey = folder.resourceKey;
+                        existing.FolderPath = folder.folderName ?? string.Empty;
+                        existing.UpdatedAt = DateTime.UtcNow;
+                        updated++;
+                    }
+                }
+
+                await dbContext.SaveChangesAsync();
+
+                return Results.Ok(new
+                {
+                    success = true,
+                    message = $"Discovered {folders.Count} folders",
+                    foldersDiscovered = folders.Count,
+                    foldersCreated = created,
+                    foldersUpdated = updated
+                });
+            }
         }
         catch (Exception ex)
         {

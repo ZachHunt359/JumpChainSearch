@@ -20,16 +20,19 @@ public class ScanSchedulerService : BackgroundService
     private readonly IServiceProvider _serviceProvider;
     private readonly IConfiguration _configuration;
     private readonly ILogger<ScanSchedulerService> _logger;
+    private readonly DriveScanCoordinator _scanCoordinator;
     private readonly TimeSpan _checkInterval = TimeSpan.FromMinutes(5); // Check every 5 minutes
 
     public ScanSchedulerService(
         IServiceProvider serviceProvider,
         IConfiguration configuration,
-        ILogger<ScanSchedulerService> logger)
+        ILogger<ScanSchedulerService> logger,
+        DriveScanCoordinator scanCoordinator)
     {
         _serviceProvider = serviceProvider;
         _configuration = configuration;
         _logger = logger;
+        _scanCoordinator = scanCoordinator;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -95,6 +98,15 @@ public class ScanSchedulerService : BackgroundService
             return;
         }
 
+        if (!_scanCoordinator.TryAcquire("scheduled drive scan", out var scanLease))
+        {
+            _logger.LogInformation(
+                "Skipping scheduled drive scan because {ActiveOperation} is already running",
+                _scanCoordinator.ActiveOperation ?? "another scan operation");
+            return;
+        }
+
+        using var activeScan = scanLease;
         _logger.LogInformation("Starting scheduled Google Drive scan");
 
         try

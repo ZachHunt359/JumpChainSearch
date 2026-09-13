@@ -38,6 +38,16 @@ public class DriveScanBackgroundService
             return false;
         }
 
+        using var coordinatorScope = serviceScopeFactory.CreateScope();
+        var scanCoordinator = coordinatorScope.ServiceProvider.GetRequiredService<DriveScanCoordinator>();
+        if (!scanCoordinator.TryAcquire("background drive scan", out var scanLease))
+        {
+            logger.LogWarning(
+                "Cannot start background drive scan because {ActiveOperation} is already running",
+                scanCoordinator.ActiveOperation ?? "another scan operation");
+            return false;
+        }
+
         _isScanning = true;
         _scanStartTime = DateTime.UtcNow;
         _drivesScanned = 0;
@@ -50,6 +60,7 @@ public class DriveScanBackgroundService
         // Start the scan in a background task with its own scope
         _ = Task.Run(async () =>
         {
+            using var activeScan = scanLease;
             try
             {
                 using var scope = serviceScopeFactory.CreateScope();
