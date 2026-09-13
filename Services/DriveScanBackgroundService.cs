@@ -15,6 +15,8 @@ public class DriveScanBackgroundService
     private static int _totalDrives = 0;
     private static int _newDocuments = 0;
     private static string? _currentDrive = null;
+    private static string? _completedDrive = null;
+    private static string? _lastAuthMethod = null;
     private static string? _lastError = null;
 
     public static bool IsScanning => _isScanning;
@@ -23,6 +25,8 @@ public class DriveScanBackgroundService
     public static int TotalDrives => _totalDrives;
     public static int NewDocuments => _newDocuments;
     public static string? CurrentDrive => _currentDrive;
+    public static string? CompletedDrive => _completedDrive;
+    public static string? LastAuthMethod => _lastAuthMethod;
     public static string? LastError => _lastError;
 
     /// <summary>
@@ -32,6 +36,25 @@ public class DriveScanBackgroundService
         IServiceScopeFactory serviceScopeFactory,
         ILogger<T> logger)
     {
+        return await StartScanAsync(serviceScopeFactory, logger, null);
+    }
+
+    /// <summary>
+    /// Start a background scan of one configured drive
+    /// </summary>
+    public static async Task<bool> StartSingleDriveScanAsync<T>(
+        string driveName,
+        IServiceScopeFactory serviceScopeFactory,
+        ILogger<T> logger)
+    {
+        return await StartScanAsync(serviceScopeFactory, logger, driveName);
+    }
+
+    private static async Task<bool> StartScanAsync<T>(
+        IServiceScopeFactory serviceScopeFactory,
+        ILogger<T> logger,
+        string? driveName)
+    {
         if (_isScanning)
         {
             logger.LogWarning("Drive scan already in progress");
@@ -40,7 +63,8 @@ public class DriveScanBackgroundService
 
         using var coordinatorScope = serviceScopeFactory.CreateScope();
         var scanCoordinator = coordinatorScope.ServiceProvider.GetRequiredService<DriveScanCoordinator>();
-        if (!scanCoordinator.TryAcquire("background drive scan", out var scanLease))
+        var operation = driveName == null ? "background drive scan" : $"individual scan of {driveName}";
+        if (!scanCoordinator.TryAcquire(operation, out var scanLease))
         {
             logger.LogWarning(
                 "Cannot start background drive scan because {ActiveOperation} is already running",
@@ -52,7 +76,9 @@ public class DriveScanBackgroundService
         _scanStartTime = DateTime.UtcNow;
         _drivesScanned = 0;
         _newDocuments = 0;
-        _currentDrive = null;
+        _currentDrive = driveName;
+        _completedDrive = null;
+        _lastAuthMethod = null;
         _lastError = null;
 
         logger.LogInformation("Starting background drive scan");
@@ -68,7 +94,7 @@ public class DriveScanBackgroundService
                 var driveService = scope.ServiceProvider.GetRequiredService<IGoogleDriveService>();
                 var documentCountService = scope.ServiceProvider.GetRequiredService<IDocumentCountService>();
                 
-                await PerformScanAsync(dbContext, driveService, documentCountService, logger);
+                await PerformScanAsync(dbContext, driveService, documentCountService, logger, driveName);
             }
             catch (Exception ex)
             {
@@ -90,20 +116,23 @@ public class DriveScanBackgroundService
         JumpChainDbContext dbContext,
         IGoogleDriveService driveService,
         IDocumentCountService documentCountService,
-        ILogger<T> logger)
+        ILogger<T> logger,
+        string? driveName)
     {
         logger.LogInformation("Starting background drive scan");
 
         var drives = await dbContext.DriveConfigurations
-            .Where(d => d.IsActive)
+            .Where(d => d.IsActive && (driveName == null || d.DriveName == driveName))
             .ToListAsync();
 
         _totalDrives = drives.Count;
 
         if (drives.Count == 0)
         {
-            logger.LogWarning("No active drives configured");
-            _lastError = "No active drives configured";
+            _lastError = driveName == null
+                ? "No active drives configured"
+                : $"Active drive '{driveName}' was not found";
+            logger.LogWarning("{ScanError}", _lastError);
             return;
         }
 
@@ -116,6 +145,7 @@ public class DriveScanBackgroundService
 
                 var (documents, successfulMethod) = await driveService.ScanDriveUnifiedAsync(drive);
                 var documentsList = documents.ToList();
+                _lastAuthMethod = successfulMethod;
 
                 // Update preferred auth method if it worked
                 if (successfulMethod != "None" && drive.PreferredAuthMethod != successfulMethod)
@@ -154,6 +184,7 @@ public class DriveScanBackgroundService
                 await dbContext.SaveChangesAsync();
 
                 _drivesScanned++;
+                _completedDrive = drive.DriveName;
                 logger.LogInformation("Completed scan of {DriveName}: {NewDocs} new documents", drive.DriveName, newDocs);
             }
             catch (Exception ex)

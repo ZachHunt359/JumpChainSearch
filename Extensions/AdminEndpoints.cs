@@ -2908,18 +2908,12 @@ public static class AdminEndpoints
             const statusDiv = document.getElementById('drive-status-' + index);
             statusDiv.style.display = 'block';
             statusDiv.style.color = 'var(--text-secondary)';
-            statusDiv.innerHTML = '<span class=""spinner""></span> Scanning drive...';
+            statusDiv.innerHTML = '<span class=""spinner""></span> Starting scan...';
             
             try {{
-                // Use longer timeout for drive scanning (10 minutes)
-                const controller = new AbortController();
-                const timeout = setTimeout(() => controller.abort(), 600000);
-                
                 const response = await fetch('/admin/drives/' + encodeURIComponent(driveName) + '/scan', {{
-                    method: 'POST',
-                    signal: controller.signal
+                    method: 'POST'
                 }});
-                clearTimeout(timeout);
                 
                 // Check if response is OK before trying to parse JSON
                 if (!response.ok) {{
@@ -2932,21 +2926,55 @@ public static class AdminEndpoints
                 const data = await response.json();
                 
                 if (data.success) {{
-                    statusDiv.style.color = 'var(--success)';
-                    statusDiv.innerHTML = `✓ Scan complete! Found ${{data.newDocuments}} new documents (Auth: ${{data.authMethod}})`;
-                    // Don't auto-hide or reload - let user see the result
+                    statusDiv.style.color = 'var(--text-secondary)';
+                    statusDiv.innerHTML = '<span class=""spinner""></span> Scanning drive in background...';
+                    await pollSingleDriveScan(driveName, index);
                 }} else {{
                     statusDiv.style.color = 'var(--danger)';
                     statusDiv.innerHTML = `✗ Error: ${{data.error}}`;
                 }}
             }} catch (error) {{
                 statusDiv.style.color = 'var(--danger)';
-                if (error.name === 'AbortError') {{
-                    statusDiv.innerHTML = `✗ Timeout: Scan took longer than 10 minutes`;
-                }} else {{
-                    statusDiv.innerHTML = `✗ Error: ${{error.message}}`;
-                }}
+                statusDiv.textContent = `✗ Error: ${{error.message}}`;
                 console.error('Scan error:', error);
+            }}
+        }}
+
+        async function pollSingleDriveScan(driveName, index) {{
+            const statusDiv = document.getElementById('drive-status-' + index);
+
+            while (true) {{
+                await new Promise(resolve => setTimeout(resolve, 2000));
+
+                const response = await fetch('/admin/drives/status', {{ cache: 'no-store' }});
+                if (!response.ok) {{
+                    throw new Error(`Status check failed (${{response.status}})`);
+                }}
+
+                const status = await response.json();
+                if (status.isScanning) {{
+                    const scanned = status.drivesScanned || 0;
+                    const total = status.scanTotalDrives || 1;
+                    statusDiv.style.color = 'var(--text-secondary)';
+                    statusDiv.innerHTML = `<span class=""spinner""></span> Scanning ${{status.currentDrive || driveName}} (${{scanned}}/${{total}} complete)...`;
+                    continue;
+                }}
+
+                if (status.lastError) {{
+                    statusDiv.style.color = 'var(--danger)';
+                    statusDiv.textContent = `✗ Error: ${{status.lastError}}`;
+                    return;
+                }}
+
+                if (status.completedDrive === driveName) {{
+                    statusDiv.style.color = 'var(--success)';
+                    statusDiv.textContent = `✓ Scan complete! Added ${{status.newDocuments}} new documents (Auth: ${{status.authMethod || 'Unknown'}})`;
+                    return;
+                }}
+
+                statusDiv.style.color = 'var(--danger)';
+                statusDiv.textContent = '✗ Scan ended without a completion result';
+                return;
             }}
         }}
         
@@ -3381,6 +3409,8 @@ sudo systemctl restart jumpchain
             var drivesScanned = DriveScanBackgroundService.DrivesScanned;
             var scanTotalDrives = DriveScanBackgroundService.TotalDrives;
             var newDocuments = DriveScanBackgroundService.NewDocuments;
+            var completedDrive = DriveScanBackgroundService.CompletedDrive;
+            var authMethod = DriveScanBackgroundService.LastAuthMethod;
             var lastError = DriveScanBackgroundService.LastError;
 
             return Results.Ok(new
@@ -3390,6 +3420,8 @@ sudo systemctl restart jumpchain
                 lastScan = lastScan != default(DateTime) ? lastScan.ToString("g") : "Never",
                 newDocuments,
                 currentDrive,
+                completedDrive,
+                authMethod,
                 drivesScanned,
                 scanTotalDrives,
                 lastError
@@ -3593,7 +3625,13 @@ sudo systemctl restart jumpchain
     /// <summary>
     /// Scan a single drive
     /// </summary>
-    private static async Task<IResult> ScanSingleDrive(string driveName, HttpContext context, IGoogleDriveService driveService, JumpChainDbContext dbContext, AdminAuthService authService, DriveScanCoordinator scanCoordinator)
+    private static async Task<IResult> ScanSingleDrive(
+        string driveName,
+        HttpContext context,
+        JumpChainDbContext dbContext,
+        AdminAuthService authService,
+        IServiceScopeFactory serviceScopeFactory,
+        ILogger<AdminAuthService> logger)
     {
         var (valid, user) = await ValidateSession(context, authService);
         if (!valid)
@@ -3610,38 +3648,31 @@ sudo systemctl restart jumpchain
                 return Results.NotFound(new { success = false, error = "Drive not found" });
             }
 
-            if (!scanCoordinator.TryAcquire($"individual scan of {drive.DriveName}", out var scanLease))
+            if (!drive.IsActive)
+            {
+                return Results.BadRequest(new { success = false, error = "Drive is not active" });
+            }
+
+            var started = await DriveScanBackgroundService.StartSingleDriveScanAsync(
+                drive.DriveName,
+                serviceScopeFactory,
+                logger);
+
+            if (!started)
             {
                 return Results.Conflict(new
                 {
                     success = false,
-                    error = "Another drive scan or folder refresh is already running.",
-                    activeOperation = scanCoordinator.ActiveOperation
+                    error = "Another drive scan or folder refresh is already running."
                 });
             }
 
-            using (scanLease)
+            return Results.Accepted(value: new
             {
-
-                // Use the unified scan method that properly handles authentication
-                var (documents, successfulMethod) = await driveService.ScanDriveUnifiedAsync(drive);
-                var documentsList = documents.ToList();
-
-                // Update preferred auth method if it worked
-                if (successfulMethod != "None" && drive.PreferredAuthMethod != successfulMethod)
-                {
-                    drive.PreferredAuthMethod = successfulMethod;
-                    await dbContext.SaveChangesAsync();
-                }
-
-                return Results.Ok(new
-                {
-                    success = true,
-                    message = $"Scan completed for {driveName}",
-                    newDocuments = documentsList.Count,
-                    authMethod = successfulMethod
-                });
-            }
+                success = true,
+                message = $"Scan started for {drive.DriveName}",
+                driveName = drive.DriveName
+            });
         }
         catch (Exception ex)
         {
