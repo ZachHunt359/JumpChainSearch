@@ -1109,13 +1109,16 @@
     // Load available tags on component initialization
     protected override async Task OnInitializedAsync()
     {
+        var publicHost = new Uri(NavigationManager.Uri).Host;
+        SfwMode.SetSfwMode(SfwModeService.IsSfwHost(publicHost));
+
         userId = await GetOrCreateUserId();
         
         // Diagnostic: Log SFW mode status
         Console.WriteLine($"[INDEX] SFW Mode Active: {SfwMode.IsSfwMode}");
         
-        await LoadAvailableTagsAsync();
         await LoadNsfwChildTagsAsync();
+        await LoadAvailableTagsAsync();
         
         // Load document count from API (which returns cached singleton value)
         await LoadTotalDocumentCountAsync();

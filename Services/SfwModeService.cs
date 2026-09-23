@@ -6,14 +6,23 @@ namespace JumpChainSearch.Services;
 /// </summary>
 public class SfwModeService
 {
-    private readonly bool _isSfwMode;
+    private bool _isSfwMode;
     private readonly HashSet<string> _nsfwTags;
     private readonly HashSet<string> _nsfwChildTags;
 
     public SfwModeService(bool isSfwMode, HashSet<string>? nsfwTags = null, HashSet<string>? nsfwChildTags = null)
     {
         _isSfwMode = isSfwMode;
-        _nsfwTags = nsfwTags ?? new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        _nsfwTags = nsfwTags ?? new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "NSFW",
+            "NSFW-ish",
+            "Lewd",
+            "Harem",
+            "Porn Parody",
+            "Incest",
+            "Rape"
+        };
         _nsfwChildTags = nsfwChildTags ?? new HashSet<string>(StringComparer.OrdinalIgnoreCase);
     }
 
@@ -21,6 +30,24 @@ public class SfwModeService
     /// Returns true if the application is running in SFW mode.
     /// </summary>
     public bool IsSfwMode => _isSfwMode;
+
+    public IReadOnlySet<string> KnownNsfwTags => _nsfwTags;
+
+    public static bool IsSfwHost(string? host)
+    {
+        if (string.IsNullOrWhiteSpace(host))
+            return false;
+
+        return host.Equals("jumpchainsearch.net", StringComparison.OrdinalIgnoreCase) ||
+               host.EndsWith(".jumpchainsearch.net", StringComparison.OrdinalIgnoreCase) ||
+               host.Equals("jumpchainsearch.org", StringComparison.OrdinalIgnoreCase) ||
+               host.EndsWith(".jumpchainsearch.org", StringComparison.OrdinalIgnoreCase);
+    }
+
+    public void SetSfwMode(bool isSfwMode)
+    {
+        _isSfwMode = isSfwMode;
+    }
 
     /// <summary>
     /// Checks if a tag name is NSFW or a child of an NSFW tag.
@@ -30,8 +57,7 @@ public class SfwModeService
         if (string.IsNullOrWhiteSpace(tagName))
             return false;
 
-        // Check if it's the NSFW tag itself
-        if (tagName.Equals("NSFW", StringComparison.OrdinalIgnoreCase))
+        if (tagName.Contains("NSFW", StringComparison.OrdinalIgnoreCase))
             return true;
 
         // Check against known NSFW tags

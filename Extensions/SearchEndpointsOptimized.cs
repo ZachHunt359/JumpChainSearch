@@ -50,14 +50,9 @@ public static class SearchEndpointsOptimized
     {
         try
         {
-            // In SFW mode, automatically exclude NSFW tags
-            if (sfwMode?.IsSfwMode == true)
-            {
-                var nsfwExclusion = "NSFW";
-                excludeTags = string.IsNullOrWhiteSpace(excludeTags) 
-                    ? nsfwExclusion 
-                    : $"{excludeTags},{nsfwExclusion}";
-            }
+            var nsfwTags = sfwMode?.IsSfwMode == true
+                ? await GetNsfwTagNamesAsync(context, sfwMode)
+                : new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             
             // Skip caching if docId is provided (direct document lookup)
             if (docId.HasValue)
@@ -67,6 +62,7 @@ public static class SearchEndpointsOptimized
                     .AsNoTracking()
                     .Include(d => d.Tags)
                     .Where(d => d.Id == docId.Value);
+                query = ApplyNsfwFilter(query, nsfwTags);
                 
                 var document = await query.FirstOrDefaultAsync();
                 
@@ -117,7 +113,7 @@ public static class SearchEndpointsOptimized
             }
             
             // Generate cache key
-            var cacheKey = GenerateCacheKey(q, limit, offset, includeTags, excludeTags);
+            var cacheKey = GenerateCacheKey(q, limit, offset, includeTags, excludeTags, nsfwTags.Count > 0);
             
             // Try to get from cache
             if (cache.TryGetValue(cacheKey, out object? cachedResult) && cachedResult != null)
@@ -135,7 +131,9 @@ public static class SearchEndpointsOptimized
                 var fts5Query = fts5Service.BuildFts5Query(searchTerms, phrases, excludedTerms);
                 
                 // If we have tag filters, we need to apply them BEFORE pagination
-                bool hasTagFilters = !string.IsNullOrWhiteSpace(includeTags) || !string.IsNullOrWhiteSpace(excludeTags);
+                bool hasTagFilters = !string.IsNullOrWhiteSpace(includeTags) ||
+                                     !string.IsNullOrWhiteSpace(excludeTags) ||
+                                     nsfwTags.Count > 0;
                 
                 List<(int Id, double Score)> fts5Results;
                 int totalCount;
@@ -177,6 +175,7 @@ public static class SearchEndpointsOptimized
                         .Where(d => allDocumentIds.Contains(d.Id));
                     
                     filteredQuery = ApplyTagFilters(filteredQuery, includeTags, excludeTags);
+                    filteredQuery = ApplyNsfwFilter(filteredQuery, nsfwTags);
                     
                     // Get filtered document IDs
                     var filteredDocumentIds = await filteredQuery.Select(d => d.Id).ToListAsync();
@@ -318,6 +317,7 @@ public static class SearchEndpointsOptimized
                 }
                 
                 query = ApplyTagFilters(query, includeTags, excludeTags);
+                query = ApplyNsfwFilter(query, nsfwTags);
                 
                 var totalCount = await query.CountAsync();
                 
@@ -385,7 +385,7 @@ public static class SearchEndpointsOptimized
         }
     }
 
-    private static string GenerateCacheKey(string? q, int limit, int offset, string? includeTags, string? excludeTags)
+    private static string GenerateCacheKey(string? q, int limit, int offset, string? includeTags, string? excludeTags, bool isSfwMode)
     {
         var sb = new StringBuilder("search:");
         sb.Append(q ?? "");
@@ -395,6 +395,7 @@ public static class SearchEndpointsOptimized
             sb.Append($":i{includeTags}");
         if (!string.IsNullOrEmpty(excludeTags))
             sb.Append($":e{excludeTags}");
+        sb.Append(isSfwMode ? ":sfw" : ":full");
         return sb.ToString();
     }
 
@@ -539,6 +540,51 @@ public static class SearchEndpointsOptimized
         return query;
     }
 
+    private static IQueryable<JumpDocument> ApplyNsfwFilter(
+        IQueryable<JumpDocument> query,
+        IReadOnlySet<string> nsfwTags)
+    {
+        if (nsfwTags.Count == 0)
+            return query;
+
+        return query.Where(document => !document.Tags.Any(tag => nsfwTags.Contains(tag.TagName)));
+    }
+
+    private static async Task<HashSet<string>> GetNsfwTagNamesAsync(
+        JumpChainDbContext context,
+        SfwModeService sfwMode)
+    {
+        var allTagNames = await context.DocumentTags
+            .AsNoTracking()
+            .Select(tag => tag.TagName)
+            .Distinct()
+            .ToListAsync();
+
+        var nsfwTags = new HashSet<string>(sfwMode.KnownNsfwTags, StringComparer.OrdinalIgnoreCase);
+        nsfwTags.UnionWith(allTagNames.Where(sfwMode.IsNsfwTag));
+
+        var hierarchies = await context.TagHierarchies
+            .AsNoTracking()
+            .Select(hierarchy => new { hierarchy.ParentTagName, hierarchy.ChildTagName })
+            .ToListAsync();
+
+        bool addedChild;
+        do
+        {
+            addedChild = false;
+            foreach (var hierarchy in hierarchies)
+            {
+                if (nsfwTags.Contains(hierarchy.ParentTagName))
+                {
+                    addedChild |= nsfwTags.Add(hierarchy.ChildTagName);
+                }
+            }
+        }
+        while (addedChild);
+
+        return nsfwTags;
+    }
+
     private static async Task<IResult> GetTagFrequencies(JumpChainDbContext context, SfwModeService? sfwMode = null)
     {
         try
@@ -556,8 +602,9 @@ public static class SearchEndpointsOptimized
             // Filter NSFW tags in SFW mode
             if (sfwMode?.IsSfwMode == true)
             {
+                var nsfwTags = await GetNsfwTagNamesAsync(context, sfwMode);
                 tagFrequencies = tagFrequencies
-                    .Where(t => !sfwMode.IsNsfwTag(t.TagName))
+                    .Where(t => !nsfwTags.Contains(t.TagName))
                     .ToList();
             }
 
@@ -653,6 +700,9 @@ public static class SearchEndpointsOptimized
         try
         {
             List<int> matchingIds;
+            var nsfwTags = sfwMode?.IsSfwMode == true
+                ? await GetNsfwTagNamesAsync(context, sfwMode)
+                : new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             
             // If search query provided, use FTS5 to get matching document IDs first
             if (!string.IsNullOrWhiteSpace(q))
@@ -685,14 +735,7 @@ public static class SearchEndpointsOptimized
                 query = query.Where(d => matchingIds.Contains(d.Id));
             }
             
-            // Apply SFW filtering if enabled
-            if (sfwMode?.IsSfwMode == true)
-            {
-                query = query.Where(d => !d.Tags.Any(t => 
-                    t.TagName == "NSFW" || 
-                    t.TagName == "Lewd" || 
-                    t.TagName == "NSFW-ish"));
-            }
+            query = ApplyNsfwFilter(query, nsfwTags);
             
             // Apply include tag filters if specified
             if (!string.IsNullOrWhiteSpace(includeTags))
@@ -792,11 +835,19 @@ public static class SearchEndpointsOptimized
         }
     }
 
-    private static async Task<IResult> GetDocumentCount(IDocumentCountService documentCountService)
+    private static async Task<IResult> GetDocumentCount(
+        IDocumentCountService documentCountService,
+        JumpChainDbContext context,
+        SfwModeService? sfwMode = null)
     {
         try
         {
             var count = await documentCountService.GetCountAsync();
+            if (sfwMode?.IsSfwMode == true)
+            {
+                var nsfwTags = await GetNsfwTagNamesAsync(context, sfwMode);
+                count = await ApplyNsfwFilter(context.JumpDocuments.AsNoTracking(), nsfwTags).CountAsync();
+            }
             
             return Results.Ok(new {
                 success = true,

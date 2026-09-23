@@ -73,8 +73,7 @@ builder.Services.AddScoped<SfwModeService>(sp =>
     var host = httpContextAccessor.HttpContext?.Request.Host.Host ?? "";
     
     // Enable SFW mode for .net and .org domains
-    bool isSfwMode = host.Contains("jumpchainsearch.net", StringComparison.OrdinalIgnoreCase) ||
-                     host.Contains("jumpchainsearch.org", StringComparison.OrdinalIgnoreCase);
+    bool isSfwMode = SfwModeService.IsSfwHost(host);
     
     // Diagnostic logging
     var logger = sp.GetRequiredService<ILogger<Program>>();
@@ -348,7 +347,7 @@ app.MapGet("/api/debug/sfw-status", (HttpContext httpContext, SfwModeService sfw
         host = host,
         isSfwMode = sfwMode.IsSfwMode,
         headers = headers,
-        detectedDomain = host.Contains("jumpchainsearch.net") || host.Contains("jumpchainsearch.org")
+        detectedDomain = SfwModeService.IsSfwHost(host)
     });
 });
 
