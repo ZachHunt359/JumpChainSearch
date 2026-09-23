@@ -41,6 +41,7 @@ public static class SearchEndpointsOptimized
         JumpChainDbContext context,
         IMemoryCache cache,
         Fts5SearchService fts5Service,
+        SearchCacheInvalidationService cacheInvalidation,
         SfwModeService? sfwMode = null,
         string? q = null,
         int limit = 50,
@@ -63,7 +64,6 @@ public static class SearchEndpointsOptimized
                     .AsNoTracking()
                     .Include(d => d.Tags)
                     .Where(d => d.Id == docId.Value);
-                query = ApplyPublicVisibilityFilter(query);
                 query = ApplyNsfwFilter(query, nsfwTags);
                 
                 var document = await query.FirstOrDefaultAsync();
@@ -115,7 +115,14 @@ public static class SearchEndpointsOptimized
             }
             
             // Generate cache key
-            var cacheKey = GenerateCacheKey(q, limit, offset, includeTags, excludeTags, nsfwTags.Count > 0);
+            var cacheKey = GenerateCacheKey(
+                q,
+                limit,
+                offset,
+                includeTags,
+                excludeTags,
+                nsfwTags.Count > 0,
+                cacheInvalidation.GetCacheVersion());
             
             // Try to get from cache
             if (cache.TryGetValue(cacheKey, out object? cachedResult) && cachedResult != null)
@@ -391,9 +398,17 @@ public static class SearchEndpointsOptimized
         }
     }
 
-    private static string GenerateCacheKey(string? q, int limit, int offset, string? includeTags, string? excludeTags, bool isSfwMode)
+    private static string GenerateCacheKey(
+        string? q,
+        int limit,
+        int offset,
+        string? includeTags,
+        string? excludeTags,
+        bool isSfwMode,
+        int cacheVersion)
     {
         var sb = new StringBuilder("search:");
+        sb.Append($"v{cacheVersion}:");
         sb.Append(q ?? "");
         sb.Append($":l{limit}");
         sb.Append($":o{offset}");

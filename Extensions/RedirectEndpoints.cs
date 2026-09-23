@@ -37,13 +37,16 @@ public static class RedirectEndpoints
                 var query = context.JumpDocuments
                     .Include(d => d.Tags)
                     .Include(d => d.Urls)
-                    .Where(d => !d.Tags.Any(t => t.TagName == "Dead Link"))
                     .AsQueryable();
                 
                 // Filter by specific document ID if provided
                 if (docId.HasValue)
                 {
                     query = query.Where(d => d.Id == docId.Value);
+                }
+                else
+                {
+                    query = query.Where(d => !d.Tags.Any(t => t.TagName == "Dead Link"));
                 }
                 
                 if (!string.IsNullOrWhiteSpace(includeTags))

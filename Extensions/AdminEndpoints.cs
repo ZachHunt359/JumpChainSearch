@@ -47,6 +47,7 @@ public static class AdminEndpoints
         // Text review queue endpoint
         group.MapGet("/text-review/queue", GetTextReviewQueue);
         group.MapGet("/dead-links", GetDeadLinkDocuments);
+        group.MapDelete("/dead-links/{documentId:int}", RemoveDeadLinkTag);
         
         // System management endpoints
         group.MapGet("/system/cache-ttl", GetCacheTTL);
@@ -2291,13 +2292,38 @@ public static class AdminEndpoints
                     return `<article style=""padding: 1rem; margin-bottom: 0.75rem; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 6px;"">
                         <div style=""display: flex; justify-content: space-between; gap: 1rem; align-items: start; flex-wrap: wrap;"">
                             <div><h3 style=""margin: 0 0 0.25rem; font-size: 1rem;"">${{escapeHtml(doc.name)}}</h3><small style=""color: var(--text-secondary);"">Document ID ${{doc.id}} · Modified ${{new Date(doc.modifiedTime).toLocaleDateString()}}</small></div>
-                            <a href=""/?docId=${{doc.id}}"" target=""_blank"" rel=""noopener"" class=""btn btn-sm btn-primary"">View Record</a>
+                            <div class=""btn-group"">
+                                <a href=""/?docId=${{doc.id}}"" target=""_blank"" rel=""noopener"" class=""btn btn-sm btn-primary"">View Record</a>
+                                <button class=""btn btn-sm btn-danger"" onclick=""removeDeadLinkTag(${{doc.id}})"">Remove Dead Link Tag</button>
+                            </div>
                         </div>
                         <div style=""margin-top: 0.75rem;"">${{sourceRows}}</div>
                     </article>`;
                 }}).join('');
             }} catch (error) {{
                 container.innerHTML = '<div style=""color: var(--danger);"">Error loading dead links: ' + escapeHtml(error.message) + '</div>';
+            }}
+        }}
+
+        async function removeDeadLinkTag(documentId) {{
+            if (!confirm('Remove the Dead Link tag from document #' + documentId + '? The document will become visible in public search again.')) {{
+                return;
+            }}
+
+            try {{
+                const response = await fetch('/admin/dead-links/' + documentId, {{
+                    method: 'DELETE',
+                    credentials: 'same-origin'
+                }});
+                const data = await response.json();
+                if (!response.ok || !data.success) {{
+                    throw new Error(data.error || 'Failed to remove Dead Link tag');
+                }}
+
+                await loadDeadLinks();
+                await checkDeadLinksQueue();
+            }} catch (error) {{
+                alert('Error removing Dead Link tag: ' + error.message);
             }}
         }}
         
@@ -4025,6 +4051,46 @@ sudo systemctl restart jumpchain
             success = true,
             count = documents.Count,
             documents
+        });
+    }
+
+    /// <summary>
+    /// Removes the Dead Link tag so a verified document returns to public search.
+    /// </summary>
+    private static async Task<IResult> RemoveDeadLinkTag(
+        int documentId,
+        HttpContext context,
+        JumpChainDbContext dbContext,
+        AdminAuthService authService,
+        SearchCacheInvalidationService cacheInvalidation)
+    {
+        var (valid, _) = await ValidateSession(context, authService);
+        if (!valid)
+            return Results.Unauthorized();
+
+        var deadLinkTag = await dbContext.DocumentTags
+            .FirstOrDefaultAsync(tag =>
+                tag.JumpDocumentId == documentId &&
+                tag.TagName == "Dead Link");
+
+        if (deadLinkTag == null)
+        {
+            return Results.NotFound(new
+            {
+                success = false,
+                error = "Document is not tagged Dead Link."
+            });
+        }
+
+        dbContext.DocumentTags.Remove(deadLinkTag);
+        await dbContext.SaveChangesAsync();
+        cacheInvalidation.InvalidateAllSearchCaches();
+
+        return Results.Ok(new
+        {
+            success = true,
+            documentId,
+            message = "Dead Link tag removed."
         });
     }
 
