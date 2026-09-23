@@ -9,6 +9,7 @@ namespace JumpChainSearch.Services;
 /// </summary>
 public class Fts5SearchService
 {
+    private const string DeadLinkTag = "Dead Link";
     private readonly JumpChainDbContext _context;
 
     public Fts5SearchService(JumpChainDbContext context)
@@ -133,6 +134,11 @@ public class Fts5SearchService
             FROM JumpDocuments_fts fts
             INNER JOIN JumpDocuments jd ON fts.rowid = jd.Id
             WHERE JumpDocuments_fts MATCH {0}
+                            AND NOT EXISTS (
+                                    SELECT 1
+                                    FROM DocumentTags dt
+                                    WHERE dt.JumpDocumentId = jd.Id
+                                        AND dt.TagName = {3})
             ORDER BY BM25Score
             LIMIT {1} OFFSET {2}";
 
@@ -145,10 +151,11 @@ public class Fts5SearchService
         try
         {
             using var command = connection.CreateCommand();
-            command.CommandText = string.Format(sql, "@p0", "@p1", "@p2");
+            command.CommandText = string.Format(sql, "@p0", "@p1", "@p2", "@p3");
             command.Parameters.Add(new Microsoft.Data.Sqlite.SqliteParameter("@p0", fts5Query));
             command.Parameters.Add(new Microsoft.Data.Sqlite.SqliteParameter("@p1", fetchLimit));
             command.Parameters.Add(new Microsoft.Data.Sqlite.SqliteParameter("@p2", fetchOffset));
+            command.Parameters.Add(new Microsoft.Data.Sqlite.SqliteParameter("@p3", DeadLinkTag));
 
             var rawResults = new List<(int Id, string Name, double BM25Score)>();
             
@@ -284,8 +291,14 @@ public class Fts5SearchService
         
         var sql = @"
             SELECT COUNT(*)
-            FROM JumpDocuments_fts
-            WHERE JumpDocuments_fts MATCH {0}";
+                        FROM JumpDocuments_fts fts
+                        INNER JOIN JumpDocuments jd ON fts.rowid = jd.Id
+                        WHERE JumpDocuments_fts MATCH {0}
+                            AND NOT EXISTS (
+                                    SELECT 1
+                                    FROM DocumentTags dt
+                                    WHERE dt.JumpDocumentId = jd.Id
+                                        AND dt.TagName = {1})";
 
         var connection = _context.Database.GetDbConnection();
         var shouldClose = connection.State == System.Data.ConnectionState.Closed;
@@ -296,8 +309,9 @@ public class Fts5SearchService
         try
         {
             using var command = connection.CreateCommand();
-            command.CommandText = string.Format(sql, "@p0");
+            command.CommandText = string.Format(sql, "@p0", "@p1");
             command.Parameters.Add(new Microsoft.Data.Sqlite.SqliteParameter("@p0", fts5Query));
+            command.Parameters.Add(new Microsoft.Data.Sqlite.SqliteParameter("@p1", DeadLinkTag));
 
             var count = await command.ExecuteScalarAsync();
             var result = Convert.ToInt32(count);

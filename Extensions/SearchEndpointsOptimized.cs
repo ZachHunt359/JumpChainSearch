@@ -19,6 +19,7 @@ namespace JumpChainSearch.Extensions;
 /// </summary>
 public static class SearchEndpointsOptimized
 {
+    private const string DeadLinkTag = "Dead Link";
     private static TimeSpan _cacheDuration = TimeSpan.FromMinutes(5);
     
     public static void SetCacheDuration(int minutes)
@@ -62,6 +63,7 @@ public static class SearchEndpointsOptimized
                     .AsNoTracking()
                     .Include(d => d.Tags)
                     .Where(d => d.Id == docId.Value);
+                query = ApplyPublicVisibilityFilter(query);
                 query = ApplyNsfwFilter(query, nsfwTags);
                 
                 var document = await query.FirstOrDefaultAsync();
@@ -175,6 +177,7 @@ public static class SearchEndpointsOptimized
                         .Where(d => allDocumentIds.Contains(d.Id));
                     
                     filteredQuery = ApplyTagFilters(filteredQuery, includeTags, excludeTags);
+                    filteredQuery = ApplyPublicVisibilityFilter(filteredQuery);
                     filteredQuery = ApplyNsfwFilter(filteredQuery, nsfwTags);
                     
                     // Get filtered document IDs
@@ -205,7 +208,7 @@ public static class SearchEndpointsOptimized
                             includeTags = includeTags ?? "",
                             excludeTags = excludeTags ?? "",
                             resultCount = 0,
-                            totalCount = 0,
+                            totalCount,
                             results = new List<object>()
                         };
                         
@@ -239,6 +242,8 @@ public static class SearchEndpointsOptimized
                 {
                     query = ApplyTagFilters(query, includeTags, excludeTags);
                 }
+                query = ApplyPublicVisibilityFilter(query);
+                query = ApplyNsfwFilter(query, nsfwTags);
                 
                 Console.WriteLine($"[SEARCH] Executing query...");
                 var documents = await query.ToListAsync();
@@ -317,6 +322,7 @@ public static class SearchEndpointsOptimized
                 }
                 
                 query = ApplyTagFilters(query, includeTags, excludeTags);
+                query = ApplyPublicVisibilityFilter(query);
                 query = ApplyNsfwFilter(query, nsfwTags);
                 
                 var totalCount = await query.CountAsync();
@@ -550,6 +556,11 @@ public static class SearchEndpointsOptimized
         return query.Where(document => !document.Tags.Any(tag => nsfwTags.Contains(tag.TagName)));
     }
 
+    private static IQueryable<JumpDocument> ApplyPublicVisibilityFilter(IQueryable<JumpDocument> query)
+    {
+        return query.Where(document => !document.Tags.Any(tag => tag.TagName == DeadLinkTag));
+    }
+
     private static async Task<HashSet<string>> GetNsfwTagNamesAsync(
         JumpChainDbContext context,
         SfwModeService sfwMode)
@@ -590,6 +601,8 @@ public static class SearchEndpointsOptimized
         try
         {
             var tagFrequencies = await context.DocumentTags
+                .Where(tag => tag.TagName != DeadLinkTag &&
+                              !tag.JumpDocument.Tags.Any(documentTag => documentTag.TagName == DeadLinkTag))
                 .GroupBy(t => new { t.TagName, t.TagCategory })
                 .Select(g => new {
                     TagName = g.Key.TagName,
@@ -666,6 +679,7 @@ public static class SearchEndpointsOptimized
             var documents = await context.JumpDocuments
                 .Where(d => ids.Contains(d.Id))
                 .Include(d => d.Tags)
+                .Where(d => !d.Tags.Any(tag => tag.TagName == DeadLinkTag))
                 .Select(d => new {
                     DocumentId = d.Id,
                     Tags = d.Tags.Select(t => t.TagName).ToList()
@@ -728,6 +742,7 @@ public static class SearchEndpointsOptimized
             }
             
             var query = context.JumpDocuments.Include(d => d.Tags).Include(d => d.Urls).AsQueryable();
+            query = ApplyPublicVisibilityFilter(query);
             
             // Apply search filter if we have FTS5 results
             if (matchingIds.Any())
@@ -846,7 +861,13 @@ public static class SearchEndpointsOptimized
             if (sfwMode?.IsSfwMode == true)
             {
                 var nsfwTags = await GetNsfwTagNamesAsync(context, sfwMode);
-                count = await ApplyNsfwFilter(context.JumpDocuments.AsNoTracking(), nsfwTags).CountAsync();
+                count = await ApplyNsfwFilter(
+                    ApplyPublicVisibilityFilter(context.JumpDocuments.AsNoTracking()),
+                    nsfwTags).CountAsync();
+            }
+            else
+            {
+                count = await ApplyPublicVisibilityFilter(context.JumpDocuments.AsNoTracking()).CountAsync();
             }
             
             return Results.Ok(new {

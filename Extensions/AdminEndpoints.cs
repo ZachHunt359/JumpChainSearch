@@ -46,6 +46,7 @@ public static class AdminEndpoints
         
         // Text review queue endpoint
         group.MapGet("/text-review/queue", GetTextReviewQueue);
+        group.MapGet("/dead-links", GetDeadLinkDocuments);
         
         // System management endpoints
         group.MapGet("/system/cache-ttl", GetCacheTTL);
@@ -481,6 +482,10 @@ public static class AdminEndpoints
                     📝 Text Review
                     <span class=""badge"" id=""review-badge"" style=""display: none;"">0</span>
                 </button>
+                <button class=""tab-button"" id=""dead-links-tab"" onclick=""switchTab('dead-links')"">
+                    🔗 Dead Links
+                    <span class=""badge"" id=""dead-links-badge"" style=""display: none;"">0</span>
+                </button>
                 <button class=""tab-button"" onclick=""switchTab('system')"">⚙️ System</button>
             </div>
         </nav>
@@ -533,6 +538,11 @@ public static class AdminEndpoints
                         <h3>Tag Voting</h3>
                         <p id=""voting-summary"">Checking for pending tags...</p>
                         <button class=""btn btn-primary"" onclick=""switchTab('voting')"">View Pending</button>
+                    </div>
+                    <div class=""action-card"">
+                        <h3>Dead Links</h3>
+                        <p id=""dead-links-summary"">Checking for broken document links...</p>
+                        <button class=""btn btn-primary"" onclick=""switchTab('dead-links')"">Find Replacements</button>
                     </div>
                 </div>
             </section>
@@ -790,6 +800,23 @@ public static class AdminEndpoints
                 </div>
             </section>
         </div>
+
+        <!-- Dead Link Queue Tab -->
+        <div id=""dead-links"" class=""tab-content"">
+            <section>
+                <h2>🔗 Dead Link Queue</h2>
+                <div class=""action-card"">
+                    <div style=""display: flex; justify-content: space-between; align-items: start; gap: 1rem; flex-wrap: wrap;"">
+                        <div>
+                            <h3>Documents Needing Replacement Links</h3>
+                            <p>These documents are hidden from public search until the Dead Link tag is removed.</p>
+                        </div>
+                        <button class=""btn btn-primary"" onclick=""loadDeadLinks()"">Refresh Queue</button>
+                    </div>
+                    <div id=""dead-links-queue"" style=""margin-top: 1rem;""></div>
+                </div>
+            </section>
+        </div>
         
         <!-- Account Management Tab -->
         <div id=""account"" class=""tab-content"">
@@ -975,6 +1002,8 @@ public static class AdminEndpoints
             // Auto-load data for certain tabs
             if (tabName === 'review') {{
                 loadReviewQueue();
+            }} else if (tabName === 'dead-links') {{
+                loadDeadLinks();
             }} else if (tabName === 'voting') {{
                 loadPendingTags();
             }} else if (tabName === 'drives') {{
@@ -990,11 +1019,13 @@ public static class AdminEndpoints
             updateStatus();
             checkReviewQueue();
             checkVotingQueue();
+            checkDeadLinksQueue();
             // Poll every 30 seconds
             setInterval(() => {{
                 updateStatus();
                 checkReviewQueue();
                 checkVotingQueue();
+                checkDeadLinksQueue();
             }}, 30000);
             
             // Hide tag search results when clicking outside
@@ -1033,6 +1064,33 @@ public static class AdminEndpoints
                 }}
             }} catch (e) {{
                 console.error('Error checking review queue:', e);
+            }}
+        }}
+
+        async function checkDeadLinksQueue() {{
+            try {{
+                const response = await fetch('/admin/dead-links');
+                const data = await response.json();
+                const count = data.count || 0;
+                const badge = document.getElementById('dead-links-badge');
+                const summary = document.getElementById('dead-links-summary');
+
+                if (count > 0) {{
+                    badge.textContent = count;
+                    badge.style.display = 'inline-block';
+                    if (summary) {{
+                        summary.textContent = count + ' document' + (count !== 1 ? 's' : '') + ' need replacement links';
+                        summary.style.color = 'var(--warning)';
+                    }}
+                }} else {{
+                    badge.style.display = 'none';
+                    if (summary) {{
+                        summary.textContent = 'No dead links ✓';
+                        summary.style.color = 'var(--success)';
+                    }}
+                }}
+            }} catch (error) {{
+                console.error('Error checking dead link queue:', error);
             }}
         }}
         
@@ -2187,6 +2245,59 @@ public static class AdminEndpoints
                 }}
             }} catch (error) {{
                 container.innerHTML = '<div style=""color: var(--danger);"">Error loading queue: ' + error.message + '</div>';
+            }}
+        }}
+
+        async function loadDeadLinks() {{
+            const container = document.getElementById('dead-links-queue');
+            container.innerHTML = '<div style=""color: var(--text-secondary);""><span class=""spinner""></span> Loading dead links...</div>';
+
+            try {{
+                const response = await fetch('/admin/dead-links');
+                const data = await response.json();
+                if (!response.ok || !data.success) {{
+                    throw new Error(data.error || 'Failed to load dead links');
+                }}
+
+                if (!data.documents || data.documents.length === 0) {{
+                    container.innerHTML = '<div style=""color: var(--success); padding: 1rem;"">No documents are tagged Dead Link.</div>';
+                    return;
+                }}
+
+                container.innerHTML = data.documents.map(doc => {{
+                    const sources = [{{
+                        sourceDrive: doc.sourceDrive,
+                        folderPath: doc.folderPath,
+                        googleDriveFileId: doc.googleDriveFileId,
+                        webViewLink: doc.webViewLink,
+                        downloadLink: doc.downloadLink
+                    }}].concat(doc.alternateUrls || []);
+
+                    const sourceRows = sources.map((source, sourceIndex) => {{
+                        const viewLink = source.webViewLink
+                            ? `<a href=""${{escapeHtml(source.webViewLink)}}"" target=""_blank"" rel=""noopener"" class=""btn btn-sm btn-secondary"">Open Link</a>`
+                            : '<span style=""color: var(--text-muted);"">No view URL</span>';
+                        const downloadLink = source.downloadLink
+                            ? `<a href=""${{escapeHtml(source.downloadLink)}}"" target=""_blank"" rel=""noopener"" class=""btn btn-sm btn-secondary"">Download</a>`
+                            : '';
+
+                        return `<div style=""padding: 0.75rem 0; border-top: ${{sourceIndex === 0 ? 'none' : '1px solid var(--border)'}}; display: grid; grid-template-columns: minmax(180px, 1fr) minmax(220px, 2fr) auto; gap: 0.75rem; align-items: center;"">
+                            <div><strong>${{escapeHtml(source.sourceDrive || 'Unknown drive')}}</strong><br><small style=""color: var(--text-secondary);"">${{escapeHtml(source.folderPath || '/')}}</small></div>
+                            <div style=""overflow-wrap: anywhere;""><small>File ID: ${{escapeHtml(source.googleDriveFileId || 'Unknown')}}</small></div>
+                            <div class=""btn-group"">${{viewLink}} ${{downloadLink}}</div>
+                        </div>`;
+                    }}).join('');
+
+                    return `<article style=""padding: 1rem; margin-bottom: 0.75rem; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 6px;"">
+                        <div style=""display: flex; justify-content: space-between; gap: 1rem; align-items: start; flex-wrap: wrap;"">
+                            <div><h3 style=""margin: 0 0 0.25rem; font-size: 1rem;"">${{escapeHtml(doc.name)}}</h3><small style=""color: var(--text-secondary);"">Document ID ${{doc.id}} · Modified ${{new Date(doc.modifiedTime).toLocaleDateString()}}</small></div>
+                            <a href=""/?docId=${{doc.id}}"" target=""_blank"" rel=""noopener"" class=""btn btn-sm btn-primary"">View Record</a>
+                        </div>
+                        <div style=""margin-top: 0.75rem;"">${{sourceRows}}</div>
+                    </article>`;
+                }}).join('');
+            }} catch (error) {{
+                container.innerHTML = '<div style=""color: var(--danger);"">Error loading dead links: ' + escapeHtml(error.message) + '</div>';
             }}
         }}
         
@@ -3867,6 +3978,54 @@ sudo systemctl restart jumpchain
             Console.WriteLine($"Error fetching text review queue: {ex.Message}");
             return Results.BadRequest(new { success = false, error = ex.Message });
         }
+    }
+
+    /// <summary>
+    /// Lists documents hidden from public results because they are tagged Dead Link.
+    /// </summary>
+    private static async Task<IResult> GetDeadLinkDocuments(
+        HttpContext context,
+        JumpChainDbContext dbContext,
+        AdminAuthService authService)
+    {
+        var (valid, _) = await ValidateSession(context, authService);
+        if (!valid)
+            return Results.Unauthorized();
+
+        var documents = await dbContext.JumpDocuments
+            .AsNoTracking()
+            .Where(document => document.Tags.Any(tag => tag.TagName == "Dead Link"))
+            .OrderBy(document => document.Name)
+            .Select(document => new
+            {
+                document.Id,
+                document.Name,
+                document.SourceDrive,
+                document.FolderPath,
+                document.GoogleDriveFileId,
+                document.WebViewLink,
+                document.DownloadLink,
+                document.ModifiedTime,
+                alternateUrls = document.Urls
+                    .OrderBy(url => url.SourceDrive)
+                    .Select(url => new
+                    {
+                        url.SourceDrive,
+                        url.FolderPath,
+                        url.GoogleDriveFileId,
+                        url.WebViewLink,
+                        url.DownloadLink
+                    })
+                    .ToList()
+            })
+            .ToListAsync();
+
+        return Results.Ok(new
+        {
+            success = true,
+            count = documents.Count,
+            documents
+        });
     }
 
     // Helper method to validate session
