@@ -30,7 +30,7 @@ public class Fts5SearchService
             // Use prefix matching for partial terms to allow 'zom' -> matches 'zombie'
             // but avoid applying to very short terms to reduce noise
             var escaped = EscapeFts5Term(term);
-            if (!string.IsNullOrWhiteSpace(escaped) && escaped.Length >= 3)
+            if (!string.IsNullOrWhiteSpace(escaped) && term.Length >= 3)
             {
                 queryParts.Add(escaped + "*");
             }
@@ -43,7 +43,7 @@ public class Fts5SearchService
         // Add quoted phrases
         foreach (var phrase in phrases)
         {
-            queryParts.Add($"\"{EscapeFts5Term(phrase)}\"");
+            queryParts.Add(EscapeFts5Term(phrase));
         }
 
         // Combine terms with AND
@@ -54,7 +54,7 @@ public class Fts5SearchService
         var excludeParts = excludedTerms.Select(term =>
         {
             var e = EscapeFts5Term(term);
-            return (!string.IsNullOrWhiteSpace(e) && e.Length >= 3) ? $"NOT {e}*" : $"NOT {e}";
+            return (!string.IsNullOrWhiteSpace(e) && term.Length >= 3) ? $"NOT {e}*" : $"NOT {e}";
         });
         var excludeQuery = string.Join(" ", excludeParts);
 
@@ -83,9 +83,9 @@ public class Fts5SearchService
         if (string.IsNullOrWhiteSpace(term))
             return "";
 
-        // FTS5 special characters that need escaping: " (double quote)
-        // Quotes are already handled by caller when building phrases
-        return term.Replace("\"", "\"\"");
+        // Quoted FTS5 strings safely treat punctuation as token separators while
+        // preserving phrase order. Prefix operators are appended by the caller.
+        return $"\"{term.Replace("\"", "\"\"")}\"";
     }
 
     /// <summary>

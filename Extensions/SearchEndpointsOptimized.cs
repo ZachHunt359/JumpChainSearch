@@ -491,8 +491,10 @@ public static class SearchEndpointsOptimized
                     else
                         terms.Add(term);
                     currentTerm.Clear();
-                    isExcluded = false;
                 }
+
+                // A standalone hyphen is punctuation, not an exclusion for the next term.
+                isExcluded = false;
             }
             else
             {
