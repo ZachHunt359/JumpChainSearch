@@ -1,4 +1,5 @@
 using JumpChainSearch.Data;
+using JumpChainSearch.Helpers;
 using JumpChainSearch.Models;
 using JumpChainSearch.Services;
 using Microsoft.EntityFrameworkCore;
@@ -688,10 +689,19 @@ public static class GoogleDriveEndpoints
                             {
                                 // Existing document - check if we need to add DocumentUrl for this location
                                 var docId = existingFileIds[doc.GoogleDriveFileId];
+                                var existingDocument = await dbContext.JumpDocuments
+                                    .Include(existing => existing.Tags)
+                                    .Include(existing => existing.Urls)
+                                    .FirstAsync(existing => existing.Id == docId);
+                                var sourceEnriched = JumpDocumentScanMerge.EnrichSourceLessDocument(existingDocument, doc);
+                                if (sourceEnriched)
+                                {
+                                    updatedDocs++;
+                                }
                                 
                                 // Get folder ID from the document's Urls (created during conversion)
                                 var newUrl = doc.Urls.FirstOrDefault();
-                                if (newUrl != null && !string.IsNullOrEmpty(newUrl.GoogleDriveFolderId))
+                                if (!sourceEnriched && newUrl != null && !string.IsNullOrEmpty(newUrl.GoogleDriveFolderId))
                                 {
                                     // Check if this location already exists in DocumentUrls
                                     var existingUrl = await dbContext.DocumentUrls
@@ -723,10 +733,8 @@ public static class GoogleDriveEndpoints
                                 }
                                 
                                 // Check if it has a Drive tag for this drive
-                                var hasDriveTag = await dbContext.DocumentTags
-                                    .AnyAsync(t => t.JumpDocumentId == docId 
-                                                && t.TagCategory == "Drive" 
-                                                && t.TagName == drive.DriveName);
+                                var hasDriveTag = existingDocument.Tags.Any(t =>
+                                    t.TagCategory == "Drive" && t.TagName == drive.DriveName);
                                 
                                 if (!hasDriveTag)
                                 {
@@ -1112,10 +1120,13 @@ public static class GoogleDriveEndpoints
                     {
                         // Existing document - check if it has a Drive tag for this drive
                         var docId = existingFileIds[doc.GoogleDriveFileId];
-                        var hasDriveTag = await dbContext.DocumentTags
-                            .AnyAsync(t => t.JumpDocumentId == docId 
-                                        && t.TagCategory == "Drive" 
-                                        && t.TagName == drive.DriveName);
+                        var existingDocument = await dbContext.JumpDocuments
+                            .Include(existing => existing.Tags)
+                            .Include(existing => existing.Urls)
+                            .FirstAsync(existing => existing.Id == docId);
+                        JumpDocumentScanMerge.EnrichSourceLessDocument(existingDocument, doc);
+                        var hasDriveTag = existingDocument.Tags.Any(t =>
+                            t.TagCategory == "Drive" && t.TagName == drive.DriveName);
                         
                         if (!hasDriveTag)
                         {

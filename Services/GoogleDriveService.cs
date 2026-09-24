@@ -27,7 +27,8 @@ namespace JumpChainSearch.Services
         Task<IEnumerable<JumpDocument>> ScanPublicFolderAsync(string folderId, string folderName, string? resourceKey = null, string? parentDriveName = null);
         Task<(IEnumerable<JumpDocument> documents, string successfulMethod)> ScanDriveUnifiedAsync(DriveConfiguration driveConfig);
         Task<string?> ExtractTextFromDocumentAsync(string fileId);
-        Task<(string? text, string? method)> ExtractTextWithMethodAsync(string fileId);
+        Task<(string? text, string? method)> ExtractTextWithMethodAsync(string fileId, string? resourceKey = null);
+        Task<JumpDocument> GetSubmittedDocumentAsync(string fileId, string? resourceKey = null);
         Task<IEnumerable<DriveData>> GetAvailableDrivesAsync();
         Task<object> DebugFilePropertiesAsync(string fileId);
         Task<List<(string folderId, string folderName, string? resourceKey)>> DiscoverFolderHierarchyAsync(string rootFolderId, string? rootResourceKey = null);
@@ -726,7 +727,7 @@ namespace JumpChainSearch.Services
             return null;
         }
 
-        public async Task<(string? text, string? method)> ExtractTextWithMethodAsync(string fileId)
+        public async Task<(string? text, string? method)> ExtractTextWithMethodAsync(string fileId, string? resourceKey = null)
         {
             // For public documents, try public API key FIRST, then service account as fallback
             var services = new[] { _publicDriveService, _driveService };
@@ -741,12 +742,15 @@ namespace JumpChainSearch.Services
                 {
                     _logger.LogInformation($"Attempting text extraction with {serviceName} for file {fileId}");
                     
-                    var file = await service.Files.Get(fileId).ExecuteAsync();
+                    var metadataRequest = service.Files.Get(fileId);
+                    ApplyResourceKey(metadataRequest, fileId, resourceKey);
+                    var file = await metadataRequest.ExecuteAsync();
                     
                     if (file.MimeType == "application/vnd.google-apps.document")
                     {
                         // For Google Docs, export as plain text
                         var request = service.Files.Export(fileId, "text/plain");
+                        ApplyResourceKey(request, fileId, resourceKey);
                         var stream = new MemoryStream();
                         await request.DownloadAsync(stream);
                         stream.Position = 0;
@@ -763,6 +767,7 @@ namespace JumpChainSearch.Services
                         {
                             _logger.LogInformation($"Trying improved PdfPig extraction for file {fileId}");
                             var request = service.Files.Get(fileId);
+                            ApplyResourceKey(request, fileId, resourceKey);
                             var stream = new MemoryStream();
                             await request.DownloadAsync(stream);
                             stream.Position = 0;
@@ -786,6 +791,7 @@ namespace JumpChainSearch.Services
                         {
                             _logger.LogInformation($"Trying to export PDF as plain text for file {fileId}");
                             var exportRequest = service.Files.Export(fileId, "text/plain");
+                            ApplyResourceKey(exportRequest, fileId, resourceKey);
                             var exportStream = new MemoryStream();
                             await exportRequest.DownloadAsync(exportStream);
                             exportStream.Position = 0;
@@ -811,6 +817,7 @@ namespace JumpChainSearch.Services
                             System.IO.File.AppendAllText("ocr-debug.txt", $"[{DateTime.Now}] Starting OCR for {fileId} using {serviceName}\n");
                             
                             var request = service.Files.Get(fileId);
+                            ApplyResourceKey(request, fileId, resourceKey);
                             var stream = new MemoryStream();
                             await request.DownloadAsync(stream);
                             _logger.LogInformation($"Downloaded PDF for OCR, stream length: {stream.Length} bytes");
@@ -848,6 +855,7 @@ namespace JumpChainSearch.Services
                         {
                             _logger.LogInformation($"Trying to export Word document as plain text for file {fileId}");
                             var exportRequest = service.Files.Export(fileId, "text/plain");
+                            ApplyResourceKey(exportRequest, fileId, resourceKey);
                             var exportStream = new MemoryStream();
                             await exportRequest.DownloadAsync(exportStream);
                             exportStream.Position = 0;
@@ -869,6 +877,7 @@ namespace JumpChainSearch.Services
                         try
                         {
                             var request = service.Files.Get(fileId);
+                            ApplyResourceKey(request, fileId, resourceKey);
                             var stream = new MemoryStream();
                             await request.DownloadAsync(stream);
                             stream.Position = 0;
@@ -892,6 +901,7 @@ namespace JumpChainSearch.Services
                     {
                         // For plain text files
                         var request = service.Files.Get(fileId);
+                        ApplyResourceKey(request, fileId, resourceKey);
                         var stream = new MemoryStream();
                         await request.DownloadAsync(stream);
                         stream.Position = 0;
@@ -922,6 +932,107 @@ namespace JumpChainSearch.Services
             }
             
             return (null, null);
+        }
+
+        public async Task<JumpDocument> GetSubmittedDocumentAsync(string fileId, string? resourceKey = null)
+        {
+            Google.Apis.Drive.v3.Data.File? file = null;
+            Exception? lastError = null;
+
+            foreach (var service in new[] { _publicDriveService, _driveService })
+            {
+                try
+                {
+                    var request = service.Files.Get(fileId);
+                    request.Fields = "id,name,description,mimeType,size,createdTime,modifiedTime,webViewLink,webContentLink,exportLinks,thumbnailLink,hasThumbnail,trashed";
+                    ApplyResourceKey(request, fileId, resourceKey);
+                    file = await request.ExecuteAsync();
+                    break;
+                }
+                catch (Exception ex)
+                {
+                    lastError = ex;
+                }
+            }
+
+            if (file == null)
+            {
+                throw new InvalidOperationException("The document could not be accessed. Confirm that anyone with the link can view it.", lastError);
+            }
+
+            var supportedMimeTypes = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            {
+                "application/pdf",
+                "application/vnd.google-apps.document",
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                "text/plain"
+            };
+
+            if (file.Trashed == true)
+            {
+                throw new InvalidOperationException("The submitted document is in the trash.");
+            }
+
+            if (string.IsNullOrWhiteSpace(file.MimeType) || !supportedMimeTypes.Contains(file.MimeType))
+            {
+                throw new InvalidOperationException($"Unsupported document type: {file.MimeType ?? "unknown"}.");
+            }
+
+            var modifiedTime = file.ModifiedTimeDateTimeOffset?.UtcDateTime ?? DateTime.UtcNow;
+            var (extractedText, extractionMethod) = await ExtractTextWithMethodAsync(fileId, resourceKey);
+            var document = new JumpDocument
+            {
+                GoogleDriveFileId = file.Id,
+                Name = file.Name ?? "Untitled",
+                Description = file.Description ?? string.Empty,
+                MimeType = file.MimeType,
+                Size = file.Size ?? 0,
+                CreatedTime = file.CreatedTimeDateTimeOffset?.UtcDateTime ?? DateTime.UtcNow,
+                ModifiedTime = modifiedTime,
+                LastScanned = DateTime.UtcNow,
+                LastModified = modifiedTime,
+                SourceDrive = string.Empty,
+                FolderPath = string.Empty,
+                WebViewLink = file.WebViewLink ?? $"https://drive.google.com/open?id={file.Id}",
+                DownloadLink = file.WebContentLink ?? file.ExportLinks?.Values.FirstOrDefault() ?? string.Empty,
+                ThumbnailLink = file.ThumbnailLink ?? string.Empty,
+                HasThumbnail = file.HasThumbnail ?? false,
+                ExtractedText = extractedText,
+                ExtractionMethod = extractionMethod
+            };
+
+            document.Tags = GenerateTags(document, string.Empty, string.Empty);
+            return document;
+        }
+
+        private static void ApplyResourceKey(Google.Apis.Drive.v3.FilesResource.GetRequest request, string fileId, string? resourceKey)
+        {
+            if (string.IsNullOrWhiteSpace(resourceKey))
+            {
+                return;
+            }
+
+            var headerValue = $"{fileId}/{resourceKey}";
+            request.ModifyRequest += message => message.Headers.TryAddWithoutValidation("X-Goog-Drive-Resource-Keys", headerValue);
+            if (request.MediaDownloader is Google.Apis.Download.MediaDownloader downloader)
+            {
+                downloader.ModifyRequest += message => message.Headers.TryAddWithoutValidation("X-Goog-Drive-Resource-Keys", headerValue);
+            }
+        }
+
+        private static void ApplyResourceKey(Google.Apis.Drive.v3.FilesResource.ExportRequest request, string fileId, string? resourceKey)
+        {
+            if (string.IsNullOrWhiteSpace(resourceKey))
+            {
+                return;
+            }
+
+            var headerValue = $"{fileId}/{resourceKey}";
+            request.ModifyRequest += message => message.Headers.TryAddWithoutValidation("X-Goog-Drive-Resource-Keys", headerValue);
+            if (request.MediaDownloader is Google.Apis.Download.MediaDownloader downloader)
+            {
+                downloader.ModifyRequest += message => message.Headers.TryAddWithoutValidation("X-Goog-Drive-Resource-Keys", headerValue);
+            }
         }
 
         private (string? text, string method) ExtractTextFromPdfWithMethod(Stream pdfStream)
@@ -1669,8 +1780,10 @@ namespace JumpChainSearch.Services
         {
             var tags = new List<DocumentTag>();
 
-            // Source Drive tag - Always add this
-            tags.Add(new DocumentTag { TagName = driveName, TagCategory = "Drive" });
+            if (!string.IsNullOrWhiteSpace(driveName))
+            {
+                tags.Add(new DocumentTag { TagName = driveName, TagCategory = "Drive" });
+            }
 
             // Determine content type based on folder path and filename (using Google Apps Script logic)
             string contentType = DetermineContentType(document.Name, folderPath);

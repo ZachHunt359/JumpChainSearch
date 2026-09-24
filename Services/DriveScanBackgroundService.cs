@@ -1,4 +1,5 @@
 using JumpChainSearch.Data;
+using JumpChainSearch.Helpers;
 using JumpChainSearch.Models;
 using Microsoft.EntityFrameworkCore;
 
@@ -155,26 +156,30 @@ public class DriveScanBackgroundService
 
                 // Process and save documents (simplified - full logic would match GoogleDriveEndpoints)
                 var fileIds = documentsList.Select(d => d.GoogleDriveFileId).ToList();
-                var existingFileIds = await dbContext.JumpDocuments
+                var existingDocuments = await dbContext.JumpDocuments
+                    .Include(d => d.Tags)
+                    .Include(d => d.Urls)
                     .Where(d => fileIds.Contains(d.GoogleDriveFileId))
-                    .Select(d => d.GoogleDriveFileId)
                     .ToListAsync();
+                var existingByFileId = existingDocuments.ToDictionary(d => d.GoogleDriveFileId);
 
                 var newDocs = 0;
                 foreach (var doc in documentsList)
                 {
-                    if (!existingFileIds.Contains(doc.GoogleDriveFileId))
+                    if (!existingByFileId.TryGetValue(doc.GoogleDriveFileId, out var existing))
                     {
                         dbContext.JumpDocuments.Add(doc);
+                        existingByFileId[doc.GoogleDriveFileId] = doc;
                         newDocs++;
+                    }
+                    else
+                    {
+                        JumpDocumentScanMerge.EnrichSourceLessDocument(existing, doc);
                     }
                 }
 
-                if (newDocs > 0)
-                {
-                    await dbContext.SaveChangesAsync();
-                    _newDocuments += newDocs;
-                }
+                await dbContext.SaveChangesAsync();
+                _newDocuments += newDocs;
 
                 drive.LastScanTime = DateTime.Now;
                 drive.DocumentCount = await dbContext.JumpDocuments

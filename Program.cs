@@ -182,6 +182,9 @@ app.MapGroup("/api/google-drive").MapGoogleDriveEndpoints();
 // Map public moderated drive submissions
 app.MapGroup("/api/drive-submissions").MapDriveSubmissionEndpoints();
 
+// Map public moderated document submissions
+app.MapGroup("/api/document-submissions").MapDocumentSubmissionEndpoints();
+
 // Map Tag Management API endpoints
 app.MapGroup("/api/tags").MapTagManagementEndpoints();
 

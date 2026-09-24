@@ -17,6 +17,7 @@ namespace JumpChainSearch.Data
         public DbSet<DriveConfiguration> DriveConfigurations { get; set; }
         public DbSet<FolderConfiguration> FolderConfigurations { get; set; }
         public DbSet<DriveSubmission> DriveSubmissions { get; set; }
+        public DbSet<DocumentSubmission> DocumentSubmissions { get; set; }
         
         // Tag voting system
         public DbSet<TagSuggestion> TagSuggestions { get; set; }
@@ -141,6 +142,30 @@ namespace JumpChainSearch.Data
                 entity.Property(e => e.Status).HasMaxLength(20);
                 entity.Property(e => e.ReviewedBy).HasMaxLength(100);
                 entity.Property(e => e.ReviewNotes).HasMaxLength(1000);
+            });
+
+            modelBuilder.Entity<DocumentSubmission>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.HasIndex(e => e.Status);
+                entity.HasIndex(e => e.GoogleDriveFileId)
+                    .IsUnique()
+                    .HasFilter("\"Status\" = 'Pending'")
+                    .HasDatabaseName("IX_DocumentSubmissions_PendingFileId");
+
+                entity.Property(e => e.DocumentUrl).HasMaxLength(1000);
+                entity.Property(e => e.GoogleDriveFileId).HasMaxLength(256);
+                entity.Property(e => e.ResourceKey).HasMaxLength(256);
+                entity.Property(e => e.Notes).HasMaxLength(2000);
+                entity.Property(e => e.SubmitterName).HasMaxLength(100);
+                entity.Property(e => e.Status).HasMaxLength(20);
+                entity.Property(e => e.ReviewedBy).HasMaxLength(100);
+                entity.Property(e => e.ReviewNotes).HasMaxLength(1000);
+
+                entity.HasOne(e => e.JumpDocument)
+                    .WithMany()
+                    .HasForeignKey(e => e.JumpDocumentId)
+                    .OnDelete(DeleteBehavior.SetNull);
             });
 
             // Configure FolderConfiguration

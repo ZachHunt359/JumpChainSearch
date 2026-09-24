@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.EntityFrameworkCore;
+using JumpChainSearch.Helpers;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -151,19 +152,42 @@ public class ScanSchedulerService : BackgroundService
                     
                     // Count new vs existing documents
                     var fileIds = documentsList.Select(d => d.GoogleDriveFileId).ToList();
-                    var existingCount = await dbContext.JumpDocuments
+                    var existingDocuments = await dbContext.JumpDocuments
+                        .Include(d => d.Tags)
+                        .Include(d => d.Urls)
                         .Where(d => fileIds.Contains(d.GoogleDriveFileId))
-                        .CountAsync(cancellationToken);
+                        .ToListAsync(cancellationToken);
+                    var existingByFileId = existingDocuments.ToDictionary(d => d.GoogleDriveFileId);
+
+                    var newDocs = 0;
+                    foreach (var document in documentsList)
+                    {
+                        if (!existingByFileId.TryGetValue(document.GoogleDriveFileId, out var existing))
+                        {
+                            dbContext.JumpDocuments.Add(document);
+                            existingByFileId[document.GoogleDriveFileId] = document;
+                            newDocs++;
+                        }
+                        else
+                        {
+                            JumpDocumentScanMerge.EnrichSourceLessDocument(existing, document);
+                        }
+                    }
+
+                    drive.LastScanTime = DateTime.UtcNow;
+                    await dbContext.SaveChangesAsync(cancellationToken);
+                    drive.DocumentCount = await dbContext.JumpDocuments
+                        .CountAsync(document => document.SourceDrive == (drive.ParentDriveName ?? drive.DriveName), cancellationToken);
+                    await dbContext.SaveChangesAsync(cancellationToken);
                     
-                    var newDocs = documentsList.Count - existingCount;
                     totalNewDocuments += newDocs;
-                    totalUpdatedDocuments += existingCount;
+                    totalUpdatedDocuments += existingDocuments.Count;
                     
                     _logger.LogInformation(
                         "Drive {DriveName}: {NewDocs} new, {ExistingDocs} existing",
                         drive.DriveName,
                         newDocs,
-                        existingCount);
+                        existingDocuments.Count);
                 }
                 catch (Exception ex)
                 {

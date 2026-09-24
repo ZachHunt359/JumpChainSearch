@@ -43,6 +43,12 @@ public static class AdminEndpoints
             .WithSummary("Approve a submission and create its drive configuration");
         group.MapPost("/drive-submissions/{id:int}/reject", RejectDriveSubmission)
             .WithSummary("Reject a submitted Google Drive link");
+        group.MapGet("/document-submissions", GetDocumentSubmissions)
+            .WithSummary("List submitted Google Drive documents awaiting review");
+        group.MapPost("/document-submissions/{id:int}/approve", ApproveDocumentSubmission)
+            .WithSummary("Approve, process, and index a submitted Google Drive document");
+        group.MapPost("/document-submissions/{id:int}/reject", RejectDocumentSubmission)
+            .WithSummary("Reject a submitted Google Drive document");
         group.MapGet("/drives/{driveName}/folders", GetDriveFolders);
         group.MapPost("/drives/{driveName}/scan", ScanSingleDrive);
         group.MapPost("/drives/{driveName}/refresh-folders", RefreshDriveFolders);
@@ -702,6 +708,9 @@ public static class AdminEndpoints
 
                 <h3 style=""margin-top: 2rem;"">Pending Submissions <span id=""drive-submission-count"" class=""status status-idle"">0</span></h3>
                 <div id=""drive-submission-list"" style=""margin-top: 1rem;""></div>
+
+                <h3 style=""margin-top: 2rem;"">Pending Documents <span id=""document-submission-count"" class=""status status-idle"">0</span></h3>
+                <div id=""document-submission-list"" style=""margin-top: 1rem;""></div>
 
                 <h3 style=""margin-top: 2rem;"">Configured Drives</h3>
                 <div id=""drive-list"" style=""margin-top: 1.5rem;"">
@@ -2987,7 +2996,7 @@ public static class AdminEndpoints
         const configuredDrives = new Map();
 
         async function loadDriveManagement() {{
-            await Promise.all([loadDriveList(), loadDriveSubmissions()]);
+            await Promise.all([loadDriveList(), loadDriveSubmissions(), loadDocumentSubmissions()]);
         }}
 
         function getDriveUrl(drive) {{
@@ -3090,6 +3099,41 @@ public static class AdminEndpoints
             }} catch (error) {{
                 count.textContent = '?';
                 container.innerHTML = '<div style=""color: var(--danger);"">Error loading submissions: ' + escapeHtml(error.message) + '</div>';
+            }}
+        }}
+
+        async function loadDocumentSubmissions() {{
+            const container = document.getElementById('document-submission-list');
+            const count = document.getElementById('document-submission-count');
+            container.innerHTML = '<div style=""color: var(--text-secondary);"">Loading documents...</div>';
+
+            try {{
+                const response = await fetch('/admin/document-submissions');
+                const data = await response.json();
+                if (!response.ok || !data.success) throw new Error(data.message || 'Failed to load document submissions');
+
+                count.textContent = data.submissions.length;
+                if (data.submissions.length === 0) {{
+                    container.innerHTML = '<div style=""color: var(--text-secondary);"">No documents are awaiting review.</div>';
+                    return;
+                }}
+
+                container.innerHTML = data.submissions.map(submission => `
+                    <div style=""background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: 8px; padding: 1rem; margin-bottom: 1rem;"">
+                        <strong>Google Drive document</strong>
+                        <div style=""font-size: 0.85rem; color: var(--text-secondary);"">Submitted ${{new Date(submission.submittedAt).toLocaleString()}}${{submission.submitterName ? ' by ' + escapeHtml(submission.submitterName) : ''}}</div>
+                        <a href=""${{escapeHtml(submission.documentUrl)}}"" target=""_blank"" rel=""noopener noreferrer"" style=""font-size: 0.85rem;"">Open submitted document</a>
+                        ${{submission.notes ? '<p style=""margin-top: 0.5rem;"">' + escapeHtml(submission.notes) + '</p>' : ''}}
+                        <input id=""document-submission-review-${{submission.id}}"" maxlength=""1000"" placeholder=""Review notes (optional)"" style=""display: block; width: 100%; padding: 0.65rem; margin-top: 0.75rem;"" />
+                        <div class=""btn-group"" style=""margin-top: 0.75rem;"">
+                            <button class=""btn btn-success"" onclick=""approveDocumentSubmission(${{submission.id}}, this)"">Approve and Process</button>
+                            <button class=""btn btn-danger"" onclick=""rejectDocumentSubmission(${{submission.id}})"">Reject</button>
+                        </div>
+                    </div>
+                `).join('');
+            }} catch (error) {{
+                count.textContent = '?';
+                container.innerHTML = '<div style=""color: var(--danger);"">Error loading document submissions: ' + escapeHtml(error.message) + '</div>';
             }}
         }}
 
@@ -3198,6 +3242,39 @@ public static class AdminEndpoints
             const data = await response.json();
             if (!response.ok) return alert(data.message || data.error || 'Unable to reject submission');
             await loadDriveSubmissions();
+        }}
+
+        async function approveDocumentSubmission(id, button) {{
+            const originalText = button.textContent;
+            button.disabled = true;
+            button.textContent = 'Processing...';
+            try {{
+                const response = await fetch('/admin/document-submissions/' + id + '/approve', {{
+                    method: 'POST',
+                    headers: {{ 'Content-Type': 'application/json' }},
+                    body: JSON.stringify({{ reviewNotes: document.getElementById('document-submission-review-' + id).value }})
+                }});
+                const data = await response.json();
+                if (!response.ok) throw new Error(data.message || data.error || 'Unable to approve document');
+                alert('Indexed ' + data.documentName);
+                await loadDocumentSubmissions();
+            }} catch (error) {{
+                alert(error.message);
+                button.disabled = false;
+                button.textContent = originalText;
+            }}
+        }}
+
+        async function rejectDocumentSubmission(id) {{
+            if (!confirm('Reject this document submission?')) return;
+            const response = await fetch('/admin/document-submissions/' + id + '/reject', {{
+                method: 'POST',
+                headers: {{ 'Content-Type': 'application/json' }},
+                body: JSON.stringify({{ reviewNotes: document.getElementById('document-submission-review-' + id).value }})
+            }});
+            const data = await response.json();
+            if (!response.ok) return alert(data.message || data.error || 'Unable to reject document');
+            await loadDocumentSubmissions();
         }}
         
         async function toggleDriveFolders(index, driveName) {{
@@ -4157,6 +4234,160 @@ sudo systemctl restart jumpchain
             return Results.Conflict(new { success = false, message = "This submission has already been reviewed." });
         if (request.ReviewNotes?.Length > 1000)
             return Results.BadRequest(new { success = false, message = "Review notes must be 1,000 characters or fewer." });
+
+        submission.Status = "Rejected";
+        submission.ReviewedAt = DateTime.UtcNow;
+        submission.ReviewedBy = user?.Username;
+        submission.ReviewNotes = NormalizeOptional(request.ReviewNotes);
+        await dbContext.SaveChangesAsync();
+
+        return Results.Ok(new { success = true });
+    }
+
+    private static async Task<IResult> GetDocumentSubmissions(
+        string? status,
+        HttpContext context,
+        JumpChainDbContext dbContext,
+        AdminAuthService authService)
+    {
+        var (valid, _) = await ValidateSession(context, authService);
+        if (!valid)
+            return Results.Unauthorized();
+
+        var requestedStatus = string.IsNullOrWhiteSpace(status) ? "Pending" : status.Trim();
+        if (requestedStatus is not ("Pending" or "Approved" or "Rejected" or "All"))
+            return Results.BadRequest(new { success = false, message = "Invalid submission status." });
+
+        var query = dbContext.DocumentSubmissions.AsNoTracking();
+        if (requestedStatus != "All")
+            query = query.Where(submission => submission.Status == requestedStatus);
+
+        var submissions = await query
+            .OrderByDescending(submission => submission.SubmittedAt)
+            .Select(submission => new
+            {
+                submission.Id,
+                submission.DocumentUrl,
+                submission.GoogleDriveFileId,
+                submission.Notes,
+                submission.SubmitterName,
+                submission.Status,
+                submission.SubmittedAt,
+                submission.ReviewedAt,
+                submission.ReviewedBy,
+                submission.ReviewNotes,
+                submission.JumpDocumentId
+            })
+            .ToListAsync();
+
+        return Results.Ok(new { success = true, submissions });
+    }
+
+    private static async Task<IResult> ApproveDocumentSubmission(
+        int id,
+        ReviewDocumentSubmissionRequest request,
+        HttpContext context,
+        JumpChainDbContext dbContext,
+        AdminAuthService authService,
+        IGoogleDriveService driveService,
+        IDocumentCountService documentCountService)
+    {
+        var (valid, user) = await ValidateSession(context, authService);
+        if (!valid)
+            return Results.Unauthorized();
+        if (request.ReviewNotes?.Length > 1000)
+            return Results.BadRequest(new { success = false, message = "Review notes must be 1,000 characters or fewer." });
+
+        var pendingSubmission = await dbContext.DocumentSubmissions
+            .AsNoTracking()
+            .FirstOrDefaultAsync(submission => submission.Id == id);
+        if (pendingSubmission is null)
+            return Results.NotFound(new { success = false, message = "Document submission not found." });
+        if (pendingSubmission.Status != "Pending")
+            return Results.Conflict(new { success = false, message = "This submission has already been reviewed." });
+
+        JumpDocument? submittedDocument = null;
+        var existingDocument = await dbContext.JumpDocuments
+            .AsNoTracking()
+            .FirstOrDefaultAsync(document => document.GoogleDriveFileId == pendingSubmission.GoogleDriveFileId);
+        if (existingDocument is null)
+        {
+            try
+            {
+                submittedDocument = await driveService.GetSubmittedDocumentAsync(
+                    pendingSubmission.GoogleDriveFileId,
+                    pendingSubmission.ResourceKey);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return Results.BadRequest(new { success = false, message = ex.Message });
+            }
+        }
+
+        var documentWasAdded = false;
+        await using var transaction = await dbContext.Database.BeginTransactionAsync();
+        var submission = await dbContext.DocumentSubmissions.FindAsync(id);
+        if (submission is null)
+            return Results.NotFound(new { success = false, message = "Document submission not found." });
+        if (submission.Status != "Pending")
+            return Results.Conflict(new { success = false, message = "This submission has already been reviewed." });
+
+        var document = await dbContext.JumpDocuments
+            .FirstOrDefaultAsync(item => item.GoogleDriveFileId == submission.GoogleDriveFileId);
+        if (document is null)
+        {
+            document = submittedDocument
+                ?? throw new InvalidOperationException("Document ingestion did not return a document.");
+            dbContext.JumpDocuments.Add(document);
+            documentWasAdded = true;
+        }
+
+        submission.Status = "Approved";
+        submission.ReviewedAt = DateTime.UtcNow;
+        submission.ReviewedBy = user?.Username;
+        submission.ReviewNotes = NormalizeOptional(request.ReviewNotes);
+        submission.JumpDocument = document;
+
+        try
+        {
+            await dbContext.SaveChangesAsync();
+            await transaction.CommitAsync();
+        }
+        catch (DbUpdateException)
+        {
+            return Results.Conflict(new { success = false, message = "The document was indexed by another request. Reload the queue." });
+        }
+
+        if (documentWasAdded)
+            await documentCountService.RefreshCountAsync();
+
+        return Results.Ok(new
+        {
+            success = true,
+            documentId = document.Id,
+            documentName = document.Name,
+            alreadyIndexed = !documentWasAdded
+        });
+    }
+
+    private static async Task<IResult> RejectDocumentSubmission(
+        int id,
+        ReviewDocumentSubmissionRequest request,
+        HttpContext context,
+        JumpChainDbContext dbContext,
+        AdminAuthService authService)
+    {
+        var (valid, user) = await ValidateSession(context, authService);
+        if (!valid)
+            return Results.Unauthorized();
+        if (request.ReviewNotes?.Length > 1000)
+            return Results.BadRequest(new { success = false, message = "Review notes must be 1,000 characters or fewer." });
+
+        var submission = await dbContext.DocumentSubmissions.FindAsync(id);
+        if (submission is null)
+            return Results.NotFound(new { success = false, message = "Document submission not found." });
+        if (submission.Status != "Pending")
+            return Results.Conflict(new { success = false, message = "This submission has already been reviewed." });
 
         submission.Status = "Rejected";
         submission.ReviewedAt = DateTime.UtcNow;

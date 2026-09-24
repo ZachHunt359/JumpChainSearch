@@ -5,7 +5,7 @@
 
 <div class="page">
     <div class="sidebar @(sidebarExpanded ? "expanded" : "collapsed")" id="sidebar">
-        <NavMenu @ref="navMenu" OnToggle="HandleSidebarToggle" OnSubmitDrive="OpenDriveSubmission" />
+        <NavMenu @ref="navMenu" OnToggle="HandleSidebarToggle" OnSubmitDrive="OpenDriveSubmission" OnSubmitDocument="OpenDocumentSubmission" />
     </div>
 
     <main>
@@ -72,6 +72,52 @@
     </div>
 }
 
+@if (showDocumentSubmission)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);" @onclick="CloseDocumentSubmission">
+        <div class="modal-dialog modal-dialog-centered" @onclick:stopPropagation="true">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><span class="oi oi-document me-2"></span>Submit a Document</h5>
+                    <button type="button" class="btn-close" @onclick="CloseDocumentSubmission"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="document-submission-url" class="form-label">Google Drive document URL</label>
+                        <input id="document-submission-url" type="url" class="form-control" maxlength="1000"
+                               @bind="documentSubmissionUrl" placeholder="https://docs.google.com/document/d/..." />
+                    </div>
+                    <div class="mb-3">
+                        <label for="document-submitter-name" class="form-label">Your name <span class="text-muted">(optional)</span></label>
+                        <input id="document-submitter-name" class="form-control" maxlength="100" @bind="documentSubmitterName" />
+                    </div>
+                    <div class="mb-3">
+                        <label for="document-submission-notes" class="form-label">Notes <span class="text-muted">(optional)</span></label>
+                        <textarea id="document-submission-notes" class="form-control" rows="3" maxlength="2000"
+                                  @bind="documentSubmissionNotes"></textarea>
+                    </div>
+                    @if (!string.IsNullOrEmpty(documentSubmissionMessage))
+                    {
+                        <div class="alert @(documentSubmissionSucceeded ? "alert-success" : "alert-danger") mb-0" role="status">
+                            @documentSubmissionMessage
+                        </div>
+                    }
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="CloseDocumentSubmission">Cancel</button>
+                    <button type="button" class="btn btn-success" disabled="@isSubmittingDocument" @onclick="SubmitDocument">
+                        @if (isSubmittingDocument)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1"></span>
+                        }
+                        Submit for Review
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
 @code {
     private bool sidebarExpanded = false; // Start collapsed
     private NavMenu? navMenu;
@@ -83,6 +129,13 @@
     private string driveSubmitterName = string.Empty;
     private string driveSubmissionNotes = string.Empty;
     private string driveSubmissionMessage = string.Empty;
+    private bool showDocumentSubmission;
+    private bool isSubmittingDocument;
+    private bool documentSubmissionSucceeded;
+    private string documentSubmissionUrl = string.Empty;
+    private string documentSubmitterName = string.Empty;
+    private string documentSubmissionNotes = string.Empty;
+    private string documentSubmissionMessage = string.Empty;
 
     private void HandleSidebarToggle(bool expanded)
     {
@@ -146,6 +199,63 @@
         finally
         {
             isSubmittingDrive = false;
+        }
+    }
+
+    private void OpenDocumentSubmission()
+    {
+        documentSubmissionMessage = string.Empty;
+        documentSubmissionSucceeded = false;
+        showDocumentSubmission = true;
+    }
+
+    private void CloseDocumentSubmission()
+    {
+        if (!isSubmittingDocument)
+            showDocumentSubmission = false;
+    }
+
+    private async Task SubmitDocument()
+    {
+        documentSubmissionMessage = string.Empty;
+        documentSubmissionSucceeded = false;
+
+        if (string.IsNullOrWhiteSpace(documentSubmissionUrl))
+        {
+            documentSubmissionMessage = "Document URL is required.";
+            return;
+        }
+
+        isSubmittingDocument = true;
+        try
+        {
+            var response = await Http.PostAsJsonAsync("/api/document-submissions", new
+            {
+                DocumentUrl = documentSubmissionUrl,
+                Notes = documentSubmissionNotes,
+                SubmitterName = documentSubmitterName
+            });
+
+            using var payload = System.Text.Json.JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+            documentSubmissionMessage = payload.RootElement.TryGetProperty("message", out var message)
+                ? message.GetString() ?? "Unable to submit document."
+                : "Unable to submit document.";
+            documentSubmissionSucceeded = response.IsSuccessStatusCode;
+
+            if (documentSubmissionSucceeded)
+            {
+                documentSubmissionUrl = string.Empty;
+                documentSubmitterName = string.Empty;
+                documentSubmissionNotes = string.Empty;
+            }
+        }
+        catch
+        {
+            documentSubmissionMessage = "Unable to submit the document right now. Please try again.";
+        }
+        finally
+        {
+            isSubmittingDocument = false;
         }
     }
 }

@@ -149,7 +149,7 @@
                         </button>
                     </div>
                     <div class="nav-item px-3">
-                        <button type="button" class="nav-link" disabled title="Coming soon">
+                        <button type="button" class="nav-link" @onclick="OnSubmitDocument">
                             <span class="oi oi-document" aria-hidden="true"></span>
                             <span class="nav-text">Submit Doc</span>
                         </button>
@@ -171,6 +171,7 @@
 @code {
     [Parameter] public EventCallback<bool> OnToggle { get; set; }
     [Parameter] public EventCallback OnSubmitDrive { get; set; }
+    [Parameter] public EventCallback OnSubmitDocument { get; set; }
     
     private bool collapseNavMenu = true; // Start collapsed by default
     private string selectedTheme = "material";
