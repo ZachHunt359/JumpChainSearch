@@ -1,10 +1,11 @@
 ﻿@inherits LayoutComponentBase
+@inject HttpClient Http
 
 <PageTitle>JumpChain Search</PageTitle>
 
 <div class="page">
     <div class="sidebar @(sidebarExpanded ? "expanded" : "collapsed")" id="sidebar">
-        <NavMenu @ref="navMenu" OnToggle="HandleSidebarToggle" />
+        <NavMenu @ref="navMenu" OnToggle="HandleSidebarToggle" OnSubmitDrive="OpenDriveSubmission" />
     </div>
 
     <main>
@@ -20,13 +21,131 @@
     </main>
 </div>
 
+@if (showDriveSubmission)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);" @onclick="CloseDriveSubmission">
+        <div class="modal-dialog modal-dialog-centered" @onclick:stopPropagation="true">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><span class="oi oi-cloud-upload me-2"></span>Submit a Google Drive</h5>
+                    <button type="button" class="btn-close" @onclick="CloseDriveSubmission"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="drive-submission-url" class="form-label">Google Drive folder URL</label>
+                        <input id="drive-submission-url" type="url" class="form-control" maxlength="1000"
+                               @bind="driveSubmissionUrl" placeholder="https://drive.google.com/drive/folders/..." />
+                    </div>
+                    <div class="mb-3">
+                        <label for="drive-submission-name" class="form-label">Drive name</label>
+                        <input id="drive-submission-name" class="form-control" maxlength="200"
+                               @bind="driveSubmissionName" placeholder="Name shown in search results" />
+                    </div>
+                    <div class="mb-3">
+                        <label for="drive-submitter-name" class="form-label">Your name <span class="text-muted">(optional)</span></label>
+                        <input id="drive-submitter-name" class="form-control" maxlength="100" @bind="driveSubmitterName" />
+                    </div>
+                    <div class="mb-3">
+                        <label for="drive-submission-notes" class="form-label">Notes <span class="text-muted">(optional)</span></label>
+                        <textarea id="drive-submission-notes" class="form-control" rows="3" maxlength="2000"
+                                  @bind="driveSubmissionNotes"></textarea>
+                    </div>
+                    @if (!string.IsNullOrEmpty(driveSubmissionMessage))
+                    {
+                        <div class="alert @(driveSubmissionSucceeded ? "alert-success" : "alert-danger") mb-0" role="status">
+                            @driveSubmissionMessage
+                        </div>
+                    }
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="CloseDriveSubmission">Cancel</button>
+                    <button type="button" class="btn btn-success" disabled="@isSubmittingDrive" @onclick="SubmitDrive">
+                        @if (isSubmittingDrive)
+                        {
+                            <span class="spinner-border spinner-border-sm me-1"></span>
+                        }
+                        Submit for Review
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
 @code {
     private bool sidebarExpanded = false; // Start collapsed
     private NavMenu? navMenu;
+    private bool showDriveSubmission;
+    private bool isSubmittingDrive;
+    private bool driveSubmissionSucceeded;
+    private string driveSubmissionUrl = string.Empty;
+    private string driveSubmissionName = string.Empty;
+    private string driveSubmitterName = string.Empty;
+    private string driveSubmissionNotes = string.Empty;
+    private string driveSubmissionMessage = string.Empty;
 
     private void HandleSidebarToggle(bool expanded)
     {
         sidebarExpanded = expanded;
         StateHasChanged();
+    }
+
+    private void OpenDriveSubmission()
+    {
+        driveSubmissionMessage = string.Empty;
+        driveSubmissionSucceeded = false;
+        showDriveSubmission = true;
+    }
+
+    private void CloseDriveSubmission()
+    {
+        if (!isSubmittingDrive)
+            showDriveSubmission = false;
+    }
+
+    private async Task SubmitDrive()
+    {
+        driveSubmissionMessage = string.Empty;
+        driveSubmissionSucceeded = false;
+
+        if (string.IsNullOrWhiteSpace(driveSubmissionUrl) || string.IsNullOrWhiteSpace(driveSubmissionName))
+        {
+            driveSubmissionMessage = "Drive URL and name are required.";
+            return;
+        }
+
+        isSubmittingDrive = true;
+        try
+        {
+            var response = await Http.PostAsJsonAsync("/api/drive-submissions", new
+            {
+                DriveUrl = driveSubmissionUrl,
+                SuggestedName = driveSubmissionName,
+                Notes = driveSubmissionNotes,
+                SubmitterName = driveSubmitterName
+            });
+
+            using var payload = System.Text.Json.JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+            driveSubmissionMessage = payload.RootElement.TryGetProperty("message", out var message)
+                ? message.GetString() ?? "Unable to submit drive."
+                : "Unable to submit drive.";
+            driveSubmissionSucceeded = response.IsSuccessStatusCode;
+
+            if (driveSubmissionSucceeded)
+            {
+                driveSubmissionUrl = string.Empty;
+                driveSubmissionName = string.Empty;
+                driveSubmitterName = string.Empty;
+                driveSubmissionNotes = string.Empty;
+            }
+        }
+        catch
+        {
+            driveSubmissionMessage = "Unable to submit the drive right now. Please try again.";
+        }
+        finally
+        {
+            isSubmittingDrive = false;
+        }
     }
 }

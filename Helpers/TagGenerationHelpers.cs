@@ -54,13 +54,21 @@ public static class TagGenerationHelpers
         if (fullPath.Contains("draft") || fullPath.Contains("rough"))
             tags.Add(new DocumentTag { TagName = "Draft", TagCategory = "Status", JumpDocumentId = documentId });
 
-        if (fullPath.Contains("nsfw") || fullPath.Contains("adult"))
+        if (ShouldTagNsfw(fileName, folderPath))
             tags.Add(new DocumentTag { TagName = "NSFW", TagCategory = "Content", JumpDocumentId = documentId });
 
         if (fullPath.Contains("v1.") || fullPath.Contains("version 1"))
             tags.Add(new DocumentTag { TagName = "v1.x", TagCategory = "Version", JumpDocumentId = documentId });
         if (fullPath.Contains("v2.") || fullPath.Contains("version 2"))
             tags.Add(new DocumentTag { TagName = "v2.x", TagCategory = "Version", JumpDocumentId = documentId });
+    }
+
+    public static bool ShouldTagNsfw(string fileName, string folderPath)
+    {
+        var fullPath = $"{folderPath}/{fileName}";
+        return fullPath.Contains("nsfw", StringComparison.OrdinalIgnoreCase) ||
+               fullPath.Contains("adult", StringComparison.OrdinalIgnoreCase) ||
+               fileName.Contains("lewd", StringComparison.OrdinalIgnoreCase);
     }
 
     public static void AddSeriesTags(List<DocumentTag> tags, string fileName, string folderPath, int documentId)

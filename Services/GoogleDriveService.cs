@@ -2,6 +2,7 @@ using Google.Apis.Auth.OAuth2;
 using Google.Apis.Drive.v3;
 using Google.Apis.Drive.v3.Data;
 using Google.Apis.Services;
+using JumpChainSearch.Helpers;
 using JumpChainSearch.Models;
 using Microsoft.EntityFrameworkCore;
 using JumpChainSearch.Data;
@@ -1769,7 +1770,7 @@ namespace JumpChainSearch.Services
             if (fullPath.Contains("draft") || fullPath.Contains("rough"))
                 tags.Add(new DocumentTag { TagName = "Draft", TagCategory = "Status" });
 
-            if (fullPath.Contains("nsfw") || fullPath.Contains("adult"))
+            if (TagGenerationHelpers.ShouldTagNsfw(fileName, folderPath))
                 tags.Add(new DocumentTag { TagName = "NSFW", TagCategory = "Content" });
 
             // Note: No SFW tag - absence of NSFW tag implies safe content

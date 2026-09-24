@@ -158,6 +158,31 @@
     color: var(--text-primary);
 }
 
+.nav-item button.nav-link {
+    width: calc(100% - 1rem);
+    height: 2.5rem;
+    display: flex;
+    align-items: center;
+    padding: 0 1rem;
+    margin: 0 0.5rem;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--text-secondary);
+    text-align: left;
+    transition: all 0.2s ease;
+}
+
+.nav-item button.nav-link:hover:not(:disabled) {
+    background-color: var(--accent-primary);
+    color: var(--text-primary);
+}
+
+.nav-item button.nav-link:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+}
+
 .nav-text {
     margin-left: 0.75rem;
 }

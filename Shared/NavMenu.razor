@@ -131,6 +131,31 @@
                     }
                 </div>
             }
+
+            <!-- Submit Section -->
+            <div class="nav-section-header collapsible" @onclick="@(() => ToggleSection("submit"))">
+                <span class="text-muted small">
+                    <span class="oi oi-chevron-@(sectionStates["submit"] ? "down" : "right")" aria-hidden="true"></span>
+                    SUBMIT
+                </span>
+            </div>
+            @if (sectionStates["submit"])
+            {
+                <div class="nav-section-content">
+                    <div class="nav-item px-3">
+                        <button type="button" class="nav-link" @onclick="OnSubmitDrive">
+                            <span class="oi oi-cloud-upload" aria-hidden="true"></span>
+                            <span class="nav-text">Submit Drive</span>
+                        </button>
+                    </div>
+                    <div class="nav-item px-3">
+                        <button type="button" class="nav-link" disabled title="Coming soon">
+                            <span class="oi oi-document" aria-hidden="true"></span>
+                            <span class="nav-text">Submit Doc</span>
+                        </button>
+                    </div>
+                </div>
+            }
         }
     </nav>
 </div>
@@ -145,6 +170,7 @@
 
 @code {
     [Parameter] public EventCallback<bool> OnToggle { get; set; }
+    [Parameter] public EventCallback OnSubmitDrive { get; set; }
     
     private bool collapseNavMenu = true; // Start collapsed by default
     private string selectedTheme = "material";
@@ -156,7 +182,8 @@
         { "favorites", false },
         { "navigation", false },
         { "appearance", false },
-        { "tools", false }
+        { "tools", false },
+        { "submit", false }
     };
     
     private List<FavoriteDocument> favoriteDocuments = new List<FavoriteDocument>();
@@ -172,6 +199,7 @@
             sectionStates[sectionName] = !sectionStates[sectionName];
         }
     }
+
     
     public async Task AddFavorite(string id, string name, string url)
     {
