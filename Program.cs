@@ -179,6 +179,9 @@ app.MapGroup("/api/batch").MapBatchProcessingEndpoints();
 // Map Google Drive API endpoints
 app.MapGroup("/api/google-drive").MapGoogleDriveEndpoints();
 
+// Map public moderated drive submissions
+app.MapGroup("/api/drive-submissions").MapDriveSubmissionEndpoints();
+
 // Map Tag Management API endpoints
 app.MapGroup("/api/tags").MapTagManagementEndpoints();
 

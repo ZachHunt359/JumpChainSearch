@@ -16,6 +16,7 @@ namespace JumpChainSearch.Data
         public DbSet<DocumentPurchasable> DocumentPurchasables { get; set; }
         public DbSet<DriveConfiguration> DriveConfigurations { get; set; }
         public DbSet<FolderConfiguration> FolderConfigurations { get; set; }
+        public DbSet<DriveSubmission> DriveSubmissions { get; set; }
         
         // Tag voting system
         public DbSet<TagSuggestion> TagSuggestions { get; set; }
@@ -120,6 +121,26 @@ namespace JumpChainSearch.Data
                 entity.Property(e => e.DriveId).HasMaxLength(100);
                 entity.Property(e => e.DriveName).HasMaxLength(200);
                 entity.Property(e => e.Description).HasMaxLength(500);
+            });
+
+            modelBuilder.Entity<DriveSubmission>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.HasIndex(e => e.Status);
+                entity.HasIndex(e => e.DriveId)
+                    .IsUnique()
+                    .HasFilter("\"Status\" = 'Pending'")
+                    .HasDatabaseName("IX_DriveSubmissions_PendingDriveId");
+
+                entity.Property(e => e.DriveUrl).HasMaxLength(1000);
+                entity.Property(e => e.DriveId).HasMaxLength(200);
+                entity.Property(e => e.ResourceKey).HasMaxLength(500);
+                entity.Property(e => e.SuggestedName).HasMaxLength(200);
+                entity.Property(e => e.Notes).HasMaxLength(2000);
+                entity.Property(e => e.SubmitterName).HasMaxLength(100);
+                entity.Property(e => e.Status).HasMaxLength(20);
+                entity.Property(e => e.ReviewedBy).HasMaxLength(100);
+                entity.Property(e => e.ReviewNotes).HasMaxLength(1000);
             });
 
             // Configure FolderConfiguration

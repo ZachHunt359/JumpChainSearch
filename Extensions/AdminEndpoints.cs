@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Http.HttpResults;
 using JumpChainSearch.Data;
+using JumpChainSearch.DTOs;
+using JumpChainSearch.Helpers;
 using JumpChainSearch.Services;
 using JumpChainSearch.Models;
 using Microsoft.EntityFrameworkCore;
@@ -29,6 +31,18 @@ public static class AdminEndpoints
         group.MapPost("/drives/scan", StartDriveScan);
         group.MapPost("/drives/scan/stop", StopDriveScan);
         group.MapGet("/drive-configurations", GetDriveConfigurations);
+        group.MapPost("/drive-configurations", CreateDriveConfiguration)
+            .WithSummary("Create an approved Google Drive configuration");
+        group.MapPut("/drive-configurations/{id:int}", UpdateDriveConfiguration)
+            .WithSummary("Update an approved Google Drive configuration");
+        group.MapDelete("/drive-configurations/{id:int}", DeleteDriveConfiguration)
+            .WithSummary("Delete a drive configuration while preserving indexed documents");
+        group.MapGet("/drive-submissions", GetDriveSubmissions)
+            .WithSummary("List submitted Google Drive links awaiting review");
+        group.MapPost("/drive-submissions/{id:int}/approve", ApproveDriveSubmission)
+            .WithSummary("Approve a submission and create its drive configuration");
+        group.MapPost("/drive-submissions/{id:int}/reject", RejectDriveSubmission)
+            .WithSummary("Reject a submitted Google Drive link");
         group.MapGet("/drives/{driveName}/folders", GetDriveFolders);
         group.MapPost("/drives/{driveName}/scan", ScanSingleDrive);
         group.MapPost("/drives/{driveName}/refresh-folders", RefreshDriveFolders);
@@ -651,20 +665,47 @@ public static class AdminEndpoints
         <div id=""drives"" class=""tab-content"">
             <section>
                 <h2>💾 Google Drive Management</h2>
-                <div class=""action-card"">
-                    <h3>Drive Sync Status</h3>
-                    <p>Scan configured Google Drives for new JumpChain documents.</p>
-                    <span class=""status status-idle"" id=""drive-status"">Checking...</span>
-                    <div class=""btn-group"" style=""margin-top: 1rem;"">
-                        <button class=""btn btn-success"" onclick=""startDriveScan()"">Scan All Drives</button>
-                        <button class=""btn btn-danger"" onclick=""stopDriveScan()"">Stop</button>
-                        <button class=""btn btn-primary"" onclick=""loadDriveList()"">Refresh Drive List</button>
+                <div class=""action-grid"">
+                    <div class=""action-card"">
+                        <h3>Drive Sync Status</h3>
+                        <p>Scan active Google Drives for new JumpChain documents.</p>
+                        <span class=""status status-idle"" id=""drive-status"">Checking...</span>
+                        <div class=""btn-group"" style=""margin-top: 1rem;"">
+                            <button class=""btn btn-success"" onclick=""startDriveScan()"">Scan All Drives</button>
+                            <button class=""btn btn-danger"" onclick=""stopDriveScan()"">Stop</button>
+                            <button class=""btn btn-primary"" onclick=""loadDriveManagement()"">Refresh</button>
+                        </div>
+                        <div id=""drive-info"" style=""margin-top: 1rem; color: var(--text-secondary); font-size: 0.85rem;""></div>
                     </div>
-                    <div id=""drive-info"" style=""margin-top: 1rem; color: var(--text-secondary); font-size: 0.85rem;""></div>
+                    <div class=""action-card"">
+                        <h3 id=""drive-form-title"">Add Drive</h3>
+                        <input type=""hidden"" id=""drive-form-id"" />
+                        <div style=""display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0.75rem;"">
+                            <input id=""drive-form-name"" maxlength=""200"" placeholder=""Drive name"" style=""padding: 0.65rem;"" />
+                            <input id=""drive-form-url"" type=""url"" maxlength=""1000"" placeholder=""Google Drive folder URL"" style=""padding: 0.65rem;"" />
+                            <input id=""drive-form-parent"" maxlength=""200"" placeholder=""Parent drive name (optional)"" style=""padding: 0.65rem;"" />
+                            <select id=""drive-form-auth"" style=""padding: 0.65rem;"">
+                                <option value=""Auto"">Automatic authentication</option>
+                                <option value=""ServiceAccount"">Service account</option>
+                                <option value=""ApiKey"">API key</option>
+                            </select>
+                        </div>
+                        <textarea id=""drive-form-description"" maxlength=""500"" rows=""2"" placeholder=""Description (optional)"" style=""width: 100%; padding: 0.65rem; margin-top: 0.75rem;""></textarea>
+                        <label style=""display: block; margin-top: 0.75rem;""><input id=""drive-form-active"" type=""checkbox"" checked /> Active for scans</label>
+                        <div class=""btn-group"" style=""margin-top: 1rem;"">
+                            <button class=""btn btn-success"" onclick=""saveDriveConfiguration()"">Save Drive</button>
+                            <button class=""btn btn-primary"" onclick=""resetDriveForm()"">Cancel Edit</button>
+                        </div>
+                        <div id=""drive-form-message"" style=""margin-top: 0.75rem; font-size: 0.85rem;""></div>
+                    </div>
                 </div>
-                
+
+                <h3 style=""margin-top: 2rem;"">Pending Submissions <span id=""drive-submission-count"" class=""status status-idle"">0</span></h3>
+                <div id=""drive-submission-list"" style=""margin-top: 1rem;""></div>
+
+                <h3 style=""margin-top: 2rem;"">Configured Drives</h3>
                 <div id=""drive-list"" style=""margin-top: 1.5rem;"">
-                    <p style=""color: var(--text-secondary);"">Click ""Refresh Drive List"" to load drives...</p>
+                    <p style=""color: var(--text-secondary);"">Loading drives...</p>
                 </div>
             </section>
         </div>
@@ -1008,7 +1049,7 @@ public static class AdminEndpoints
             }} else if (tabName === 'voting') {{
                 loadPendingTags();
             }} else if (tabName === 'drives') {{
-                loadDriveList();
+                loadDriveManagement();
             }} else if (tabName === 'system') {{
                 loadCacheSettings();
                 loadScanSchedule();
@@ -2943,6 +2984,17 @@ public static class AdminEndpoints
         }}
         
         // Drive Management Functions
+        const configuredDrives = new Map();
+
+        async function loadDriveManagement() {{
+            await Promise.all([loadDriveList(), loadDriveSubmissions()]);
+        }}
+
+        function getDriveUrl(drive) {{
+            const resourceKey = drive.resourceKey ? '?resourcekey=' + encodeURIComponent(drive.resourceKey) : '';
+            return 'https://drive.google.com/drive/folders/' + encodeURIComponent(drive.driveId) + resourceKey;
+        }}
+
         async function loadDriveList() {{
             const container = document.getElementById('drive-list');
             container.innerHTML = '<div style=""color: var(--text-secondary);"">Loading drives...</div>';
@@ -2956,15 +3008,17 @@ public static class AdminEndpoints
                     return;
                 }}
                 
+                configuredDrives.clear();
                 let html = '<div style=""display: flex; flex-direction: column; gap: 1rem;"">';
                 
                 data.drives.forEach((drive, index) => {{
+                    configuredDrives.set(drive.id, drive);
                     const lastScan = drive.lastScanTime ? new Date(drive.lastScanTime).toLocaleString() : 'Never';
                     const statusColor = drive.isActive ? 'var(--success)' : 'var(--danger)';
                     
                     html += `
                         <div style=""background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: 8px; padding: 1rem;"">
-                            <div style=""display: flex; justify-content: space-between; align-items: start; cursor: pointer;"" onclick=""toggleDriveFolders(${{index}}, '${{escapeHtml(drive.driveName)}}')"">
+                            <div style=""display: flex; justify-content: space-between; align-items: start; cursor: pointer; gap: 1rem;"" onclick=""toggleDriveFolders(${{index}}, configuredDrives.get(${{drive.id}}).driveName)"">
                                 <div style=""flex: 1;"">
                                     <h3 style=""margin: 0 0 0.5rem 0; color: var(--text-primary); font-size: 1.1rem;"">
                                         <span id=""drive-arrow-${{index}}"" style=""display: inline-block; width: 20px; transition: transform 0.3s;"">▶</span>
@@ -2977,9 +3031,12 @@ public static class AdminEndpoints
                                         <span style=""color: ${{statusColor}};"">● ${{drive.isActive ? 'Active' : 'Inactive'}}</span>
                                     </div>
                                 </div>
-                                <div style=""display: flex; gap: 0.5rem;"" onclick=""event.stopPropagation();"">
-                                    <button class=""btn btn-success"" style=""padding: 0.4rem 0.8rem; font-size: 0.85rem;"" onclick=""scanDrive('${{escapeHtml(drive.driveName)}}', ${{index}})"">\ud83d\udd04 Scan</button>
-                                    <button class=""btn btn-primary"" style=""padding: 0.4rem 0.8rem; font-size: 0.85rem;"" onclick=""refreshFolders('${{escapeHtml(drive.driveName)}}', ${{index}})"">\ud83d\udcc2 Refresh Folders</button>
+                                <div style=""display: flex; gap: 0.5rem; flex-wrap: wrap;"" onclick=""event.stopPropagation();"">
+                                    <button class=""btn btn-success"" style=""padding: 0.4rem 0.8rem; font-size: 0.85rem;"" onclick=""scanDrive(configuredDrives.get(${{drive.id}}).driveName, ${{index}})"">Scan</button>
+                                    <button class=""btn btn-primary"" style=""padding: 0.4rem 0.8rem; font-size: 0.85rem;"" onclick=""refreshFolders(configuredDrives.get(${{drive.id}}).driveName, ${{index}})"">Refresh Folders</button>
+                                    <button class=""btn btn-primary"" style=""padding: 0.4rem 0.8rem; font-size: 0.85rem;"" onclick=""editDriveConfiguration(${{drive.id}})"">Edit</button>
+                                    <button class=""btn btn-warning"" style=""padding: 0.4rem 0.8rem; font-size: 0.85rem;"" onclick=""toggleDriveActive(${{drive.id}})"">${{drive.isActive ? 'Deactivate' : 'Activate'}}</button>
+                                    <button class=""btn btn-danger"" style=""padding: 0.4rem 0.8rem; font-size: 0.85rem;"" onclick=""deleteDriveConfiguration(${{drive.id}})"">Delete</button>
                                 </div>
                             </div>
                             <div id=""drive-folders-${{index}}"" style=""display: none; margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border);"">
@@ -2995,6 +3052,152 @@ public static class AdminEndpoints
             }} catch (error) {{
                 container.innerHTML = '<div style=""color: var(--danger);"">Error loading drives: ' + error.message + '</div>';
             }}
+        }}
+
+        async function loadDriveSubmissions() {{
+            const container = document.getElementById('drive-submission-list');
+            const count = document.getElementById('drive-submission-count');
+            container.innerHTML = '<div style=""color: var(--text-secondary);"">Loading submissions...</div>';
+
+            try {{
+                const response = await fetch('/admin/drive-submissions');
+                const data = await response.json();
+                if (!response.ok || !data.success) throw new Error(data.message || 'Failed to load submissions');
+
+                count.textContent = data.submissions.length;
+                if (data.submissions.length === 0) {{
+                    container.innerHTML = '<div style=""color: var(--text-secondary);"">No drives are awaiting review.</div>';
+                    return;
+                }}
+
+                container.innerHTML = data.submissions.map(submission => `
+                    <div style=""background: var(--bg-tertiary); border: 1px solid var(--border); border-radius: 8px; padding: 1rem; margin-bottom: 1rem;"">
+                        <strong>${{escapeHtml(submission.suggestedName)}}</strong>
+                        <div style=""font-size: 0.85rem; color: var(--text-secondary);"">Submitted ${{new Date(submission.submittedAt).toLocaleString()}}${{submission.submitterName ? ' by ' + escapeHtml(submission.submitterName) : ''}}</div>
+                        <a href=""${{escapeHtml(submission.driveUrl)}}"" target=""_blank"" rel=""noopener noreferrer"" style=""font-size: 0.85rem;"">Open submitted drive</a>
+                        ${{submission.notes ? '<p style=""margin-top: 0.5rem;"">' + escapeHtml(submission.notes) + '</p>' : ''}}
+                        <div style=""display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0.75rem; margin-top: 0.75rem;"">
+                            <input id=""submission-name-${{submission.id}}"" value=""${{escapeHtml(submission.suggestedName)}}"" maxlength=""200"" placeholder=""Approved drive name"" style=""padding: 0.65rem;"" />
+                            <input id=""submission-description-${{submission.id}}"" maxlength=""500"" placeholder=""Description (optional)"" style=""padding: 0.65rem;"" />
+                            <input id=""submission-review-${{submission.id}}"" maxlength=""1000"" placeholder=""Review notes (optional)"" style=""padding: 0.65rem;"" />
+                        </div>
+                        <div class=""btn-group"" style=""margin-top: 0.75rem;"">
+                            <button class=""btn btn-success"" onclick=""approveDriveSubmission(${{submission.id}})"">Approve</button>
+                            <button class=""btn btn-danger"" onclick=""rejectDriveSubmission(${{submission.id}})"">Reject</button>
+                        </div>
+                    </div>
+                `).join('');
+            }} catch (error) {{
+                count.textContent = '?';
+                container.innerHTML = '<div style=""color: var(--danger);"">Error loading submissions: ' + escapeHtml(error.message) + '</div>';
+            }}
+        }}
+
+        function resetDriveForm() {{
+            document.getElementById('drive-form-id').value = '';
+            document.getElementById('drive-form-title').textContent = 'Add Drive';
+            document.getElementById('drive-form-name').value = '';
+            document.getElementById('drive-form-url').value = '';
+            document.getElementById('drive-form-parent').value = '';
+            document.getElementById('drive-form-auth').value = 'Auto';
+            document.getElementById('drive-form-description').value = '';
+            document.getElementById('drive-form-active').checked = true;
+            document.getElementById('drive-form-message').textContent = '';
+        }}
+
+        function editDriveConfiguration(id) {{
+            const drive = configuredDrives.get(id);
+            if (!drive) return;
+            document.getElementById('drive-form-id').value = id;
+            document.getElementById('drive-form-title').textContent = 'Edit ' + drive.driveName;
+            document.getElementById('drive-form-name').value = drive.driveName;
+            document.getElementById('drive-form-url').value = getDriveUrl(drive);
+            document.getElementById('drive-form-parent').value = drive.parentDriveName || '';
+            document.getElementById('drive-form-auth').value = drive.preferredAuthMethod || 'Auto';
+            document.getElementById('drive-form-description').value = drive.description || '';
+            document.getElementById('drive-form-active').checked = drive.isActive;
+            document.getElementById('drive-form-title').scrollIntoView({{ behavior: 'smooth', block: 'center' }});
+        }}
+
+        function getDriveFormRequest(drive) {{
+            return {{
+                driveUrl: drive ? getDriveUrl(drive) : document.getElementById('drive-form-url').value,
+                driveName: drive ? drive.driveName : document.getElementById('drive-form-name').value,
+                description: drive ? drive.description : document.getElementById('drive-form-description').value,
+                parentDriveName: drive ? drive.parentDriveName : document.getElementById('drive-form-parent').value,
+                preferredAuthMethod: drive ? (drive.preferredAuthMethod || 'Auto') : document.getElementById('drive-form-auth').value,
+                isActive: drive ? drive.isActive : document.getElementById('drive-form-active').checked
+            }};
+        }}
+
+        async function saveDriveConfiguration() {{
+            const id = document.getElementById('drive-form-id').value;
+            const message = document.getElementById('drive-form-message');
+            try {{
+                const response = await fetch(id ? '/admin/drive-configurations/' + id : '/admin/drive-configurations', {{
+                    method: id ? 'PUT' : 'POST',
+                    headers: {{ 'Content-Type': 'application/json' }},
+                    body: JSON.stringify(getDriveFormRequest(null))
+                }});
+                const data = await response.json();
+                if (!response.ok) throw new Error(data.message || data.error || 'Unable to save drive');
+                resetDriveForm();
+                await loadDriveList();
+            }} catch (error) {{
+                message.style.color = 'var(--danger)';
+                message.textContent = error.message;
+            }}
+        }}
+
+        async function toggleDriveActive(id) {{
+            const drive = configuredDrives.get(id);
+            if (!drive) return;
+            const request = getDriveFormRequest(drive);
+            request.isActive = !drive.isActive;
+            const response = await fetch('/admin/drive-configurations/' + id, {{
+                method: 'PUT', headers: {{ 'Content-Type': 'application/json' }}, body: JSON.stringify(request)
+            }});
+            if (!response.ok) {{
+                const data = await response.json();
+                alert(data.message || data.error || 'Unable to update drive');
+            }}
+            await loadDriveList();
+        }}
+
+        async function deleteDriveConfiguration(id) {{
+            const drive = configuredDrives.get(id);
+            if (!drive || !confirm('Remove ' + drive.driveName + ' from future scans? Indexed documents will be preserved.')) return;
+            const response = await fetch('/admin/drive-configurations/' + id, {{ method: 'DELETE' }});
+            const data = await response.json();
+            if (!response.ok) alert(data.message || data.error || 'Unable to delete drive');
+            await loadDriveList();
+        }}
+
+        async function approveDriveSubmission(id) {{
+            const response = await fetch('/admin/drive-submissions/' + id + '/approve', {{
+                method: 'POST',
+                headers: {{ 'Content-Type': 'application/json' }},
+                body: JSON.stringify({{
+                    driveName: document.getElementById('submission-name-' + id).value,
+                    description: document.getElementById('submission-description-' + id).value,
+                    reviewNotes: document.getElementById('submission-review-' + id).value
+                }})
+            }});
+            const data = await response.json();
+            if (!response.ok) return alert(data.message || data.error || 'Unable to approve submission');
+            await loadDriveManagement();
+        }}
+
+        async function rejectDriveSubmission(id) {{
+            if (!confirm('Reject this drive submission?')) return;
+            const response = await fetch('/admin/drive-submissions/' + id + '/reject', {{
+                method: 'POST',
+                headers: {{ 'Content-Type': 'application/json' }},
+                body: JSON.stringify({{ reviewNotes: document.getElementById('submission-review-' + id).value }})
+            }});
+            const data = await response.json();
+            if (!response.ok) return alert(data.message || data.error || 'Unable to reject submission');
+            await loadDriveSubmissions();
         }}
         
         async function toggleDriveFolders(index, driveName) {{
@@ -3720,7 +3923,10 @@ sudo systemctl restart jumpchain
                     documentCount = d.DocumentCount,
                     lastScanTime = d.LastScanTime,
                     isActive = d.IsActive,
-                    description = d.Description
+                    description = d.Description,
+                    resourceKey = d.ResourceKey,
+                    parentDriveName = d.ParentDriveName,
+                    preferredAuthMethod = d.PreferredAuthMethod
                 })
                 .ToListAsync();
 
@@ -3741,6 +3947,9 @@ sudo systemctl restart jumpchain
                     drive.lastScanTime,
                     drive.isActive,
                     drive.description,
+                    drive.resourceKey,
+                    drive.parentDriveName,
+                    drive.preferredAuthMethod,
                     folderCount
                 });
             }
@@ -3757,6 +3966,258 @@ sudo systemctl restart jumpchain
             Console.WriteLine($"[ERROR] Stack trace: {ex.StackTrace}");
             return Results.BadRequest(new { success = false, error = ex.Message, stackTrace = ex.StackTrace });
         }
+    }
+
+    private static async Task<IResult> CreateDriveConfiguration(
+        SaveDriveConfigurationRequest request,
+        HttpContext context,
+        JumpChainDbContext dbContext,
+        AdminAuthService authService)
+    {
+        var (valid, _) = await ValidateSession(context, authService);
+        if (!valid)
+            return Results.Unauthorized();
+
+        var validation = ValidateDriveConfigurationRequest(request, out var driveId, out var resourceKey);
+        if (validation is not null)
+            return validation;
+
+        if (await dbContext.DriveConfigurations.AnyAsync(drive =>
+                drive.DriveId == driveId || drive.DriveName == request.DriveName.Trim()))
+        {
+            return Results.Conflict(new { success = false, message = "A drive with that ID or name already exists." });
+        }
+
+        var drive = CreateDriveConfigurationModel(request, driveId, resourceKey);
+        dbContext.DriveConfigurations.Add(drive);
+        await dbContext.SaveChangesAsync();
+
+        return Results.Created($"/admin/drive-configurations/{drive.Id}", new { success = true, driveId = drive.Id });
+    }
+
+    private static async Task<IResult> UpdateDriveConfiguration(
+        int id,
+        SaveDriveConfigurationRequest request,
+        HttpContext context,
+        JumpChainDbContext dbContext,
+        AdminAuthService authService)
+    {
+        var (valid, _) = await ValidateSession(context, authService);
+        if (!valid)
+            return Results.Unauthorized();
+
+        var validation = ValidateDriveConfigurationRequest(request, out var driveId, out var resourceKey);
+        if (validation is not null)
+            return validation;
+
+        var drive = await dbContext.DriveConfigurations.FindAsync(id);
+        if (drive is null)
+            return Results.NotFound(new { success = false, message = "Drive configuration not found." });
+
+        if (await dbContext.DriveConfigurations.AnyAsync(other => other.Id != id &&
+                (other.DriveId == driveId || other.DriveName == request.DriveName.Trim())))
+        {
+            return Results.Conflict(new { success = false, message = "A drive with that ID or name already exists." });
+        }
+
+        drive.DriveId = driveId;
+        drive.DriveName = request.DriveName.Trim();
+        drive.ResourceKey = resourceKey;
+        drive.Description = NormalizeOptional(request.Description);
+        drive.ParentDriveName = NormalizeOptional(request.ParentDriveName);
+        drive.PreferredAuthMethod = NormalizeAuthMethod(request.PreferredAuthMethod);
+        drive.IsActive = request.IsActive;
+        await dbContext.SaveChangesAsync();
+
+        return Results.Ok(new { success = true });
+    }
+
+    private static async Task<IResult> DeleteDriveConfiguration(
+        int id,
+        HttpContext context,
+        JumpChainDbContext dbContext,
+        AdminAuthService authService)
+    {
+        var (valid, _) = await ValidateSession(context, authService);
+        if (!valid)
+            return Results.Unauthorized();
+
+        var drive = await dbContext.DriveConfigurations.FindAsync(id);
+        if (drive is null)
+            return Results.NotFound(new { success = false, message = "Drive configuration not found." });
+
+        var folders = await dbContext.FolderConfigurations
+            .Where(folder => folder.ParentDriveId == id)
+            .ToListAsync();
+        dbContext.FolderConfigurations.RemoveRange(folders);
+        dbContext.DriveConfigurations.Remove(drive);
+        await dbContext.SaveChangesAsync();
+
+        return Results.Ok(new
+        {
+            success = true,
+            message = $"Removed {drive.DriveName} from future scans. Indexed documents were preserved."
+        });
+    }
+
+    private static async Task<IResult> GetDriveSubmissions(
+        string? status,
+        HttpContext context,
+        JumpChainDbContext dbContext,
+        AdminAuthService authService)
+    {
+        var (valid, _) = await ValidateSession(context, authService);
+        if (!valid)
+            return Results.Unauthorized();
+
+        var requestedStatus = string.IsNullOrWhiteSpace(status) ? "Pending" : status.Trim();
+        if (requestedStatus is not ("Pending" or "Approved" or "Rejected" or "All"))
+            return Results.BadRequest(new { success = false, message = "Invalid submission status." });
+
+        var query = dbContext.DriveSubmissions.AsNoTracking();
+        if (requestedStatus != "All")
+            query = query.Where(submission => submission.Status == requestedStatus);
+
+        var submissions = await query
+            .OrderByDescending(submission => submission.SubmittedAt)
+            .ToListAsync();
+
+        return Results.Ok(new { success = true, submissions });
+    }
+
+    private static async Task<IResult> ApproveDriveSubmission(
+        int id,
+        ReviewDriveSubmissionRequest request,
+        HttpContext context,
+        JumpChainDbContext dbContext,
+        AdminAuthService authService)
+    {
+        var (valid, user) = await ValidateSession(context, authService);
+        if (!valid)
+            return Results.Unauthorized();
+
+        await using var transaction = await dbContext.Database.BeginTransactionAsync();
+        var submission = await dbContext.DriveSubmissions.FindAsync(id);
+        if (submission is null)
+            return Results.NotFound(new { success = false, message = "Drive submission not found." });
+        if (submission.Status != "Pending")
+            return Results.Conflict(new { success = false, message = "This submission has already been reviewed." });
+        if (await dbContext.DriveConfigurations.AnyAsync(drive => drive.DriveId == submission.DriveId))
+            return Results.Conflict(new { success = false, message = "That drive is already configured." });
+
+        var driveName = string.IsNullOrWhiteSpace(request.DriveName)
+            ? submission.SuggestedName
+            : request.DriveName.Trim();
+        if (driveName.Length > 200)
+            return Results.BadRequest(new { success = false, message = "Drive name must be 200 characters or fewer." });
+        if (request.Description?.Length > 500 || request.ParentDriveName?.Length > 200 || request.ReviewNotes?.Length > 1000)
+            return Results.BadRequest(new { success = false, message = "Approval details exceed the allowed length." });
+        if (NormalizeAuthMethod(request.PreferredAuthMethod) == "Invalid")
+            return Results.BadRequest(new { success = false, message = "Authentication method must be Auto, ServiceAccount, or ApiKey." });
+        if (await dbContext.DriveConfigurations.AnyAsync(drive => drive.DriveName == driveName))
+            return Results.Conflict(new { success = false, message = "A drive with that name already exists." });
+
+        var drive = new DriveConfiguration
+        {
+            DriveId = submission.DriveId,
+            DriveName = driveName,
+            ResourceKey = submission.ResourceKey,
+            Description = NormalizeOptional(request.Description) ?? submission.Notes,
+            ParentDriveName = NormalizeOptional(request.ParentDriveName),
+            PreferredAuthMethod = NormalizeAuthMethod(request.PreferredAuthMethod),
+            IsActive = true
+        };
+
+        dbContext.DriveConfigurations.Add(drive);
+        submission.Status = "Approved";
+        submission.ReviewedAt = DateTime.UtcNow;
+        submission.ReviewedBy = user?.Username;
+        submission.ReviewNotes = NormalizeOptional(request.ReviewNotes);
+        await dbContext.SaveChangesAsync();
+        await transaction.CommitAsync();
+
+        return Results.Ok(new { success = true, driveConfigurationId = drive.Id });
+    }
+
+    private static async Task<IResult> RejectDriveSubmission(
+        int id,
+        ReviewDriveSubmissionRequest request,
+        HttpContext context,
+        JumpChainDbContext dbContext,
+        AdminAuthService authService)
+    {
+        var (valid, user) = await ValidateSession(context, authService);
+        if (!valid)
+            return Results.Unauthorized();
+
+        var submission = await dbContext.DriveSubmissions.FindAsync(id);
+        if (submission is null)
+            return Results.NotFound(new { success = false, message = "Drive submission not found." });
+        if (submission.Status != "Pending")
+            return Results.Conflict(new { success = false, message = "This submission has already been reviewed." });
+        if (request.ReviewNotes?.Length > 1000)
+            return Results.BadRequest(new { success = false, message = "Review notes must be 1,000 characters or fewer." });
+
+        submission.Status = "Rejected";
+        submission.ReviewedAt = DateTime.UtcNow;
+        submission.ReviewedBy = user?.Username;
+        submission.ReviewNotes = NormalizeOptional(request.ReviewNotes);
+        await dbContext.SaveChangesAsync();
+
+        return Results.Ok(new { success = true });
+    }
+
+    private static IResult? ValidateDriveConfigurationRequest(
+        SaveDriveConfigurationRequest request,
+        out string driveId,
+        out string? resourceKey)
+    {
+        driveId = string.Empty;
+        resourceKey = null;
+        if (request.DriveUrl?.Length > 1000 ||
+            !GoogleDriveLinkParser.TryParseFolderUrl(request.DriveUrl, out driveId, out resourceKey) ||
+            resourceKey?.Length > 500)
+            return Results.BadRequest(new { success = false, message = "Enter a valid Google Drive folder URL." });
+        if (string.IsNullOrWhiteSpace(request.DriveName) || request.DriveName.Trim().Length > 200)
+            return Results.BadRequest(new { success = false, message = "Drive name is required and must be 200 characters or fewer." });
+        if (request.Description?.Length > 500 || request.ParentDriveName?.Length > 200)
+            return Results.BadRequest(new { success = false, message = "Drive details exceed the allowed length." });
+        if (NormalizeAuthMethod(request.PreferredAuthMethod) == "Invalid")
+            return Results.BadRequest(new { success = false, message = "Authentication method must be Auto, ServiceAccount, or ApiKey." });
+
+        return null;
+    }
+
+    private static DriveConfiguration CreateDriveConfigurationModel(
+        SaveDriveConfigurationRequest request,
+        string driveId,
+        string? resourceKey) => new()
+    {
+        DriveId = driveId,
+        DriveName = request.DriveName.Trim(),
+        ResourceKey = resourceKey,
+        Description = NormalizeOptional(request.Description),
+        ParentDriveName = NormalizeOptional(request.ParentDriveName),
+        PreferredAuthMethod = NormalizeAuthMethod(request.PreferredAuthMethod),
+        IsActive = request.IsActive
+    };
+
+    private static string? NormalizeOptional(string? value)
+    {
+        var normalized = value?.Trim();
+        return string.IsNullOrEmpty(normalized) ? null : normalized;
+    }
+
+    private static string? NormalizeAuthMethod(string? value)
+    {
+        var normalized = NormalizeOptional(value);
+        if (normalized is null || normalized.Equals("Auto", StringComparison.OrdinalIgnoreCase))
+            return null;
+        if (normalized.Equals("ServiceAccount", StringComparison.OrdinalIgnoreCase))
+            return "ServiceAccount";
+        if (normalized.Equals("ApiKey", StringComparison.OrdinalIgnoreCase))
+            return "ApiKey";
+        return "Invalid";
     }
 
     /// <summary>

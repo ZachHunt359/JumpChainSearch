@@ -31,4 +31,35 @@ namespace JumpChainSearch.Models
         // Preferred authentication method: "ServiceAccount", "ApiKey", or null (auto-detect)
         public string? PreferredAuthMethod { get; set; }
     }
+
+    public class DriveSubmission
+    {
+        public int Id { get; set; }
+
+        [Required]
+        public string DriveUrl { get; set; } = string.Empty;
+
+        [Required]
+        public string DriveId { get; set; } = string.Empty;
+
+        public string? ResourceKey { get; set; }
+
+        [Required]
+        public string SuggestedName { get; set; } = string.Empty;
+
+        public string? Notes { get; set; }
+
+        public string? SubmitterName { get; set; }
+
+        [Required]
+        public string Status { get; set; } = "Pending";
+
+        public DateTime SubmittedAt { get; set; } = DateTime.UtcNow;
+
+        public DateTime? ReviewedAt { get; set; }
+
+        public string? ReviewedBy { get; set; }
+
+        public string? ReviewNotes { get; set; }
+    }
 }
