@@ -4,16 +4,18 @@
 <PageTitle>JumpChain Search</PageTitle>
 
 <div class="page">
-    <div class="sidebar @(sidebarExpanded ? "expanded" : "collapsed")" id="sidebar">
+    <aside class="sidebar @(sidebarExpanded ? "expanded" : "collapsed")"
+           aria-label="Primary navigation"
+           aria-expanded="@sidebarExpanded.ToString().ToLowerInvariant()">
         <NavMenu @ref="navMenu" OnToggle="HandleSidebarToggle" OnSubmitDrive="OpenDriveSubmission" OnSubmitDocument="OpenDocumentSubmission" />
-    </div>
+    </aside>
 
     <main>
-        <div class="top-row px-4">
+        <header class="top-row px-4">
             <a href="https://github.com/ZachHunt359/JumpChainSearch" target="_blank" title="View on GitHub">
                 <span class="oi oi-external-link" aria-hidden="true"></span> GitHub
             </a>
-        </div>
+        </header>
 
         <article class="content px-4">
             @Body

@@ -1,17 +1,17 @@
-﻿<div class="sidebar-header @(collapseNavMenu ? "collapsed" : "expanded")" @onclick="ToggleNavMenu">
+﻿<header class="sidebar-header @(collapseNavMenu ? "collapsed" : "expanded")" @onclick="ToggleNavMenu">
     <div class="sidebar-brand">
         @if (!collapseNavMenu)
         {
             <span class="brand-text">JumpChain Search</span>
         }
-        <button class="sidebar-toggle" title="@(collapseNavMenu ? "Expand sidebar" : "Collapse sidebar")">
+        <button type="button" class="sidebar-toggle" title="@(collapseNavMenu ? "Expand sidebar" : "Collapse sidebar")">
             <span class="oi @(collapseNavMenu ? "oi-chevron-right" : "oi-chevron-left")" aria-hidden="true"></span>
         </button>
     </div>
-</div>
+</header>
 
-<div class="@NavMenuCssClass nav-scrollable">
-    <nav class="flex-column">
+<nav class="@NavMenuCssClass nav-scrollable" aria-label="JumpChain Search" hidden="@collapseNavMenu">
+    <div class="flex-column">
         @if (!collapseNavMenu)
         {
            
@@ -143,13 +143,13 @@
             {
                 <div class="nav-section-content">
                     <div class="nav-item px-3">
-                        <button type="button" class="nav-link" @onclick="OnSubmitDrive">
+                        <button type="button" data-nav-command class="nav-link" @onclick="OnSubmitDrive">
                             <span class="oi oi-cloud-upload" aria-hidden="true"></span>
                             <span class="nav-text">Submit Drive</span>
                         </button>
                     </div>
                     <div class="nav-item px-3">
-                        <button type="button" class="nav-link" @onclick="OnSubmitDocument">
+                        <button type="button" data-nav-command class="nav-link" @onclick="OnSubmitDocument">
                             <span class="oi oi-document" aria-hidden="true"></span>
                             <span class="nav-text">Submit Doc</span>
                         </button>
@@ -157,8 +157,8 @@
                 </div>
             }
         }
-    </nav>
-</div>
+    </div>
+</nav>
 
 @using Microsoft.JSInterop
 @using JumpChainSearch.Services

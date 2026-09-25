@@ -616,3 +616,171 @@ html, body {
 #components-reconnect-rejected {
     display: none !important;
 }
+
+/* Semantic navigation fallback. These rules do not depend on Blazor's generated scope attributes. */
+.page {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+}
+
+.page > aside {
+    width: 100%;
+    background-color: var(--bg-secondary);
+    border-right: 1px solid var(--border-color);
+    overflow: hidden;
+    transition: width 0.3s ease;
+}
+
+.page > aside + main {
+    flex: 1;
+    transition: margin-left 0.3s ease;
+}
+
+.page > aside > header {
+    min-height: 3.5rem;
+    display: flex;
+    align-items: center;
+    padding: 0 0.5rem;
+    background-color: var(--bg-secondary);
+    border-bottom: 1px solid var(--border-color);
+    cursor: pointer;
+}
+
+.page > aside > header > div {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.page > aside > header button {
+    min-width: 40px;
+    height: 40px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    padding: 0.5rem;
+    border: 0;
+    border-radius: 4px;
+    background: transparent;
+    color: var(--text-secondary);
+}
+
+.page > aside > header button:hover {
+    background-color: var(--accent-primary);
+    color: var(--text-primary);
+}
+
+.page > aside > nav {
+    height: calc(100vh - 3.5rem);
+    overflow-x: hidden;
+    overflow-y: auto;
+}
+
+.page > aside > nav[hidden] {
+    display: none !important;
+}
+
+.page > aside nav a,
+.page > aside nav button[data-nav-command] {
+    width: calc(100% - 1rem);
+    height: 2.5rem;
+    display: flex;
+    align-items: center;
+    margin: 0 0.5rem;
+    padding: 0 1rem;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--text-secondary);
+    line-height: 2.5rem;
+    text-align: left;
+    text-decoration: none;
+}
+
+.page > aside nav a:hover,
+.page > aside nav a.active,
+.page > aside nav button[data-nav-command]:hover {
+    background-color: var(--accent-primary);
+    color: var(--text-primary);
+}
+
+.page > aside nav button[draggable="true"] {
+    width: 100%;
+    overflow: hidden;
+    padding: 0.65rem 0.85rem;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background-color: var(--bg-tertiary);
+    color: var(--text-secondary);
+    text-align: left;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.page > main > header {
+    min-height: 3.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    background-color: var(--bg-tertiary);
+    border-bottom: 1px solid var(--border-color);
+    color: var(--text-secondary);
+}
+
+.page > main > header a {
+    color: var(--text-secondary);
+    text-decoration: none;
+    white-space: nowrap;
+}
+
+.page > main > header a:hover {
+    color: var(--accent-primary);
+}
+
+@media (min-width: 641px) {
+    .page {
+        flex-direction: row;
+    }
+
+    .page > aside {
+        width: 60px;
+        height: 100vh;
+        position: fixed;
+        inset: 0 auto 0 0;
+        z-index: 1000;
+    }
+
+    .page > aside[aria-expanded="true"] {
+        width: 280px;
+    }
+
+    .page > aside + main {
+        margin-left: 60px;
+    }
+
+    .page > aside[aria-expanded="true"] + main {
+        margin-left: 280px;
+    }
+
+    .page > main > header {
+        position: sticky;
+        top: 0;
+        z-index: 1;
+    }
+}
+
+@media (max-width: 640.98px) {
+    .page > aside > nav:not([hidden]) {
+        position: fixed;
+        inset: 3.5rem 0 0;
+        z-index: 1000;
+        background-color: var(--bg-secondary);
+    }
+
+    .page > main > header {
+        display: none;
+    }
+}
