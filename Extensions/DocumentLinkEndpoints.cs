@@ -26,6 +26,7 @@ public static class DocumentLinkEndpoints
         ILoggerFactory loggerFactory,
         CancellationToken cancellationToken)
     {
+        var logger = loggerFactory.CreateLogger("DocumentLinkEndpoints");
         try
         {
             return await ReportLinkCore(
@@ -34,12 +35,12 @@ public static class DocumentLinkEndpoints
                 context,
                 healthService,
                 cacheInvalidation,
+                logger,
                 cancellationToken);
         }
         catch (Exception exception)
         {
-            loggerFactory.CreateLogger("DocumentLinkEndpoints")
-                .LogError(exception, "Failed to verify document link {LinkId}", linkId);
+            logger.LogError(exception, "Failed to verify document link {LinkId}", linkId);
             return Results.Problem(
                 title: "Link verification failed",
                 detail: "The server could not complete the link check. Please try again.",
@@ -53,6 +54,7 @@ public static class DocumentLinkEndpoints
         JumpChainDbContext context,
         IDocumentLinkHealthService healthService,
         SearchCacheInvalidationService cacheInvalidation,
+        ILogger logger,
         CancellationToken cancellationToken)
     {
         var link = await context.DocumentUrls
@@ -89,9 +91,26 @@ public static class DocumentLinkEndpoints
         }
 
         link.IsDead = verification.Health == DocumentLinkHealth.Dead;
-        SynchronizeDocumentAvailability(link.JumpDocument);
+        var preferredSource = GetPreferredHealthySource(link.JumpDocument);
+        var primaryFileIdConflict = preferredSource != null &&
+            preferredSource.GoogleDriveFileId != link.JumpDocument.GoogleDriveFileId &&
+            await context.JumpDocuments.AnyAsync(document =>
+                document.Id != link.JumpDocument.Id &&
+                document.GoogleDriveFileId == preferredSource.GoogleDriveFileId,
+                cancellationToken);
+
+        SynchronizeDocumentAvailability(link.JumpDocument, updatePrimaryFileId: !primaryFileIdConflict);
         await context.SaveChangesAsync(cancellationToken);
         cacheInvalidation.InvalidateAllSearchCaches();
+
+        if (primaryFileIdConflict)
+        {
+            logger.LogWarning(
+                "Document {DocumentId} retained primary file ID {FileId} because healthy source {HealthyFileId} is assigned to another document",
+                link.JumpDocument.Id,
+                link.JumpDocument.GoogleDriveFileId,
+                preferredSource!.GoogleDriveFileId);
+        }
 
         var reportMatched = request.ReportedDead == link.IsDead;
         return Results.Ok(new
@@ -107,14 +126,9 @@ public static class DocumentLinkEndpoints
         });
     }
 
-    public static void SynchronizeDocumentAvailability(JumpDocument document)
+    public static void SynchronizeDocumentAvailability(JumpDocument document, bool updatePrimaryFileId = true)
     {
-        var healthyLinks = document.Urls
-            .Where(link => !link.IsDead)
-            .OrderByDescending(link => link.GoogleDriveFileId == document.GoogleDriveFileId)
-            .ThenByDescending(link => link.LastHealthCheckAt)
-            .ThenBy(link => link.Id)
-            .ToList();
+        var healthyLinks = document.Urls.Where(link => !link.IsDead).ToList();
 
         var deadLinkTag = document.Tags.FirstOrDefault(tag =>
             tag.TagName.Equals("Dead Link", StringComparison.OrdinalIgnoreCase));
@@ -135,12 +149,23 @@ public static class DocumentLinkEndpoints
         if (deadLinkTag != null)
             document.Tags.Remove(deadLinkTag);
 
-        var primary = healthyLinks[0];
-        document.GoogleDriveFileId = primary.GoogleDriveFileId;
+        var primary = GetPreferredHealthySource(document)!;
+        if (updatePrimaryFileId)
+            document.GoogleDriveFileId = primary.GoogleDriveFileId;
         document.SourceDrive = primary.SourceDrive;
         document.FolderPath = primary.FolderPath;
         document.WebViewLink = primary.WebViewLink;
         document.DownloadLink = primary.DownloadLink;
+    }
+
+    private static DocumentUrl? GetPreferredHealthySource(JumpDocument document)
+    {
+        return document.Urls
+            .Where(link => !link.IsDead)
+            .OrderByDescending(link => link.GoogleDriveFileId == document.GoogleDriveFileId)
+            .ThenByDescending(link => link.LastHealthCheckAt)
+            .ThenBy(link => link.Id)
+            .FirstOrDefault();
     }
 
     public static async Task VerifySourcesAsync(
