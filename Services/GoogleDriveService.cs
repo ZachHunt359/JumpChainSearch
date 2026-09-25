@@ -1,5 +1,6 @@
 using Google.Apis.Auth.OAuth2;
 using Google.Apis.Drive.v3;
+using Google;
 using Google.Apis.Drive.v3.Data;
 using Google.Apis.Services;
 using JumpChainSearch.Helpers;
@@ -29,6 +30,7 @@ namespace JumpChainSearch.Services
         Task<string?> ExtractTextFromDocumentAsync(string fileId);
         Task<(string? text, string? method)> ExtractTextWithMethodAsync(string fileId, string? resourceKey = null);
         Task<JumpDocument> GetSubmittedDocumentAsync(string fileId, string? resourceKey = null);
+        Task<DocumentLinkVerificationResult> VerifyFileAccessAsync(string fileId, string? resourceKey = null, CancellationToken cancellationToken = default);
         Task<IEnumerable<DriveData>> GetAvailableDrivesAsync();
         Task<object> DebugFilePropertiesAsync(string fileId);
         Task<List<(string folderId, string folderName, string? resourceKey)>> DiscoverFolderHierarchyAsync(string rootFolderId, string? rootResourceKey = null);
@@ -163,7 +165,7 @@ namespace JumpChainSearch.Services
                 request.IncludeItemsFromAllDrives = true;
                 request.SupportsAllDrives = true;
                 request.Corpora = "drive";
-                request.Fields = "nextPageToken, files(id, name, description, mimeType, size, createdTime, modifiedTime, parents, webViewLink, exportLinks, thumbnailLink, hasThumbnail)";
+                request.Fields = "nextPageToken, files(id, name, description, mimeType, size, createdTime, modifiedTime, parents, webViewLink, exportLinks, thumbnailLink, hasThumbnail, resourceKey)";
                 request.PageSize = 1000;
 
                 string? pageToken = null;
@@ -528,6 +530,20 @@ namespace JumpChainSearch.Services
                             
                             // Generate comprehensive tags (NSFW, ContentType, Format, Series, etc.)
                             doc.Tags = GenerateTags(doc, currentPath, rootFolderName);
+                            var fileResourceKey = fileElement.TryGetProperty("resourceKey", out var fileResourceKeyElement)
+                                ? fileResourceKeyElement.GetString()
+                                : null;
+                            doc.Urls.Add(new DocumentUrl
+                            {
+                                GoogleDriveFileId = fileId,
+                                SourceDrive = rootFolderName,
+                                FolderPath = currentPath,
+                                ResourceKey = fileResourceKey,
+                                WebViewLink = doc.WebViewLink,
+                                DownloadLink = doc.DownloadLink,
+                                LastScanned = doc.LastScanned,
+                                LastHealthCheckStatus = "Unknown"
+                            });
                             
                             documents.Add(doc);
                             _logger.LogDebug($"Found document: {fileName} at {currentPath}");
@@ -944,6 +960,7 @@ namespace JumpChainSearch.Services
                 try
                 {
                     var request = service.Files.Get(fileId);
+                    request.SupportsAllDrives = true;
                     request.Fields = "id,name,description,mimeType,size,createdTime,modifiedTime,webViewLink,webContentLink,exportLinks,thumbnailLink,hasThumbnail,trashed";
                     ApplyResourceKey(request, fileId, resourceKey);
                     file = await request.ExecuteAsync();
@@ -1002,7 +1019,86 @@ namespace JumpChainSearch.Services
             };
 
             document.Tags = GenerateTags(document, string.Empty, string.Empty);
+            document.Urls.Add(new DocumentUrl
+            {
+                GoogleDriveFileId = file.Id,
+                SourceDrive = string.Empty,
+                FolderPath = string.Empty,
+                ResourceKey = resourceKey,
+                WebViewLink = document.WebViewLink,
+                DownloadLink = document.DownloadLink,
+                LastScanned = document.LastScanned,
+                LastHealthCheckAt = DateTime.UtcNow,
+                LastHealthCheckStatus = "Healthy"
+            });
             return document;
+        }
+
+        public async Task<DocumentLinkVerificationResult> VerifyFileAccessAsync(
+            string fileId,
+            string? resourceKey = null,
+            CancellationToken cancellationToken = default)
+        {
+            var sawTransientFailure = false;
+
+            foreach (var service in new[] { _publicDriveService, _driveService })
+            {
+                try
+                {
+                    var request = service.Files.Get(fileId);
+                    request.SupportsAllDrives = true;
+                    request.Fields = "id,name,mimeType,size,trashed,webViewLink";
+                    ApplyResourceKey(request, fileId, resourceKey);
+                    var file = await request.ExecuteAsync(cancellationToken);
+
+                    if (file.Trashed == true)
+                        return new(DocumentLinkHealth.Dead, "Google Drive reports that the file is in the trash.");
+
+                    return new(
+                        DocumentLinkHealth.Healthy,
+                        "Google Drive confirmed that the file is accessible.",
+                        file.Name,
+                        file.MimeType,
+                        file.Size,
+                        file.WebViewLink);
+                }
+                catch (GoogleApiException exception) when (IsDefinitiveAccessFailure(exception))
+                {
+                    continue;
+                }
+                catch (Exception exception)
+                {
+                    sawTransientFailure = true;
+                    _logger.LogWarning(exception, "Google Drive could not conclusively verify file {FileId}", fileId);
+                }
+            }
+
+            return sawTransientFailure
+                ? new(DocumentLinkHealth.Unknown, "Google Drive could not verify this link right now. Its existing status was not changed.")
+                : new(DocumentLinkHealth.Dead, "Google Drive reports that the file is missing or inaccessible.");
+        }
+
+        private static bool IsDefinitiveAccessFailure(GoogleApiException exception)
+        {
+            if (exception.HttpStatusCode == System.Net.HttpStatusCode.NotFound)
+                return true;
+
+            if (exception.HttpStatusCode != System.Net.HttpStatusCode.Forbidden)
+                return false;
+
+            var transientReasons = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            {
+                "dailyLimitExceeded",
+                "rateLimitExceeded",
+                "userRateLimitExceeded",
+                "sharingRateLimitExceeded"
+            };
+            var reasons = exception.Error?.Errors?
+                .Select(error => error.Reason)
+                .Where(reason => !string.IsNullOrWhiteSpace(reason))
+                .ToList() ?? [];
+
+            return reasons.Count == 0 || reasons.All(reason => !transientReasons.Contains(reason));
         }
 
         private static void ApplyResourceKey(Google.Apis.Drive.v3.FilesResource.GetRequest request, string fileId, string? resourceKey)
@@ -1732,6 +1828,7 @@ namespace JumpChainSearch.Services
                         SourceDrive = driveName,
                         FolderPath = folderPath,
                         GoogleDriveFolderId = folderId,
+                        ResourceKey = file.ResourceKey,
                         WebViewLink = file.WebViewLink ?? string.Empty,
                         DownloadLink = file.ExportLinks?.Values.FirstOrDefault() ?? string.Empty,
                         LastScanned = DateTime.UtcNow

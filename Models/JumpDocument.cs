@@ -80,12 +80,24 @@ namespace JumpChainSearch.Models
         
         // Google Drive folder ID where this file is located
         public string? GoogleDriveFolderId { get; set; }
+
+        public string? ResourceKey { get; set; }
         
         public string WebViewLink { get; set; } = string.Empty;
         
         public string DownloadLink { get; set; } = string.Empty;
         
         public DateTime LastScanned { get; set; }
+
+        public bool IsDead { get; set; }
+
+        public DateTime? LastHealthCheckAt { get; set; }
+
+        public string LastHealthCheckStatus { get; set; } = "Unknown";
+
+        public string? LastHealthCheckMessage { get; set; }
+
+        public DateTime? LastReportedAt { get; set; }
         
         // Navigation properties
         public virtual JumpDocument JumpDocument { get; set; } = null!;

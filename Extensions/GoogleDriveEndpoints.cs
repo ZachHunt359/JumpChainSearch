@@ -590,7 +590,7 @@ public static class GoogleDriveEndpoints
         }
     }
 
-    private static async Task<IResult> ScanAllDrives(JumpChainDbContext dbContext, IGoogleDriveService driveService, IDocumentCountService documentCountService, DriveScanCoordinator scanCoordinator)
+    private static async Task<IResult> ScanAllDrives(JumpChainDbContext dbContext, IGoogleDriveService driveService, IDocumentLinkHealthService healthService, IDocumentCountService documentCountService, DriveScanCoordinator scanCoordinator)
     {
         Console.WriteLine("===== ScanAllDrives ENDPOINT INVOKED =====");
 
@@ -662,13 +662,19 @@ public static class GoogleDriveEndpoints
                     
                     if (documentsList.Count > 0)
                     {
-                        // Get existing documents with their IDs
+                        // Resolve both canonical IDs and alternate source IDs to their logical document.
                         var fileIds = documentsList.Select(d => d.GoogleDriveFileId).ToList();
                         var existingDocuments = await dbContext.JumpDocuments
                             .Where(d => fileIds.Contains(d.GoogleDriveFileId))
                             .Select(d => new { d.Id, d.GoogleDriveFileId })
                             .ToListAsync();
                         var existingFileIds = existingDocuments.ToDictionary(d => d.GoogleDriveFileId, d => d.Id);
+                        var existingSources = await dbContext.DocumentUrls
+                            .Where(url => fileIds.Contains(url.GoogleDriveFileId))
+                            .Select(url => new { url.GoogleDriveFileId, url.JumpDocumentId })
+                            .ToListAsync();
+                        foreach (var source in existingSources)
+                            existingFileIds.TryAdd(source.GoogleDriveFileId, source.JumpDocumentId);
                         
                         duplicatesInDrive = existingFileIds.Count;
                         Console.WriteLine($"Found {duplicatesInDrive} existing documents (duplicates) - will add drive tags where missing");
@@ -701,17 +707,14 @@ public static class GoogleDriveEndpoints
                                 
                                 // Get folder ID from the document's Urls (created during conversion)
                                 var newUrl = doc.Urls.FirstOrDefault();
-                                if (!sourceEnriched && newUrl != null && !string.IsNullOrEmpty(newUrl.GoogleDriveFolderId))
+                                if (!sourceEnriched && newUrl != null)
                                 {
-                                    // Check if this location already exists in DocumentUrls
+                                    // A Drive file ID identifies one source globally; refresh it instead of duplicating it.
                                     var existingUrl = await dbContext.DocumentUrls
-                                        .FirstOrDefaultAsync(u => u.JumpDocumentId == docId 
-                                                                && u.SourceDrive == drive.DriveName 
-                                                                && u.GoogleDriveFolderId == newUrl.GoogleDriveFolderId);
+                                        .FirstOrDefaultAsync(u => u.GoogleDriveFileId == doc.GoogleDriveFileId);
                                     
                                     if (existingUrl == null)
                                     {
-                                        // Add new location entry
                                         dbContext.DocumentUrls.Add(new DocumentUrl
                                         {
                                             JumpDocumentId = docId,
@@ -719,6 +722,7 @@ public static class GoogleDriveEndpoints
                                             SourceDrive = drive.DriveName,
                                             FolderPath = doc.FolderPath,
                                             GoogleDriveFolderId = newUrl.GoogleDriveFolderId,
+                                            ResourceKey = newUrl.ResourceKey,
                                             WebViewLink = doc.WebViewLink,
                                             DownloadLink = doc.DownloadLink,
                                             LastScanned = DateTime.UtcNow
@@ -727,7 +731,12 @@ public static class GoogleDriveEndpoints
                                     }
                                     else
                                     {
-                                        // Update last scanned time
+                                        existingUrl.SourceDrive = drive.DriveName;
+                                        existingUrl.FolderPath = doc.FolderPath;
+                                        existingUrl.GoogleDriveFolderId = newUrl.GoogleDriveFolderId ?? existingUrl.GoogleDriveFolderId;
+                                        existingUrl.ResourceKey = newUrl.ResourceKey ?? existingUrl.ResourceKey;
+                                        existingUrl.WebViewLink = doc.WebViewLink;
+                                        existingUrl.DownloadLink = doc.DownloadLink;
                                         existingUrl.LastScanned = DateTime.UtcNow;
                                     }
                                 }
@@ -918,24 +927,22 @@ public static class GoogleDriveEndpoints
 
             Console.WriteLine("Scan complete! Running duplicate detection and cleanup...");
             
-            // Run duplicate detection and auto-merge if duplicates found
+            // Always reconcile duplicates. Newly rediscovered copies have new file IDs, so the
+            // same-file counter cannot determine whether content-level duplicates exist.
             var duplicateMergeResults = new { mergedGroups = 0, documentsMerged = 0 };
-            if (duplicatesDetected > 0)
+            Console.WriteLine("Running duplicate reconciliation...");
+            try
             {
-                Console.WriteLine($"Detected {duplicatesDetected} duplicate documents during scan. Running auto-merge...");
-                try
-                {
-                    var mergeResult = await AutoMergeDuplicates(dbContext);
-                    duplicateMergeResults = new { 
-                        mergedGroups = mergeResult.mergedGroups, 
-                        documentsMerged = mergeResult.documentsMerged 
-                    };
-                    Console.WriteLine($"Auto-merge complete: {duplicateMergeResults.mergedGroups} groups, {duplicateMergeResults.documentsMerged} documents merged");
-                }
-                catch (Exception mergeEx)
-                {
-                    Console.WriteLine($"Warning: Auto-merge failed: {mergeEx.Message}");
-                }
+                var mergeResult = await AutoMergeDuplicates(dbContext, healthService);
+                duplicateMergeResults = new {
+                    mergedGroups = mergeResult.mergedGroups,
+                    documentsMerged = mergeResult.documentsMerged
+                };
+                Console.WriteLine($"Auto-merge complete: {duplicateMergeResults.mergedGroups} groups, {duplicateMergeResults.documentsMerged} documents merged");
+            }
+            catch (Exception mergeEx)
+            {
+                Console.WriteLine($"Warning: Auto-merge failed: {mergeEx.Message}");
             }
             
             // Refresh document count cache
@@ -970,10 +977,13 @@ public static class GoogleDriveEndpoints
     /// <summary>
     /// Auto-merge duplicate documents found during scan
     /// </summary>
-    private static async Task<(int mergedGroups, int documentsMerged)> AutoMergeDuplicates(JumpChainDbContext context)
+    private static async Task<(int mergedGroups, int documentsMerged)> AutoMergeDuplicates(
+        JumpChainDbContext context,
+        IDocumentLinkHealthService healthService)
     {
         var allDocuments = await context.JumpDocuments
             .Include(d => d.Tags)
+            .Include(d => d.Urls)
             .ToListAsync();
             
         var duplicateGroups = allDocuments
@@ -1004,10 +1014,18 @@ public static class GoogleDriveEndpoints
                 .First();
             
             var duplicateDocs = docs.Where(d => d.Id != primaryDoc.Id).ToList();
+            var knownFileIds = docs
+                .SelectMany(document => document.Urls)
+                .Select(source => source.GoogleDriveFileId)
+                .ToHashSet(StringComparer.Ordinal);
+
+            EnsureCanonicalSource(primaryDoc, knownFileIds);
             
             // Merge tags and URLs from duplicates into primary
             foreach (var duplicate in duplicateDocs)
             {
+                EnsureCanonicalSource(duplicate, knownFileIds);
+
                 // Add any missing tags
                 foreach (var tag in duplicate.Tags)
                 {
@@ -1021,17 +1039,54 @@ public static class GoogleDriveEndpoints
                         });
                     }
                 }
+
+                foreach (var source in duplicate.Urls.ToList())
+                {
+                    if (primaryDoc.Urls.Any(existing => existing.GoogleDriveFileId == source.GoogleDriveFileId))
+                    {
+                        context.DocumentUrls.Remove(source);
+                        continue;
+                    }
+
+                    duplicate.Urls.Remove(source);
+                    source.JumpDocumentId = primaryDoc.Id;
+                    source.JumpDocument = primaryDoc;
+                    primaryDoc.Urls.Add(source);
+                }
                 
                 // Remove the duplicate document
                 context.JumpDocuments.Remove(duplicate);
                 documentsMerged++;
             }
+
+            await DocumentLinkEndpoints.VerifySourcesAsync(primaryDoc.Urls, healthService);
+            DocumentLinkEndpoints.SynchronizeDocumentAvailability(primaryDoc);
             
             mergedGroups++;
         }
 
         await context.SaveChangesAsync();
         return (mergedGroups, documentsMerged);
+    }
+
+    private static void EnsureCanonicalSource(JumpDocument document, HashSet<string> knownFileIds)
+    {
+        if (string.IsNullOrWhiteSpace(document.GoogleDriveFileId) ||
+            document.Urls.Any(source => source.GoogleDriveFileId == document.GoogleDriveFileId) ||
+            !knownFileIds.Add(document.GoogleDriveFileId))
+            return;
+
+        document.Urls.Add(new DocumentUrl
+        {
+            JumpDocumentId = document.Id,
+            GoogleDriveFileId = document.GoogleDriveFileId,
+            SourceDrive = document.SourceDrive,
+            FolderPath = document.FolderPath,
+            WebViewLink = document.WebViewLink,
+            DownloadLink = document.DownloadLink,
+            LastScanned = document.LastScanned,
+            LastHealthCheckStatus = "Unknown"
+        });
     }
 
     private static async Task<IResult> TestScanSingleDrive(string driveName, JumpChainDbContext dbContext, IGoogleDriveService driveService, DriveScanCoordinator scanCoordinator)

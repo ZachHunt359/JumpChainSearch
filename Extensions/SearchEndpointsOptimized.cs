@@ -63,7 +63,9 @@ public static class SearchEndpointsOptimized
                 var query = context.JumpDocuments
                     .AsNoTracking()
                     .Include(d => d.Tags)
+                    .Include(d => d.Urls)
                     .Where(d => d.Id == docId.Value);
+                query = ApplyPublicVisibilityFilter(query);
                 query = ApplyNsfwFilter(query, nsfwTags);
                 
                 var document = await query.FirstOrDefaultAsync();
@@ -96,6 +98,25 @@ public static class SearchEndpointsOptimized
                     HasExtractedText = !string.IsNullOrEmpty(document.ExtractedText),
                     ExtractedTextLength = document.ExtractedText != null ? document.ExtractedText.Length : 0,
                     Tags = document.Tags.Select(t => t.TagName).ToList(),
+                    Urls = document.Urls
+                        .OrderBy(url => url.IsDead)
+                        .ThenByDescending(url => url.GoogleDriveFileId == document.GoogleDriveFileId)
+                        .ThenBy(url => url.Id)
+                        .Select(url => new
+                        {
+                            url.Id,
+                            url.GoogleDriveFileId,
+                            url.SourceDrive,
+                            url.FolderPath,
+                            url.WebViewLink,
+                            url.DownloadLink,
+                            url.IsDead,
+                            url.LastHealthCheckAt,
+                            url.LastHealthCheckStatus,
+                            url.LastHealthCheckMessage
+                        })
+                        .ToList(),
+                    HasMultipleUrls = document.Urls.Count > 1,
                     document.CreatedTime,
                     document.ModifiedTime,
                     document.LastModified,

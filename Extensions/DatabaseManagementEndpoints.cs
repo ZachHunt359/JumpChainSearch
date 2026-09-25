@@ -344,7 +344,11 @@ public static class DatabaseManagementEndpoints
         }
     }
 
-    private static async Task<IResult> MergeDuplicates(JumpChainDbContext context, IDocumentCountService documentCountService, int? groupIndex = null)
+    private static async Task<IResult> MergeDuplicates(
+        JumpChainDbContext context,
+        IDocumentCountService documentCountService,
+        IDocumentLinkHealthService healthService,
+        int? groupIndex = null)
     {
         Console.WriteLine($"[MergeDuplicates] Called with groupIndex: {groupIndex}");
         await using var transaction = await context.Database.BeginTransactionAsync();
@@ -403,6 +407,13 @@ public static class DatabaseManagementEndpoints
                     duplicates,
                     duplicateIds,
                     existingGoogleDriveFileIds);
+
+                await context.Entry(primaryDocument)
+                    .Collection(document => document.Urls)
+                    .LoadAsync();
+                await DocumentLinkEndpoints.VerifySourcesAsync(primaryDocument.Urls, healthService);
+                DocumentLinkEndpoints.SynchronizeDocumentAvailability(primaryDocument);
+
                 duplicateTagsToRemove.AddRange(mergeStats.TagsToRemove);
                 duplicateDocumentsToRemove.AddRange(duplicates);
 

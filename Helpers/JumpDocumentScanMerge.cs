@@ -46,9 +46,14 @@ public static class JumpDocumentScanMerge
                 SourceDrive = scannedUrl.SourceDrive,
                 FolderPath = scannedUrl.FolderPath,
                 GoogleDriveFolderId = scannedUrl.GoogleDriveFolderId,
+                ResourceKey = scannedUrl.ResourceKey,
                 WebViewLink = scannedUrl.WebViewLink,
                 DownloadLink = scannedUrl.DownloadLink,
-                LastScanned = DateTime.UtcNow
+                LastScanned = DateTime.UtcNow,
+                IsDead = scannedUrl.IsDead,
+                LastHealthCheckAt = scannedUrl.LastHealthCheckAt,
+                LastHealthCheckStatus = scannedUrl.LastHealthCheckStatus,
+                LastHealthCheckMessage = scannedUrl.LastHealthCheckMessage
             });
         }
 

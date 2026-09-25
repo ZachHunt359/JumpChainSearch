@@ -67,7 +67,8 @@ public static class AdminEndpoints
         // Text review queue endpoint
         group.MapGet("/text-review/queue", GetTextReviewQueue);
         group.MapGet("/dead-links", GetDeadLinkDocuments);
-        group.MapDelete("/dead-links/{documentId:int}", RemoveDeadLinkTag);
+        group.MapPost("/dead-links/{documentId:int}/replacement", AddDeadLinkReplacement)
+            .WithSummary("Verify and attach a replacement source to a document");
         
         // System management endpoints
         group.MapGet("/system/cache-ttl", GetCacheTTL);
@@ -2311,20 +2312,12 @@ public static class AdminEndpoints
                 }}
 
                 if (!data.documents || data.documents.length === 0) {{
-                    container.innerHTML = '<div style=""color: var(--success); padding: 1rem;"">No documents are tagged Dead Link.</div>';
+                    container.innerHTML = '<div style=""color: var(--success); padding: 1rem;"">No verified dead sources.</div>';
                     return;
                 }}
 
                 container.innerHTML = data.documents.map(doc => {{
-                    const sources = [{{
-                        sourceDrive: doc.sourceDrive,
-                        folderPath: doc.folderPath,
-                        googleDriveFileId: doc.googleDriveFileId,
-                        webViewLink: doc.webViewLink,
-                        downloadLink: doc.downloadLink
-                    }}].concat(doc.alternateUrls || []);
-
-                    const sourceRows = sources.map((source, sourceIndex) => {{
+                    const sourceRows = (doc.deadUrls || []).map((source, sourceIndex) => {{
                         const viewLink = source.webViewLink
                             ? `<a href=""${{escapeHtml(source.webViewLink)}}"" target=""_blank"" rel=""noopener"" class=""btn btn-sm btn-secondary"">Open Link</a>`
                             : '<span style=""color: var(--text-muted);"">No view URL</span>';
@@ -2334,8 +2327,8 @@ public static class AdminEndpoints
 
                         return `<div style=""padding: 0.75rem 0; border-top: ${{sourceIndex === 0 ? 'none' : '1px solid var(--border)'}}; display: grid; grid-template-columns: minmax(180px, 1fr) minmax(220px, 2fr) auto; gap: 0.75rem; align-items: center;"">
                             <div><strong>${{escapeHtml(source.sourceDrive || 'Unknown drive')}}</strong><br><small style=""color: var(--text-secondary);"">${{escapeHtml(source.folderPath || '/')}}</small></div>
-                            <div style=""overflow-wrap: anywhere;""><small>File ID: ${{escapeHtml(source.googleDriveFileId || 'Unknown')}}</small></div>
-                            <div class=""btn-group"">${{viewLink}} ${{downloadLink}}</div>
+                            <div style=""overflow-wrap: anywhere;""><small>File ID: ${{escapeHtml(source.googleDriveFileId || 'Unknown')}}</small><br><small style=""color: var(--text-secondary);"">${{escapeHtml(source.lastHealthCheckMessage || '')}}</small></div>
+                            <div class=""btn-group"">${{viewLink}} ${{downloadLink}} <button class=""btn btn-sm btn-success"" onclick=""verifyDeadSource(${{source.id}})"">Verify Link</button></div>
                         </div>`;
                     }}).join('');
 
@@ -2344,10 +2337,13 @@ public static class AdminEndpoints
                             <div><h3 style=""margin: 0 0 0.25rem; font-size: 1rem;"">${{escapeHtml(doc.name)}}</h3><small style=""color: var(--text-secondary);"">Document ID ${{doc.id}} · Modified ${{new Date(doc.modifiedTime).toLocaleDateString()}}</small></div>
                             <div class=""btn-group"">
                                 <a href=""/?docId=${{doc.id}}"" target=""_blank"" rel=""noopener"" class=""btn btn-sm btn-primary"">View Record</a>
-                                <button class=""btn btn-sm btn-danger"" onclick=""removeDeadLinkTag(${{doc.id}})"">Remove Dead Link Tag</button>
                             </div>
                         </div>
                         <div style=""margin-top: 0.75rem;"">${{sourceRows}}</div>
+                        <div style=""display: flex; gap: 0.5rem; margin-top: 0.75rem; flex-wrap: wrap;"">
+                            <input id=""replacement-${{doc.id}}"" type=""url"" placeholder=""Google Drive replacement URL"" style=""flex: 1; min-width: 260px; padding: 0.5rem;"" />
+                            <button class=""btn btn-sm btn-success"" onclick=""addDeadLinkReplacement(${{doc.id}})"">Add Verified Replacement</button>
+                        </div>
                     </article>`;
                 }}).join('');
             }} catch (error) {{
@@ -2355,25 +2351,49 @@ public static class AdminEndpoints
             }}
         }}
 
-        async function removeDeadLinkTag(documentId) {{
-            if (!confirm('Remove the Dead Link tag from document #' + documentId + '? The document will become visible in public search again.')) {{
-                return;
-            }}
-
+        async function verifyDeadSource(sourceId) {{
             try {{
-                const response = await fetch('/admin/dead-links/' + documentId, {{
-                    method: 'DELETE',
-                    credentials: 'same-origin'
+                const response = await fetch('/api/document-links/' + sourceId + '/report', {{
+                    method: 'POST',
+                    headers: {{ 'Content-Type': 'application/json' }},
+                    credentials: 'same-origin',
+                    body: JSON.stringify({{ reportedDead: false }})
                 }});
                 const data = await response.json();
                 if (!response.ok || !data.success) {{
-                    throw new Error(data.error || 'Failed to remove Dead Link tag');
+                    throw new Error(data.message || 'Google Drive could not verify the source');
                 }}
 
+                alert(data.message);
                 await loadDeadLinks();
                 await checkDeadLinksQueue();
             }} catch (error) {{
-                alert('Error removing Dead Link tag: ' + error.message);
+                alert('Error verifying source: ' + error.message);
+            }}
+        }}
+
+        async function addDeadLinkReplacement(documentId) {{
+            const input = document.getElementById('replacement-' + documentId);
+            const url = input ? input.value.trim() : '';
+            if (!url) return alert('Enter a Google Drive replacement URL.');
+
+            try {{
+                const response = await fetch('/admin/dead-links/' + documentId + '/replacement', {{
+                    method: 'POST',
+                    headers: {{ 'Content-Type': 'application/json' }},
+                    credentials: 'same-origin',
+                    body: JSON.stringify({{ url }})
+                }});
+                const data = await response.json();
+                if (!response.ok || !data.success) {{
+                    throw new Error(data.error || 'Failed to attach replacement');
+                }}
+
+                alert(data.message);
+                await loadDeadLinks();
+                await checkDeadLinksQueue();
+            }} catch (error) {{
+                alert('Error adding replacement: ' + error.message);
             }}
         }}
         
@@ -4699,7 +4719,7 @@ sudo systemctl restart jumpchain
     }
 
     /// <summary>
-    /// Lists documents hidden from public results because they are tagged Dead Link.
+    /// Lists every document source currently verified as dead.
     /// </summary>
     private static async Task<IResult> GetDeadLinkDocuments(
         HttpContext context,
@@ -4712,27 +4732,26 @@ sudo systemctl restart jumpchain
 
         var documents = await dbContext.JumpDocuments
             .AsNoTracking()
-            .Where(document => document.Tags.Any(tag => tag.TagName == "Dead Link"))
+            .Where(document => document.Urls.Any(url => url.IsDead))
             .OrderBy(document => document.Name)
             .Select(document => new
             {
                 document.Id,
                 document.Name,
-                document.SourceDrive,
-                document.FolderPath,
-                document.GoogleDriveFileId,
-                document.WebViewLink,
-                document.DownloadLink,
                 document.ModifiedTime,
-                alternateUrls = document.Urls
+                deadUrls = document.Urls
+                    .Where(url => url.IsDead)
                     .OrderBy(url => url.SourceDrive)
                     .Select(url => new
                     {
+                        url.Id,
                         url.SourceDrive,
                         url.FolderPath,
                         url.GoogleDriveFileId,
                         url.WebViewLink,
-                        url.DownloadLink
+                        url.DownloadLink,
+                        url.LastHealthCheckAt,
+                        url.LastHealthCheckMessage
                     })
                     .ToList()
             })
@@ -4747,34 +4766,70 @@ sudo systemctl restart jumpchain
     }
 
     /// <summary>
-    /// Removes the Dead Link tag so a verified document returns to public search.
+    /// Verifies and attaches a replacement Google Drive source.
     /// </summary>
-    private static async Task<IResult> RemoveDeadLinkTag(
+    private static async Task<IResult> AddDeadLinkReplacement(
         int documentId,
+        AddReplacementLinkRequest request,
         HttpContext context,
         JumpChainDbContext dbContext,
         AdminAuthService authService,
+        IDocumentLinkHealthService healthService,
         SearchCacheInvalidationService cacheInvalidation)
     {
         var (valid, _) = await ValidateSession(context, authService);
         if (!valid)
             return Results.Unauthorized();
 
-        var deadLinkTag = await dbContext.DocumentTags
-            .FirstOrDefaultAsync(tag =>
-                tag.JumpDocumentId == documentId &&
-                tag.TagName == "Dead Link");
+        if (!GoogleDriveFileLinkParser.TryParse(request.Url, out var parsedLink) || parsedLink == null)
+            return Results.BadRequest(new { success = false, error = "Enter a valid Google Drive file URL." });
 
-        if (deadLinkTag == null)
+        var document = await dbContext.JumpDocuments
+            .Include(item => item.Tags)
+            .Include(item => item.Urls)
+            .FirstOrDefaultAsync(item => item.Id == documentId);
+        if (document == null)
+            return Results.NotFound(new { success = false, error = "Document not found." });
+
+        var existingSource = await dbContext.DocumentUrls
+            .FirstOrDefaultAsync(source => source.GoogleDriveFileId == parsedLink.FileId);
+        if (existingSource != null)
         {
-            return Results.NotFound(new
+            return Results.Conflict(new
             {
                 success = false,
-                error = "Document is not tagged Dead Link."
+                error = existingSource.JumpDocumentId == documentId
+                    ? "That source is already attached to this document."
+                    : "That source is already attached to another document."
             });
         }
 
-        dbContext.DocumentTags.Remove(deadLinkTag);
+        var verification = await healthService.VerifyPublicLinkAsync(parsedLink.FileId, parsedLink.ResourceKey);
+        if (verification.Health != DocumentLinkHealth.Healthy)
+        {
+            return Results.BadRequest(new
+            {
+                success = false,
+                error = verification.Message
+            });
+        }
+
+        var source = new DocumentUrl
+        {
+            JumpDocument = document,
+            GoogleDriveFileId = parsedLink.FileId,
+            SourceDrive = "Admin replacement",
+            FolderPath = string.Empty,
+            ResourceKey = parsedLink.ResourceKey,
+            WebViewLink = verification.WebViewLink ?? $"https://drive.google.com/open?id={parsedLink.FileId}",
+            DownloadLink = string.Empty,
+            LastScanned = DateTime.UtcNow,
+            LastHealthCheckAt = DateTime.UtcNow,
+            LastHealthCheckStatus = DocumentLinkHealth.Healthy.ToString(),
+            LastHealthCheckMessage = verification.Message
+        };
+        document.Urls.Add(source);
+        DocumentLinkEndpoints.SynchronizeDocumentAvailability(document);
         await dbContext.SaveChangesAsync();
         cacheInvalidation.InvalidateAllSearchCaches();
 
@@ -4782,9 +4837,12 @@ sudo systemctl restart jumpchain
         {
             success = true,
             documentId,
-            message = "Dead Link tag removed."
+            sourceId = source.Id,
+            message = "Replacement link verified and attached."
         });
     }
+
+    private sealed record AddReplacementLinkRequest(string Url);
 
     // Helper method to validate session
     private static async Task<(bool valid, AdminUser? user)> ValidateSession(HttpContext context, AdminAuthService authService)

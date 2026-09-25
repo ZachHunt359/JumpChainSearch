@@ -185,6 +185,9 @@ app.MapGroup("/api/drive-submissions").MapDriveSubmissionEndpoints();
 // Map public moderated document submissions
 app.MapGroup("/api/document-submissions").MapDocumentSubmissionEndpoints();
 
+// Map public document source reporting and verification
+app.MapGroup("/api/document-links").MapDocumentLinkEndpoints();
+
 // Map Tag Management API endpoints
 app.MapGroup("/api/tags").MapTagManagementEndpoints();
 

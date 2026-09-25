@@ -82,8 +82,11 @@ namespace JumpChainSearch.Data
                 entity.Property(e => e.GoogleDriveFileId).HasMaxLength(100);
                 entity.Property(e => e.SourceDrive).HasMaxLength(200);
                 entity.Property(e => e.FolderPath).HasMaxLength(1000);
+                entity.Property(e => e.ResourceKey).HasMaxLength(500);
                 entity.Property(e => e.WebViewLink).HasMaxLength(1000);
                 entity.Property(e => e.DownloadLink).HasMaxLength(1000);
+                entity.Property(e => e.LastHealthCheckStatus).HasMaxLength(20);
+                entity.Property(e => e.LastHealthCheckMessage).HasMaxLength(500);
 
                 entity.HasOne(d => d.JumpDocument)
                     .WithMany(p => p.Urls)

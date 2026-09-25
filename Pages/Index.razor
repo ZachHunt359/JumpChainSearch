@@ -246,7 +246,7 @@
                                                 @if (document.HasMultipleUrls)
                                                 {
                                                     <span class="badge bg-info ms-2" title="Available on multiple drives">
-                                                        <i class="fas fa-clone me-1"></i>@(document.Urls.Count + 1) sources
+                                                        <i class="fas fa-clone me-1"></i>Multiple sources
                                                     </span>
                                                 }
                                             </h6>
@@ -499,45 +499,24 @@
                     <div class="mt-4">
                         <h6 class="text-primary mb-3">
                             <i class="fas fa-link me-1"></i>Access Links
-                            @if (selectedDocument.HasMultipleUrls)
+                            @if (selectedDocument.Urls.Count > 1)
                             {
-                                <span class="badge bg-info ms-2">@(selectedDocument.Urls.Count + 1) sources available</span>
+                                <span class="badge bg-info ms-2">@selectedDocument.Urls.Count sources available</span>
                             }
                         </h6>
                         
                         <div class="links-container">
-                            <!-- Primary Link -->
-                            <div class="card border-primary mb-2">
-                                <div class="card-body p-3">
-                                    <div class="d-flex justify-content-between align-items-center">
-                                        <div>
-                                            <h6 class="card-title mb-1 text-primary">
-                                                <i class="fas fa-star me-1"></i>Primary Source
-                                            </h6>
-                                            <small class="text-muted">@selectedDocument.SourceDrive</small>
-                                            @if (!string.IsNullOrEmpty(selectedDocument.FolderPath))
-                                            {
-                                                <br><small class="text-muted">@selectedDocument.FolderPath</small>
-                                            }
-                                        </div>
-                                        <a href="@selectedDocument.WebViewLink" target="_blank" class="btn btn-primary">
-                                            <i class="fas fa-external-link-alt me-1"></i> Open
-                                        </a>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <!-- Additional URLs -->
-                            @if (selectedDocument.HasMultipleUrls && selectedDocument.Urls.Any())
+                            @if (selectedDocument.Urls.Any())
                             {
                                 @foreach (var (url, index) in selectedDocument.Urls.Select((url, i) => (url, i)))
                                 {
-                                    <div class="card border-secondary mb-2">
+                                    <div class="card @(url.IsDead ? "border-danger" : index == 0 ? "border-primary" : "border-secondary") mb-2">
                                         <div class="card-body p-3">
-                                            <div class="d-flex justify-content-between align-items-center">
+                                            <div class="d-flex justify-content-between align-items-center gap-3">
                                                 <div>
-                                                    <h6 class="card-title mb-1">
-                                                        <i class="fas fa-clone me-1"></i>Alternative Source @(index + 1)
+                                                    <h6 class="card-title mb-1 @(url.IsDead ? "text-danger" : index == 0 ? "text-primary" : "")">
+                                                        <i class="fas @(url.IsDead ? "fa-unlink" : index == 0 ? "fa-star" : "fa-clone") me-1"></i>
+                                                        @(url.IsDead ? "Dead Link" : index == 0 ? "Primary Source" : $"Additional Source {index}")
                                                     </h6>
                                                     <small class="text-muted">@url.SourceDrive</small>
                                                     @if (!string.IsNullOrEmpty(url.FolderPath))
@@ -545,13 +524,30 @@
                                                         <br><small class="text-muted">@url.FolderPath</small>
                                                     }
                                                 </div>
-                                                <a href="@url.WebViewLink" target="_blank" class="btn btn-outline-primary">
-                                                    <i class="fas fa-external-link-alt me-1"></i> Open
-                                                </a>
+                                                <div class="d-flex gap-2 flex-wrap justify-content-end">
+                                                    <button type="button"
+                                                            class="btn btn-sm @(url.IsDead ? "btn-outline-success" : "btn-outline-danger")"
+                                                            disabled="@verifyingLinkIds.Contains(url.Id)"
+                                                            @onclick="() => ReportDocumentLink(url)">
+                                                        <i class="fas fa-sync-alt me-1"></i>
+                                                        @(verifyingLinkIds.Contains(url.Id) ? "Checking..." : url.IsDead ? "Report Good Link" : "Report Dead Link")
+                                                    </button>
+                                                    <a href="@url.WebViewLink" target="_blank" class="btn btn-sm btn-outline-primary">
+                                                        <i class="fas fa-external-link-alt me-1"></i> Open
+                                                    </a>
+                                                </div>
                                             </div>
+                                            @if (!string.IsNullOrWhiteSpace(url.LastHealthCheckMessage))
+                                            {
+                                                <div class="small text-muted mt-2">Last check: @url.LastHealthCheckMessage</div>
+                                            }
                                         </div>
                                     </div>
                                 }
+                            }
+                            else
+                            {
+                                <div class="alert alert-warning mb-0">No source links are available for this document.</div>
                             }
                         </div>
                     </div>
@@ -833,6 +829,7 @@
     // Modal-related variables
     private SearchResult? selectedDocument = null;
     private bool showModal = false;
+    private HashSet<int> verifyingLinkIds = new();
     
     // Favorites cache
     private HashSet<string> favoritesCache = new HashSet<string>();
@@ -846,7 +843,9 @@
         public string SourceDrive { get; set; } = "";
         public string MimeType { get; set; } = "";
         public long Size { get; set; }
+        public string GoogleDriveFileId { get; set; } = "";
         public string WebViewLink { get; set; } = "";
+        public string DownloadLink { get; set; } = "";
         public DateTime CreatedTime { get; set; }
         public DateTime ModifiedTime { get; set; }
         public string Description { get; set; } = "";
@@ -860,10 +859,16 @@
 
     public class DocumentUrl
     {
+        public int Id { get; set; }
+        public string GoogleDriveFileId { get; set; } = "";
         public string SourceDrive { get; set; } = "";
         public string FolderPath { get; set; } = "";
         public string WebViewLink { get; set; } = "";
         public string DownloadLink { get; set; } = "";
+        public bool IsDead { get; set; }
+        public DateTime? LastHealthCheckAt { get; set; }
+        public string LastHealthCheckStatus { get; set; } = "Unknown";
+        public string? LastHealthCheckMessage { get; set; }
     }
     
     public class SearchResponse
@@ -2057,13 +2062,56 @@
     // Modal-related methods
     private async Task ShowDocumentDetails(SearchResult document)
     {
-        selectedDocument = document;
+        var response = await Http.GetFromJsonAsync<SearchResponse>($"/api/search?docId={document.Id}&limit=1");
+        selectedDocument = response?.Results.FirstOrDefault() ?? document;
         showModal = true;
         await LoadFavoritesCache();
         await LoadPendingItemsForDocument(document.Id);
         StateHasChanged();
         
         // Do NOT update URL - modal should work independently of URL
+    }
+
+    private async Task ReportDocumentLink(DocumentUrl link)
+    {
+        if (!verifyingLinkIds.Add(link.Id))
+            return;
+
+        try
+        {
+            var response = await Http.PostAsJsonAsync(
+                $"/api/document-links/{link.Id}/report",
+                new { ReportedDead = !link.IsDead });
+            var result = await response.Content.ReadFromJsonAsync<DocumentLinkReportResponse>();
+
+            if (response.IsSuccessStatusCode && selectedDocument != null)
+            {
+                var details = await Http.GetFromJsonAsync<SearchResponse>($"/api/search?docId={selectedDocument.Id}&limit=1");
+                var refreshed = details?.Results.FirstOrDefault();
+                if (refreshed == null)
+                {
+                    CloseModal();
+                    await PerformSearch();
+                }
+                else
+                {
+                    selectedDocument = refreshed;
+                }
+            }
+
+            if (!string.IsNullOrWhiteSpace(result?.Message))
+                await JSRuntime.InvokeVoidAsync("alert", result.Message);
+        }
+        finally
+        {
+            verifyingLinkIds.Remove(link.Id);
+            StateHasChanged();
+        }
+    }
+
+    private sealed class DocumentLinkReportResponse
+    {
+        public string Message { get; set; } = "";
     }
 
     private void CloseModal()
