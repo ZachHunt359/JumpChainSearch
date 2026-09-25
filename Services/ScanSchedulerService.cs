@@ -138,6 +138,9 @@ public class ScanSchedulerService : BackgroundService
             {
                 try
                 {
+                    if (dbContext.Entry(drive).State == EntityState.Detached)
+                        dbContext.Attach(drive);
+
                     _logger.LogInformation("Scanning drive: {DriveName}", drive.DriveName);
                     
                     var (documents, successfulMethod) = await driveService.ScanDriveUnifiedAsync(drive);
@@ -150,29 +153,10 @@ public class ScanSchedulerService : BackgroundService
                         await dbContext.SaveChangesAsync(cancellationToken);
                     }
                     
-                    // Count new vs existing documents
-                    var fileIds = documentsList.Select(d => d.GoogleDriveFileId).ToList();
-                    var existingDocuments = await dbContext.JumpDocuments
-                        .Include(d => d.Tags)
-                        .Include(d => d.Urls)
-                        .Where(d => fileIds.Contains(d.GoogleDriveFileId))
-                        .ToListAsync(cancellationToken);
-                    var existingByFileId = existingDocuments.ToDictionary(d => d.GoogleDriveFileId);
-
-                    var newDocs = 0;
-                    foreach (var document in documentsList)
-                    {
-                        if (!existingByFileId.TryGetValue(document.GoogleDriveFileId, out var existing))
-                        {
-                            dbContext.JumpDocuments.Add(document);
-                            existingByFileId[document.GoogleDriveFileId] = document;
-                            newDocs++;
-                        }
-                        else
-                        {
-                            JumpDocumentScanMerge.EnrichSourceLessDocument(existing, document);
-                        }
-                    }
+                    var (newDocs, existingDocs) = await JumpDocumentScanMerge.MergeScannedDocumentsAsync(
+                        dbContext,
+                        documentsList,
+                        cancellationToken);
 
                     drive.LastScanTime = DateTime.UtcNow;
                     await dbContext.SaveChangesAsync(cancellationToken);
@@ -181,17 +165,18 @@ public class ScanSchedulerService : BackgroundService
                     await dbContext.SaveChangesAsync(cancellationToken);
                     
                     totalNewDocuments += newDocs;
-                    totalUpdatedDocuments += existingDocuments.Count;
+                    totalUpdatedDocuments += existingDocs;
                     
                     _logger.LogInformation(
                         "Drive {DriveName}: {NewDocs} new, {ExistingDocs} existing",
                         drive.DriveName,
                         newDocs,
-                        existingDocuments.Count);
+                        existingDocs);
                 }
                 catch (Exception ex)
                 {
                     _logger.LogError(ex, "Error scanning drive {DriveName}", drive.DriveName);
+                    dbContext.ChangeTracker.Clear();
                 }
             }
             

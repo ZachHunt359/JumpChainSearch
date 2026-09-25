@@ -141,6 +141,9 @@ public class DriveScanBackgroundService
         {
             try
             {
+                if (dbContext.Entry(drive).State == EntityState.Detached)
+                    dbContext.Attach(drive);
+
                 _currentDrive = drive.DriveName;
                 logger.LogInformation("Scanning drive: {DriveName}", drive.DriveName);
 
@@ -154,29 +157,9 @@ public class DriveScanBackgroundService
                     drive.PreferredAuthMethod = successfulMethod;
                 }
 
-                // Process and save documents (simplified - full logic would match GoogleDriveEndpoints)
-                var fileIds = documentsList.Select(d => d.GoogleDriveFileId).ToList();
-                var existingDocuments = await dbContext.JumpDocuments
-                    .Include(d => d.Tags)
-                    .Include(d => d.Urls)
-                    .Where(d => fileIds.Contains(d.GoogleDriveFileId))
-                    .ToListAsync();
-                var existingByFileId = existingDocuments.ToDictionary(d => d.GoogleDriveFileId);
-
-                var newDocs = 0;
-                foreach (var doc in documentsList)
-                {
-                    if (!existingByFileId.TryGetValue(doc.GoogleDriveFileId, out var existing))
-                    {
-                        dbContext.JumpDocuments.Add(doc);
-                        existingByFileId[doc.GoogleDriveFileId] = doc;
-                        newDocs++;
-                    }
-                    else
-                    {
-                        JumpDocumentScanMerge.EnrichSourceLessDocument(existing, doc);
-                    }
-                }
+                var (newDocs, _) = await JumpDocumentScanMerge.MergeScannedDocumentsAsync(
+                    dbContext,
+                    documentsList);
 
                 await dbContext.SaveChangesAsync();
                 _newDocuments += newDocs;
@@ -195,7 +178,8 @@ public class DriveScanBackgroundService
             catch (Exception ex)
             {
                 logger.LogError(ex, "Error scanning drive {DriveName}", drive.DriveName);
-                _lastError = $"Error scanning {drive.DriveName}: {ex.Message}";
+                _lastError = $"Error scanning {drive.DriveName}: {ex.GetBaseException().Message}";
+                dbContext.ChangeTracker.Clear();
                 // Continue with next drive
             }
         }

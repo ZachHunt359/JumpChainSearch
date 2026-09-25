@@ -1,9 +1,59 @@
+using JumpChainSearch.Data;
 using JumpChainSearch.Models;
+using Microsoft.EntityFrameworkCore;
 
 namespace JumpChainSearch.Helpers;
 
 public static class JumpDocumentScanMerge
 {
+    public static async Task<(int NewDocuments, int ExistingDocuments)> MergeScannedDocumentsAsync(
+        JumpChainDbContext context,
+        IReadOnlyCollection<JumpDocument> scannedDocuments,
+        CancellationToken cancellationToken = default)
+    {
+        var fileIds = scannedDocuments
+            .Select(document => document.GoogleDriveFileId)
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
+        var existingDocuments = await context.JumpDocuments
+            .Include(document => document.Tags)
+            .Include(document => document.Urls)
+            .Where(document => fileIds.Contains(document.GoogleDriveFileId) ||
+                document.Urls.Any(url => fileIds.Contains(url.GoogleDriveFileId)))
+            .ToListAsync(cancellationToken);
+
+        var existingByFileId = new Dictionary<string, JumpDocument>(StringComparer.Ordinal);
+        foreach (var document in existingDocuments)
+        {
+            if (fileIds.Contains(document.GoogleDriveFileId))
+                existingByFileId.TryAdd(document.GoogleDriveFileId, document);
+        }
+
+        foreach (var document in existingDocuments)
+        {
+            foreach (var source in document.Urls.Where(source => fileIds.Contains(source.GoogleDriveFileId)))
+                existingByFileId[source.GoogleDriveFileId] = document;
+        }
+
+        var newDocuments = 0;
+        var matchedDocuments = 0;
+        foreach (var scanned in scannedDocuments)
+        {
+            if (!existingByFileId.TryGetValue(scanned.GoogleDriveFileId, out var existing))
+            {
+                context.JumpDocuments.Add(scanned);
+                existingByFileId[scanned.GoogleDriveFileId] = scanned;
+                newDocuments++;
+                continue;
+            }
+
+            matchedDocuments++;
+            EnrichSourceLessDocument(existing, scanned);
+        }
+
+        return (newDocuments, matchedDocuments);
+    }
+
     public static bool EnrichSourceLessDocument(JumpDocument existing, JumpDocument scanned)
     {
         if (!string.IsNullOrWhiteSpace(existing.SourceDrive) || string.IsNullOrWhiteSpace(scanned.SourceDrive))
