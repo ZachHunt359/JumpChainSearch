@@ -506,6 +506,10 @@
                         </h6>
                         
                         <div class="links-container">
+                            @if (!string.IsNullOrWhiteSpace(linkReportMessage))
+                            {
+                                <div class="alert alert-success mb-2" role="status">@linkReportMessage</div>
+                            }
                             @if (!string.IsNullOrWhiteSpace(linkReportError))
                             {
                                 <div class="alert alert-danger mb-2" role="alert">@linkReportError</div>
@@ -834,6 +838,7 @@
     private SearchResult? selectedDocument = null;
     private bool showModal = false;
     private HashSet<int> verifyingLinkIds = new();
+    private string? linkReportMessage;
     private string? linkReportError;
     
     // Favorites cache
@@ -2082,6 +2087,7 @@
         if (!verifyingLinkIds.Add(link.Id))
             return;
 
+        linkReportMessage = null;
         linkReportError = null;
         try
         {
@@ -2112,13 +2118,21 @@
                 return;
             }
 
+            link.IsDead = result?.IsDead ?? link.IsDead;
+            link.LastHealthCheckStatus = link.IsDead ? "Dead" : "Healthy";
+            link.LastHealthCheckMessage = result?.Message;
+            linkReportMessage = result?.Message;
+
             if (selectedDocument != null)
             {
                 var details = await Http.GetFromJsonAsync<SearchResponse>($"/api/search?docId={selectedDocument.Id}&limit=1");
                 var refreshed = details?.Results.FirstOrDefault();
                 if (refreshed == null)
                 {
-                    CloseModal();
+                    if (link.IsDead)
+                    {
+                        linkReportMessage = $"{result?.Message} This document has no working sources and is now hidden from search.";
+                    }
                     await PerformSearch();
                 }
                 else
@@ -2126,9 +2140,6 @@
                     selectedDocument = refreshed;
                 }
             }
-
-            if (!string.IsNullOrWhiteSpace(result?.Message))
-                await JSRuntime.InvokeVoidAsync("alert", result.Message);
         }
         catch (Exception exception)
         {
@@ -2145,12 +2156,14 @@
     {
         public string Message { get; set; } = "";
         public string? Detail { get; set; }
+        public bool IsDead { get; set; }
     }
 
     private void CloseModal()
     {
         showModal = false;
         selectedDocument = null;
+        linkReportMessage = null;
         linkReportError = null;
         StateHasChanged();
     }
