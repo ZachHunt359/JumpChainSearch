@@ -23,6 +23,36 @@ public static class DocumentLinkEndpoints
         JumpChainDbContext context,
         IDocumentLinkHealthService healthService,
         SearchCacheInvalidationService cacheInvalidation,
+        ILoggerFactory loggerFactory,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await ReportLinkCore(
+                linkId,
+                request,
+                context,
+                healthService,
+                cacheInvalidation,
+                cancellationToken);
+        }
+        catch (Exception exception)
+        {
+            loggerFactory.CreateLogger("DocumentLinkEndpoints")
+                .LogError(exception, "Failed to verify document link {LinkId}", linkId);
+            return Results.Problem(
+                title: "Link verification failed",
+                detail: "The server could not complete the link check. Please try again.",
+                statusCode: StatusCodes.Status500InternalServerError);
+        }
+    }
+
+    private static async Task<IResult> ReportLinkCore(
+        int linkId,
+        ReportDocumentLinkRequest request,
+        JumpChainDbContext context,
+        IDocumentLinkHealthService healthService,
+        SearchCacheInvalidationService cacheInvalidation,
         CancellationToken cancellationToken)
     {
         var link = await context.DocumentUrls

@@ -30,7 +30,6 @@ namespace JumpChainSearch.Services
         Task<string?> ExtractTextFromDocumentAsync(string fileId);
         Task<(string? text, string? method)> ExtractTextWithMethodAsync(string fileId, string? resourceKey = null);
         Task<JumpDocument> GetSubmittedDocumentAsync(string fileId, string? resourceKey = null);
-        Task<DocumentLinkVerificationResult> VerifyFileAccessAsync(string fileId, string? resourceKey = null, CancellationToken cancellationToken = default);
         Task<IEnumerable<DriveData>> GetAvailableDrivesAsync();
         Task<object> DebugFilePropertiesAsync(string fileId);
         Task<List<(string folderId, string folderName, string? resourceKey)>> DiscoverFolderHierarchyAsync(string rootFolderId, string? rootResourceKey = null);
@@ -1032,73 +1031,6 @@ namespace JumpChainSearch.Services
                 LastHealthCheckStatus = "Healthy"
             });
             return document;
-        }
-
-        public async Task<DocumentLinkVerificationResult> VerifyFileAccessAsync(
-            string fileId,
-            string? resourceKey = null,
-            CancellationToken cancellationToken = default)
-        {
-            var sawTransientFailure = false;
-
-            foreach (var service in new[] { _publicDriveService, _driveService })
-            {
-                try
-                {
-                    var request = service.Files.Get(fileId);
-                    request.SupportsAllDrives = true;
-                    request.Fields = "id,name,mimeType,size,trashed,webViewLink";
-                    ApplyResourceKey(request, fileId, resourceKey);
-                    var file = await request.ExecuteAsync(cancellationToken);
-
-                    if (file.Trashed == true)
-                        return new(DocumentLinkHealth.Dead, "Google Drive reports that the file is in the trash.");
-
-                    return new(
-                        DocumentLinkHealth.Healthy,
-                        "Google Drive confirmed that the file is accessible.",
-                        file.Name,
-                        file.MimeType,
-                        file.Size,
-                        file.WebViewLink);
-                }
-                catch (GoogleApiException exception) when (IsDefinitiveAccessFailure(exception))
-                {
-                    continue;
-                }
-                catch (Exception exception)
-                {
-                    sawTransientFailure = true;
-                    _logger.LogWarning(exception, "Google Drive could not conclusively verify file {FileId}", fileId);
-                }
-            }
-
-            return sawTransientFailure
-                ? new(DocumentLinkHealth.Unknown, "Google Drive could not verify this link right now. Its existing status was not changed.")
-                : new(DocumentLinkHealth.Dead, "Google Drive reports that the file is missing or inaccessible.");
-        }
-
-        private static bool IsDefinitiveAccessFailure(GoogleApiException exception)
-        {
-            if (exception.HttpStatusCode == System.Net.HttpStatusCode.NotFound)
-                return true;
-
-            if (exception.HttpStatusCode != System.Net.HttpStatusCode.Forbidden)
-                return false;
-
-            var transientReasons = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-            {
-                "dailyLimitExceeded",
-                "rateLimitExceeded",
-                "userRateLimitExceeded",
-                "sharingRateLimitExceeded"
-            };
-            var reasons = exception.Error?.Errors?
-                .Select(error => error.Reason)
-                .Where(reason => !string.IsNullOrWhiteSpace(reason))
-                .ToList() ?? [];
-
-            return reasons.Count == 0 || reasons.All(reason => !transientReasons.Contains(reason));
         }
 
         private static void ApplyResourceKey(Google.Apis.Drive.v3.FilesResource.GetRequest request, string fileId, string? resourceKey)
