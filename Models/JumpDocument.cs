@@ -50,6 +50,10 @@ namespace JumpChainSearch.Models
         
         // OCR quality score (0.0-1.0) - only populated for OCR extractions
         public double? OcrQuality { get; set; }
+
+        public string? BinaryContentHash { get; set; }
+
+        public string? TextContentHash { get; set; }
         
         // Text review/editing fields
         public bool TextNeedsReview { get; set; }
@@ -88,6 +92,8 @@ namespace JumpChainSearch.Models
         public string DownloadLink { get; set; } = string.Empty;
         
         public DateTime LastScanned { get; set; }
+
+        public string? BinaryContentHash { get; set; }
 
         public bool IsDead { get; set; }
 

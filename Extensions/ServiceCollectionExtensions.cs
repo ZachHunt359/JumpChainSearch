@@ -16,6 +16,7 @@ public static class ServiceCollectionExtensions
         // Add custom services
         services.AddScoped<IGoogleDriveService, GoogleDriveService>();
         services.AddScoped<IDocumentLinkHealthService, DocumentLinkHealthService>();
+        services.AddScoped<DocumentDuplicateDetectionService>();
         services.AddScoped<ISearchService, SearchService>();
         services.AddScoped<IPurchasableParsingService, PurchasableParsingService>();
         services.AddScoped<GenreTagService>();

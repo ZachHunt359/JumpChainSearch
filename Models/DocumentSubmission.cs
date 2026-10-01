@@ -23,6 +23,7 @@ public sealed class DocumentSubmission
     public DateTime? ReviewedAt { get; set; }
     public string? ReviewedBy { get; set; }
     public string? ReviewNotes { get; set; }
+    public string? DuplicateReason { get; set; }
     public int? JumpDocumentId { get; set; }
     public JumpDocument? JumpDocument { get; set; }
 }

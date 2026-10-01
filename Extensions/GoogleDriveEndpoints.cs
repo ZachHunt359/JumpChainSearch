@@ -737,6 +737,7 @@ public static class GoogleDriveEndpoints
                                         existingUrl.ResourceKey = newUrl.ResourceKey ?? existingUrl.ResourceKey;
                                         existingUrl.WebViewLink = doc.WebViewLink;
                                         existingUrl.DownloadLink = doc.DownloadLink;
+                                        existingUrl.BinaryContentHash = newUrl.BinaryContentHash;
                                         existingUrl.LastScanned = DateTime.UtcNow;
                                     }
                                 }

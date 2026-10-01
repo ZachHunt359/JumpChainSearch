@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using JumpChainSearch.Models;
+using JumpChainSearch.Helpers;
 using System.Text.Json;
 
 namespace JumpChainSearch.Data
@@ -44,6 +45,8 @@ namespace JumpChainSearch.Data
             {
                 entity.HasKey(e => e.Id);
                 entity.HasIndex(e => e.GoogleDriveFileId).IsUnique();
+                entity.HasIndex(e => e.BinaryContentHash);
+                entity.HasIndex(e => e.TextContentHash);
                 entity.HasIndex(e => e.Name);
                 entity.HasIndex(e => new { e.SourceDrive, e.Name });
                 entity.HasIndex(e => e.FolderPath); // NEW: Index for FolderPath searches
@@ -52,6 +55,8 @@ namespace JumpChainSearch.Data
                 entity.Property(e => e.SourceDrive).HasMaxLength(200);
                 entity.Property(e => e.MimeType).HasMaxLength(100);
                 entity.Property(e => e.FolderPath).HasMaxLength(1000);
+                entity.Property(e => e.BinaryContentHash).HasMaxLength(80);
+                entity.Property(e => e.TextContentHash).HasMaxLength(80);
             });
 
             // Configure DocumentTag
@@ -76,6 +81,7 @@ namespace JumpChainSearch.Data
             {
                 entity.HasKey(e => e.Id);
                 entity.HasIndex(e => e.GoogleDriveFileId).IsUnique();
+                entity.HasIndex(e => e.BinaryContentHash);
                 entity.HasIndex(e => e.JumpDocumentId);
                 entity.HasIndex(e => new { e.JumpDocumentId, e.SourceDrive });
                 
@@ -85,6 +91,7 @@ namespace JumpChainSearch.Data
                 entity.Property(e => e.ResourceKey).HasMaxLength(500);
                 entity.Property(e => e.WebViewLink).HasMaxLength(1000);
                 entity.Property(e => e.DownloadLink).HasMaxLength(1000);
+                entity.Property(e => e.BinaryContentHash).HasMaxLength(80);
                 entity.Property(e => e.LastHealthCheckStatus).HasMaxLength(20);
                 entity.Property(e => e.LastHealthCheckMessage).HasMaxLength(500);
 
@@ -164,6 +171,7 @@ namespace JumpChainSearch.Data
                 entity.Property(e => e.Status).HasMaxLength(20);
                 entity.Property(e => e.ReviewedBy).HasMaxLength(100);
                 entity.Property(e => e.ReviewNotes).HasMaxLength(1000);
+                entity.Property(e => e.DuplicateReason).HasMaxLength(100);
 
                 entity.HasOne(e => e.JumpDocument)
                     .WithMany()
@@ -357,6 +365,34 @@ namespace JumpChainSearch.Data
                     .HasForeignKey(d => d.AdminUserId)
                     .OnDelete(DeleteBehavior.Cascade);
             });
+        }
+
+        public override int SaveChanges(bool acceptAllChangesOnSuccess)
+        {
+            ApplyDocumentFingerprints();
+            return base.SaveChanges(acceptAllChangesOnSuccess);
+        }
+
+        public override Task<int> SaveChangesAsync(
+            bool acceptAllChangesOnSuccess,
+            CancellationToken cancellationToken = default)
+        {
+            ApplyDocumentFingerprints();
+            return base.SaveChangesAsync(acceptAllChangesOnSuccess, cancellationToken);
+        }
+
+        private void ApplyDocumentFingerprints()
+        {
+            foreach (var entry in ChangeTracker.Entries<JumpDocument>()
+                         .Where(entry => entry.State is EntityState.Added or EntityState.Modified))
+            {
+                if (entry.State == EntityState.Added ||
+                    entry.Property(document => document.ExtractedText).IsModified ||
+                    string.IsNullOrWhiteSpace(entry.Entity.TextContentHash))
+                {
+                    entry.Entity.TextContentHash = DocumentFingerprint.FromExtractedText(entry.Entity.ExtractedText);
+                }
+            }
         }
     }
 }

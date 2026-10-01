@@ -75,6 +75,7 @@ public static class JumpDocumentScanMerge
         existing.DownloadLink = scanned.DownloadLink;
         existing.ThumbnailLink = scanned.ThumbnailLink;
         existing.HasThumbnail = scanned.HasThumbnail;
+        existing.BinaryContentHash ??= scanned.BinaryContentHash;
 
         var driveTag = scanned.Tags.FirstOrDefault(tag => tag.TagCategory == "Drive");
         if (driveTag != null && !existing.Tags.Any(tag =>
@@ -100,6 +101,7 @@ public static class JumpDocumentScanMerge
                 WebViewLink = scannedUrl.WebViewLink,
                 DownloadLink = scannedUrl.DownloadLink,
                 LastScanned = DateTime.UtcNow,
+                BinaryContentHash = scannedUrl.BinaryContentHash,
                 IsDead = scannedUrl.IsDead,
                 LastHealthCheckAt = scannedUrl.LastHealthCheckAt,
                 LastHealthCheckStatus = scannedUrl.LastHealthCheckStatus,

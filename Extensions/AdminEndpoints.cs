@@ -3105,6 +3105,7 @@ public static class AdminEndpoints
                         <div style=""font-size: 0.85rem; color: var(--text-secondary);"">Submitted ${{new Date(submission.submittedAt).toLocaleString()}}${{submission.submitterName ? ' by ' + escapeHtml(submission.submitterName) : ''}}</div>
                         <a href=""${{escapeHtml(submission.driveUrl)}}"" target=""_blank"" rel=""noopener noreferrer"" style=""font-size: 0.85rem;"">Open submitted drive</a>
                         ${{submission.notes ? '<p style=""margin-top: 0.5rem;"">' + escapeHtml(submission.notes) + '</p>' : ''}}
+                        ${{submission.matchedDocumentName ? '<p style=""margin-top: 0.5rem; color: var(--warning);"">Potential duplicate of <strong>' + escapeHtml(submission.matchedDocumentName) + '</strong> (' + escapeHtml(submission.duplicateReason || 'content match') + '). Approval will add this as another source.</p>' : ''}}
                         <div style=""display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0.75rem; margin-top: 0.75rem;"">
                             <input id=""submission-name-${{submission.id}}"" value=""${{escapeHtml(submission.suggestedName)}}"" maxlength=""200"" placeholder=""Approved drive name"" style=""padding: 0.65rem;"" />
                             <input id=""submission-description-${{submission.id}}"" maxlength=""500"" placeholder=""Description (optional)"" style=""padding: 0.65rem;"" />
@@ -3276,7 +3277,7 @@ public static class AdminEndpoints
                 }});
                 const data = await response.json();
                 if (!response.ok) throw new Error(data.message || data.error || 'Unable to approve document');
-                alert('Indexed ' + data.documentName);
+                alert(data.message || ('Indexed ' + data.documentName));
                 await loadDocumentSubmissions();
             }} catch (error) {{
                 alert(error.message);
@@ -4296,7 +4297,11 @@ sudo systemctl restart jumpchain
                 submission.ReviewedAt,
                 submission.ReviewedBy,
                 submission.ReviewNotes,
-                submission.JumpDocumentId
+                submission.JumpDocumentId,
+                submission.DuplicateReason,
+                MatchedDocumentName = submission.JumpDocument != null
+                    ? submission.JumpDocument.Name
+                    : null
             })
             .ToListAsync();
 
@@ -4310,7 +4315,9 @@ sudo systemctl restart jumpchain
         JumpChainDbContext dbContext,
         AdminAuthService authService,
         IGoogleDriveService driveService,
-        IDocumentCountService documentCountService)
+        IDocumentCountService documentCountService,
+        DocumentDuplicateDetectionService duplicateDetection,
+        CancellationToken cancellationToken)
     {
         var (valid, user) = await ValidateSession(context, authService);
         if (!valid)
@@ -4327,16 +4334,19 @@ sudo systemctl restart jumpchain
             return Results.Conflict(new { success = false, message = "This submission has already been reviewed." });
 
         JumpDocument? submittedDocument = null;
-        var existingDocument = await dbContext.JumpDocuments
-            .AsNoTracking()
-            .FirstOrDefaultAsync(document => document.GoogleDriveFileId == pendingSubmission.GoogleDriveFileId);
-        if (existingDocument is null)
+        var duplicateMatch = await duplicateDetection.FindByDriveFileIdAsync(
+            pendingSubmission.GoogleDriveFileId,
+            cancellationToken);
+        if (duplicateMatch is null)
         {
             try
             {
                 submittedDocument = await driveService.GetSubmittedDocumentAsync(
                     pendingSubmission.GoogleDriveFileId,
                     pendingSubmission.ResourceKey);
+                duplicateMatch = await duplicateDetection.FindByContentAsync(
+                    submittedDocument,
+                    cancellationToken);
             }
             catch (InvalidOperationException ex)
             {
@@ -4345,16 +4355,56 @@ sudo systemctl restart jumpchain
         }
 
         var documentWasAdded = false;
-        await using var transaction = await dbContext.Database.BeginTransactionAsync();
-        var submission = await dbContext.DocumentSubmissions.FindAsync(id);
+    var sourceWasAdded = false;
+    await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
+    var submission = await dbContext.DocumentSubmissions.FindAsync([id], cancellationToken);
         if (submission is null)
             return Results.NotFound(new { success = false, message = "Document submission not found." });
         if (submission.Status != "Pending")
             return Results.Conflict(new { success = false, message = "This submission has already been reviewed." });
 
-        var document = await dbContext.JumpDocuments
-            .FirstOrDefaultAsync(item => item.GoogleDriveFileId == submission.GoogleDriveFileId);
-        if (document is null)
+        var exactMatch = await duplicateDetection.FindByDriveFileIdAsync(
+            submission.GoogleDriveFileId,
+            cancellationToken);
+        if (exactMatch != null)
+            duplicateMatch = exactMatch;
+        else if (submittedDocument != null)
+            duplicateMatch = await duplicateDetection.FindByContentAsync(
+                submittedDocument,
+                cancellationToken);
+
+        JumpDocument document;
+        if (duplicateMatch != null)
+        {
+            document = await dbContext.JumpDocuments
+                .Include(item => item.Urls)
+                .FirstAsync(item => item.Id == duplicateMatch.DocumentId, cancellationToken);
+
+            if (exactMatch == null && submittedDocument != null &&
+                !document.Urls.Any(source => source.GoogleDriveFileId == submission.GoogleDriveFileId))
+            {
+                var submittedSource = submittedDocument.Urls.First();
+                document.Urls.Add(new DocumentUrl
+                {
+                    GoogleDriveFileId = submittedSource.GoogleDriveFileId,
+                    SourceDrive = submittedSource.SourceDrive,
+                    FolderPath = submittedSource.FolderPath,
+                    GoogleDriveFolderId = submittedSource.GoogleDriveFolderId,
+                    ResourceKey = submittedSource.ResourceKey,
+                    WebViewLink = submittedSource.WebViewLink,
+                    DownloadLink = submittedSource.DownloadLink,
+                    LastScanned = submittedSource.LastScanned,
+                    BinaryContentHash = submittedSource.BinaryContentHash,
+                    IsDead = submittedSource.IsDead,
+                    LastHealthCheckAt = submittedSource.LastHealthCheckAt,
+                    LastHealthCheckStatus = submittedSource.LastHealthCheckStatus,
+                    LastHealthCheckMessage = submittedSource.LastHealthCheckMessage
+                });
+                document.TextContentHash ??= submittedDocument.TextContentHash;
+                sourceWasAdded = true;
+            }
+        }
+        else
         {
             document = submittedDocument
                 ?? throw new InvalidOperationException("Document ingestion did not return a document.");
@@ -4367,11 +4417,14 @@ sudo systemctl restart jumpchain
         submission.ReviewedBy = user?.Username;
         submission.ReviewNotes = NormalizeOptional(request.ReviewNotes);
         submission.JumpDocument = document;
+        submission.DuplicateReason = duplicateMatch == null
+            ? null
+            : DocumentDuplicateDetectionService.DescribeMatch(duplicateMatch);
 
         try
         {
-            await dbContext.SaveChangesAsync();
-            await transaction.CommitAsync();
+            await dbContext.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
         }
         catch (DbUpdateException)
         {
@@ -4386,7 +4439,13 @@ sudo systemctl restart jumpchain
             success = true,
             documentId = document.Id,
             documentName = document.Name,
-            alreadyIndexed = !documentWasAdded
+            alreadyIndexed = !documentWasAdded,
+            sourceAdded = sourceWasAdded,
+            message = documentWasAdded
+                ? $"Indexed {document.Name}."
+                : sourceWasAdded
+                    ? $"Added the submitted link as another source for {document.Name}."
+                    : $"{document.Name} was already indexed."
         });
     }
 

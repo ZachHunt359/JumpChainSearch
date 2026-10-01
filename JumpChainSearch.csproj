@@ -24,6 +24,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Compile Remove="Tests\**\*.cs" />
     <Content Update="series-mappings.json">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>

@@ -164,7 +164,7 @@ namespace JumpChainSearch.Services
                 request.IncludeItemsFromAllDrives = true;
                 request.SupportsAllDrives = true;
                 request.Corpora = "drive";
-                request.Fields = "nextPageToken, files(id, name, description, mimeType, size, createdTime, modifiedTime, parents, webViewLink, exportLinks, thumbnailLink, hasThumbnail, resourceKey)";
+                request.Fields = "nextPageToken, files(id, name, description, mimeType, size, sha256Checksum, createdTime, modifiedTime, parents, webViewLink, exportLinks, thumbnailLink, hasThumbnail, resourceKey)";
                 request.PageSize = 1000;
 
                 string? pageToken = null;
@@ -300,7 +300,7 @@ namespace JumpChainSearch.Services
             {
                 var request = _publicDriveService.Files.List();
                 request.Q = $"'{folderId}' in parents and trashed=false";
-                request.Fields = "nextPageToken, files(id, name, description, mimeType, size, createdTime, modifiedTime, parents, webViewLink, thumbnailLink, hasThumbnail, resourceKey)";
+                request.Fields = "nextPageToken, files(id, name, description, mimeType, size, sha256Checksum, createdTime, modifiedTime, parents, webViewLink, thumbnailLink, hasThumbnail, resourceKey)";
                 request.PageSize = 1000;
                 // Note: Resource key for parent folder should be provided by caller
                 // Child folder resource keys will be automatically included in response
@@ -347,7 +347,7 @@ namespace JumpChainSearch.Services
             {
                 var request = _driveService.Files.List();
                 request.Q = $"'{folderId}' in parents and trashed=false";
-                request.Fields = "nextPageToken, files(id, name, description, mimeType, size, createdTime, modifiedTime, parents, webViewLink, exportLinks, thumbnailLink, hasThumbnail, resourceKey)";
+                request.Fields = "nextPageToken, files(id, name, description, mimeType, size, sha256Checksum, createdTime, modifiedTime, parents, webViewLink, exportLinks, thumbnailLink, hasThumbnail, resourceKey)";
                 request.PageSize = 1000;
                 // Note: Resource key for parent folder should be provided by caller
                 // Child folder resource keys will be automatically included in response
@@ -516,6 +516,8 @@ namespace JumpChainSearch.Services
                                 Description = fileElement.TryGetProperty("description", out var desc) && desc.ValueKind == System.Text.Json.JsonValueKind.String ? desc.GetString() ?? "" : "",
                                 MimeType = mimeType ?? "",
                                 Size = size,
+                                BinaryContentHash = DocumentFingerprint.FromDriveChecksum(
+                                    fileElement.TryGetProperty("sha256Checksum", out var checksum) ? checksum.GetString() : null),
                                 CreatedTime = createdTime,
                                 ModifiedTime = modifiedTime,
                                 WebViewLink = fileElement.TryGetProperty("webViewLink", out var wvl) && wvl.ValueKind == System.Text.Json.JsonValueKind.String ? wvl.GetString() ?? "" : "",
@@ -541,6 +543,7 @@ namespace JumpChainSearch.Services
                                 WebViewLink = doc.WebViewLink,
                                 DownloadLink = doc.DownloadLink,
                                 LastScanned = doc.LastScanned,
+                                BinaryContentHash = doc.BinaryContentHash,
                                 LastHealthCheckStatus = "Unknown"
                             });
                             
@@ -960,7 +963,7 @@ namespace JumpChainSearch.Services
                 {
                     var request = service.Files.Get(fileId);
                     request.SupportsAllDrives = true;
-                    request.Fields = "id,name,description,mimeType,size,createdTime,modifiedTime,webViewLink,webContentLink,exportLinks,thumbnailLink,hasThumbnail,trashed";
+                    request.Fields = "id,name,description,mimeType,size,sha256Checksum,createdTime,modifiedTime,webViewLink,webContentLink,exportLinks,thumbnailLink,hasThumbnail,trashed";
                     ApplyResourceKey(request, fileId, resourceKey);
                     file = await request.ExecuteAsync();
                     break;
@@ -1003,11 +1006,12 @@ namespace JumpChainSearch.Services
                 Description = file.Description ?? string.Empty,
                 MimeType = file.MimeType,
                 Size = file.Size ?? 0,
+                BinaryContentHash = DocumentFingerprint.FromDriveChecksum(file.Sha256Checksum),
                 CreatedTime = file.CreatedTimeDateTimeOffset?.UtcDateTime ?? DateTime.UtcNow,
                 ModifiedTime = modifiedTime,
                 LastScanned = DateTime.UtcNow,
                 LastModified = modifiedTime,
-                SourceDrive = string.Empty,
+                SourceDrive = "Community submission",
                 FolderPath = string.Empty,
                 WebViewLink = file.WebViewLink ?? $"https://drive.google.com/open?id={file.Id}",
                 DownloadLink = file.WebContentLink ?? file.ExportLinks?.Values.FirstOrDefault() ?? string.Empty,
@@ -1017,16 +1021,17 @@ namespace JumpChainSearch.Services
                 ExtractionMethod = extractionMethod
             };
 
-            document.Tags = GenerateTags(document, string.Empty, string.Empty);
+            document.Tags = GenerateTags(document, string.Empty, document.SourceDrive);
             document.Urls.Add(new DocumentUrl
             {
                 GoogleDriveFileId = file.Id,
-                SourceDrive = string.Empty,
+                SourceDrive = document.SourceDrive,
                 FolderPath = string.Empty,
                 ResourceKey = resourceKey,
                 WebViewLink = document.WebViewLink,
                 DownloadLink = document.DownloadLink,
                 LastScanned = document.LastScanned,
+                BinaryContentHash = document.BinaryContentHash,
                 LastHealthCheckAt = DateTime.UtcNow,
                 LastHealthCheckStatus = "Healthy"
             });
@@ -1701,6 +1706,7 @@ namespace JumpChainSearch.Services
                     Description = file.Description ?? string.Empty,
                     MimeType = file.MimeType ?? string.Empty,
                     Size = file.Size ?? 0,
+                    BinaryContentHash = DocumentFingerprint.FromDriveChecksum(file.Sha256Checksum),
                     CreatedTime = file.CreatedTimeDateTimeOffset?.DateTime ?? DateTime.UtcNow,
                     ModifiedTime = file.ModifiedTimeDateTimeOffset?.DateTime ?? DateTime.UtcNow,
                     LastScanned = DateTime.UtcNow,
@@ -1737,6 +1743,7 @@ namespace JumpChainSearch.Services
                     Description = file.Description ?? string.Empty,
                     MimeType = file.MimeType ?? string.Empty,
                     Size = file.Size ?? 0,
+                    BinaryContentHash = DocumentFingerprint.FromDriveChecksum(file.Sha256Checksum),
                     CreatedTime = file.CreatedTimeDateTimeOffset?.DateTime ?? DateTime.UtcNow,
                     ModifiedTime = file.ModifiedTimeDateTimeOffset?.DateTime ?? DateTime.UtcNow,
                     LastScanned = DateTime.UtcNow,
@@ -1763,6 +1770,7 @@ namespace JumpChainSearch.Services
                         ResourceKey = file.ResourceKey,
                         WebViewLink = file.WebViewLink ?? string.Empty,
                         DownloadLink = file.ExportLinks?.Values.FirstOrDefault() ?? string.Empty,
+                        BinaryContentHash = document.BinaryContentHash,
                         LastScanned = DateTime.UtcNow
                     });
                 }

@@ -2,6 +2,7 @@ using JumpChainSearch.Data;
 using JumpChainSearch.DTOs;
 using JumpChainSearch.Helpers;
 using JumpChainSearch.Models;
+using JumpChainSearch.Services;
 using Microsoft.EntityFrameworkCore;
 
 namespace JumpChainSearch.Extensions;
@@ -18,7 +19,10 @@ public static class DocumentSubmissionEndpoints
 
     private static async Task<IResult> CreateSubmission(
         CreateDocumentSubmissionRequest request,
-        JumpChainDbContext context)
+        JumpChainDbContext context,
+        IGoogleDriveService driveService,
+        DocumentDuplicateDetectionService duplicateDetection,
+        CancellationToken cancellationToken)
     {
         var documentUrl = request.DocumentUrl?.Trim();
         if (documentUrl?.Length > 1000
@@ -41,17 +45,20 @@ public static class DocumentSubmissionEndpoints
             });
         }
 
-        if (await context.JumpDocuments.AnyAsync(document => document.GoogleDriveFileId == link.FileId))
+        var existingSource = await duplicateDetection.FindByDriveFileIdAsync(link.FileId, cancellationToken);
+        if (existingSource != null)
         {
             return Results.Conflict(new
             {
                 success = false,
-                message = "That document is already indexed."
+                documentId = existingSource.DocumentId,
+                message = $"That Google Drive file is already indexed as {existingSource.DocumentName}."
             });
         }
 
         if (await context.DocumentSubmissions.AnyAsync(submission =>
-                submission.GoogleDriveFileId == link.FileId && submission.Status == "Pending"))
+                submission.GoogleDriveFileId == link.FileId && submission.Status == "Pending",
+                cancellationToken))
         {
             return Results.Conflict(new
             {
@@ -60,19 +67,35 @@ public static class DocumentSubmissionEndpoints
             });
         }
 
+        JumpDocument submittedDocument;
+        try
+        {
+            submittedDocument = await driveService.GetSubmittedDocumentAsync(link.FileId, link.ResourceKey);
+        }
+        catch (InvalidOperationException exception)
+        {
+            return Results.BadRequest(new { success = false, message = exception.Message });
+        }
+
+        var contentMatch = await duplicateDetection.FindByContentAsync(submittedDocument, cancellationToken);
+
         var submission = new DocumentSubmission
         {
             DocumentUrl = documentUrl!,
             GoogleDriveFileId = link.FileId,
             ResourceKey = link.ResourceKey,
             Notes = NormalizeOptional(request.Notes),
-            SubmitterName = NormalizeOptional(request.SubmitterName)
+            SubmitterName = NormalizeOptional(request.SubmitterName),
+            JumpDocumentId = contentMatch?.DocumentId,
+            DuplicateReason = contentMatch == null
+                ? null
+                : DocumentDuplicateDetectionService.DescribeMatch(contentMatch)
         };
 
         context.DocumentSubmissions.Add(submission);
         try
         {
-            await context.SaveChangesAsync();
+            await context.SaveChangesAsync(cancellationToken);
         }
         catch (DbUpdateException)
         {
@@ -87,7 +110,11 @@ public static class DocumentSubmissionEndpoints
         {
             success = true,
             submissionId = submission.Id,
-            message = "Document submitted for administrator review."
+            potentialDuplicate = contentMatch != null,
+            matchedDocumentId = contentMatch?.DocumentId,
+            message = contentMatch == null
+                ? "Document submitted for administrator review."
+                : $"This file matches {contentMatch.DocumentName} and was submitted for review as an additional source."
         });
     }
 
