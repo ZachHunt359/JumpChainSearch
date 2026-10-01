@@ -55,6 +55,8 @@ fi
 # Configuration
 APP_DIR=$(pwd)
 PUBLISH_DIR="$DEPLOY_DIR/publish"
+BUILD_DIR="$DEPLOY_DIR/publish.new"
+PREVIOUS_PUBLISH_DIR="$DEPLOY_DIR/publish.previous"
 BRANCH="main"
 DEPLOY_LOG="/var/lib/jumpchain/deployment.log"
 
@@ -76,15 +78,20 @@ fi
 sudo mkdir -p $(dirname "$DEPLOY_LOG")
 echo "$(date '+%Y-%m-%d %H:%M:%S %Z') | $ENVIRONMENT | $(whoami) | STARTED" | sudo tee -a "$DEPLOY_LOG" > /dev/null
 
-echo "Step 1: Stopping the service..."
-sudo systemctl stop $SERVICE_NAME
-echo "✓ Service stopped"
+echo "Step 1: Checking current service..."
+if sudo systemctl is-active --quiet "$SERVICE_NAME"; then
+    echo "✓ Service is running and will remain online during pre-deployment checks"
+else
+    echo "⚠ Service is not currently running"
+fi
 echo ""
 
 echo "Step 2: Cleaning previous build..."
-sudo rm -rf "$PUBLISH_DIR"
+sudo rm -rf "$BUILD_DIR"
 sudo rm -rf "$APP_DIR/obj"
 sudo rm -rf "$APP_DIR/bin"
+sudo rm -rf "$APP_DIR/Tests/obj"
+sudo rm -rf "$APP_DIR/Tests/bin"
 echo "✓ Previous build cleaned"
 echo ""
 
@@ -142,19 +149,19 @@ fi
 echo ""
 
 echo "Step 6: Building the application..."
-dotnet publish -c Release -o "$PUBLISH_DIR"
+dotnet publish "$APP_DIR/JumpChainSearch.csproj" -c Release -o "$BUILD_DIR"
 echo "✓ Build completed"
 echo ""
 
 echo "Step 6.5: Manually copying critical config files..."
 # Manually copy files to ensure they're always updated (dotnet publish cache can be stubborn)
-cp -f "$APP_DIR/series-mappings.json" "$PUBLISH_DIR/" 2>/dev/null && echo "✓ Copied series-mappings.json" || echo "⚠ Failed to copy series-mappings.json"
-cp -f "$APP_DIR/genre-mappings-scraped.json" "$PUBLISH_DIR/" 2>/dev/null && echo "✓ Copied genre-mappings-scraped.json" || echo "⚠ Failed to copy genre-mappings-scraped.json"
-cp -f "$APP_DIR/appsettings.json" "$PUBLISH_DIR/" 2>/dev/null && echo "✓ Copied appsettings.json" || echo "⚠ Failed to copy appsettings.json"
+cp -f "$APP_DIR/series-mappings.json" "$BUILD_DIR/" 2>/dev/null && echo "✓ Copied series-mappings.json" || echo "⚠ Failed to copy series-mappings.json"
+cp -f "$APP_DIR/genre-mappings-scraped.json" "$BUILD_DIR/" 2>/dev/null && echo "✓ Copied genre-mappings-scraped.json" || echo "⚠ Failed to copy genre-mappings-scraped.json"
+cp -f "$APP_DIR/appsettings.json" "$BUILD_DIR/" 2>/dev/null && echo "✓ Copied appsettings.json" || echo "⚠ Failed to copy appsettings.json"
 
 # Copy service-account.json if it exists (required for Google Drive API, not in git)
 if [ -f "$APP_DIR/service-account.json" ]; then
-    cp -f "$APP_DIR/service-account.json" "$PUBLISH_DIR/" 2>/dev/null && echo "✓ Copied service-account.json" || echo "⚠ Failed to copy service-account.json"
+    cp -f "$APP_DIR/service-account.json" "$BUILD_DIR/" 2>/dev/null && echo "✓ Copied service-account.json" || echo "⚠ Failed to copy service-account.json"
 else
     echo "⚠ service-account.json not found (Google Drive features will not work)"
 fi
@@ -172,7 +179,7 @@ declare -A REQUIRED_FILES=(
 
 for file in "${!REQUIRED_FILES[@]}"; do
     SOURCE_FILE="$APP_DIR/$file"
-    DEST_FILE="$PUBLISH_DIR/$file"
+    DEST_FILE="$BUILD_DIR/$file"
     DESCRIPTION="${REQUIRED_FILES[$file]}"
     
     if [ ! -f "$SOURCE_FILE" ]; then
@@ -250,8 +257,9 @@ if command -v dotnet-ef &> /dev/null; then
         echo "⚠ Database file not created at $DB_PATH"
     fi
 else
-    echo "⚠ dotnet-ef not found. Install with: dotnet tool install --global dotnet-ef"
-    echo "⚠ Skipping migrations - you may need to run manually"
+    echo "✗ dotnet-ef not found. Install with: dotnet tool install --global dotnet-ef"
+    echo "✗ Deployment aborted before service interruption because migrations cannot be verified"
+    exit 1
 fi
 echo ""
 
@@ -263,27 +271,68 @@ sudo chmod 755 "$LOGS_DIR"
 echo "✓ Logs directory ready: $LOGS_DIR"
 echo ""
 
-echo "Step 7.6: Setting publish directory permissions for www-data..."
+echo "Step 7.6: Setting candidate publish directory permissions for www-data..."
 # Make publish directory group-writable so www-data can create script/PID files
-sudo chown -R $USER:www-data "$PUBLISH_DIR"
-sudo chmod -R g+w "$PUBLISH_DIR"
-echo "✓ Publish directory writable by www-data group"
+sudo chown -R "${USER}:www-data" "$BUILD_DIR"
+sudo chmod -R g+w "$BUILD_DIR"
+echo "✓ Candidate publish directory writable by www-data group"
 echo ""
 
-echo "Step 8: Starting the service..."
-sudo systemctl start $SERVICE_NAME
-echo "✓ Service started"
+rollback_publish() {
+    echo "Rolling back to the previous publish..."
+    sudo systemctl stop "$SERVICE_NAME" || true
+    sudo rm -rf "$BUILD_DIR"
+
+    if [ -d "$PUBLISH_DIR" ]; then
+        sudo mv "$PUBLISH_DIR" "$BUILD_DIR"
+    fi
+
+    if [ -d "$PREVIOUS_PUBLISH_DIR" ]; then
+        sudo mv "$PREVIOUS_PUBLISH_DIR" "$PUBLISH_DIR"
+        if sudo systemctl start "$SERVICE_NAME"; then
+            echo "✓ Previous publish restored and started"
+        else
+            echo "✗ Previous publish was restored but failed to start"
+        fi
+    else
+        echo "✗ No previous publish was available to restore"
+    fi
+}
+
+echo "Step 8: Activating the candidate build..."
+sudo systemctl stop "$SERVICE_NAME"
+sudo rm -rf "$PREVIOUS_PUBLISH_DIR"
+if [ -d "$PUBLISH_DIR" ]; then
+    sudo mv "$PUBLISH_DIR" "$PREVIOUS_PUBLISH_DIR"
+fi
+if ! sudo mv "$BUILD_DIR" "$PUBLISH_DIR"; then
+    echo "✗ Failed to activate the candidate build"
+    rollback_publish
+    exit 1
+fi
+echo "✓ Candidate build activated"
+echo ""
+
+echo "Step 8.5: Starting the service..."
+if ! sudo systemctl start "$SERVICE_NAME"; then
+    echo "✗ Service failed immediately during startup"
+    sudo journalctl -u "$SERVICE_NAME" -n 50 --no-pager
+    rollback_publish
+    exit 1
+fi
+echo "✓ Service start requested"
 echo ""
 
 echo "Step 9: Checking service status..."
 sleep 2
-if sudo systemctl is-active --quiet $SERVICE_NAME; then
+if sudo systemctl is-active --quiet "$SERVICE_NAME"; then
     echo "✓ Service is running"
-    sudo systemctl status $SERVICE_NAME --no-pager -l | head -n 15
+    sudo systemctl status "$SERVICE_NAME" --no-pager -l | head -n 15
 else
     echo "✗ Service failed to start!"
     echo "Checking logs..."
-    sudo journalctl -u $SERVICE_NAME -n 50 --no-pager
+    sudo journalctl -u "$SERVICE_NAME" -n 50 --no-pager
+    rollback_publish
     exit 1
 fi
 

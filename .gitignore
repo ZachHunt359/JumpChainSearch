@@ -5,6 +5,9 @@
 # Build results
 bin/
 obj/
+publish/
+publish.new/
+publish.previous/
 
 # User-specific files
 *.suo
