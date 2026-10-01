@@ -74,6 +74,66 @@ if [ ! -f "JumpChainSearch.csproj" ]; then
     exit 1
 fi
 
+prune_database_backups() {
+    local backup_directory
+    backup_directory=$(dirname "$DB_PATH")
+    if [ ! -d "$backup_directory" ]; then
+        return
+    fi
+
+    DB_BACKUP_RETENTION=${DB_BACKUP_RETENTION:-5}
+    mapfile -t DATABASE_BACKUPS < <(
+        find "$backup_directory" -maxdepth 1 -type f \
+            -name "$(basename "$DB_PATH").backup-*" -printf '%p\n' | sort -r
+    )
+
+    if [ "${#DATABASE_BACKUPS[@]}" -gt "$DB_BACKUP_RETENTION" ]; then
+        for ((index = DB_BACKUP_RETENTION; index < ${#DATABASE_BACKUPS[@]}; index++)); do
+            sudo rm -f "${DATABASE_BACKUPS[$index]}"
+        done
+        echo "✓ Pruned database backups beyond the newest $DB_BACKUP_RETENTION"
+    fi
+}
+
+echo "Preflight: Cleaning stale generated artifacts..."
+sudo rm -rf "$BUILD_DIR"
+sudo rm -rf "$APP_DIR/obj"
+sudo rm -rf "$APP_DIR/bin"
+sudo rm -rf "$APP_DIR/Tests/obj"
+sudo rm -rf "$APP_DIR/Tests/bin"
+prune_database_backups
+echo "✓ Stale generated artifacts cleaned"
+echo ""
+
+echo "Preflight: Checking disk capacity..."
+DB_SIZE_KB=0
+if [ -f "$DB_PATH" ]; then
+    DB_SIZE_KB=$((($(stat -c%s "$DB_PATH") + 1023) / 1024))
+fi
+
+# Leave room for the candidate publish, build intermediates, NuGet/MSBuild temp files,
+# and one database backup. Override these values only when the server is sized differently.
+MIN_APP_FREE_KB=${DEPLOY_MIN_FREE_KB:-2097152}
+MIN_TEMP_FREE_KB=${DEPLOY_MIN_TEMP_FREE_KB:-524288}
+MIN_FREE_INODES=${DEPLOY_MIN_FREE_INODES:-10000}
+REQUIRED_APP_FREE_KB=$((MIN_APP_FREE_KB + DB_SIZE_KB))
+AVAILABLE_APP_KB=$(df -Pk "$APP_DIR" | awk 'NR == 2 { print $4 }')
+AVAILABLE_TEMP_KB=$(df -Pk "${TMPDIR:-/tmp}" | awk 'NR == 2 { print $4 }')
+AVAILABLE_INODES=$(df -Pi "$APP_DIR" | awk 'NR == 2 { print $4 }')
+
+if [ "$AVAILABLE_APP_KB" -lt "$REQUIRED_APP_FREE_KB" ] || \
+   [ "$AVAILABLE_TEMP_KB" -lt "$MIN_TEMP_FREE_KB" ] || \
+   [ "$AVAILABLE_INODES" -lt "$MIN_FREE_INODES" ]; then
+    echo "✗ Insufficient disk capacity for a safe deployment"
+    echo "  App filesystem: $((AVAILABLE_APP_KB / 1024)) MiB free; $((REQUIRED_APP_FREE_KB / 1024)) MiB required"
+    echo "  Temp filesystem: $((AVAILABLE_TEMP_KB / 1024)) MiB free; $((MIN_TEMP_FREE_KB / 1024)) MiB required"
+    echo "  App filesystem inodes: $AVAILABLE_INODES free; $MIN_FREE_INODES required"
+    echo "  Inspect with: df -h; df -i; sudo du -xhd1 /var/lib/jumpchain /home/deploy /var/log | sort -h"
+    exit 1
+fi
+echo "✓ Disk capacity is sufficient"
+echo ""
+
 # Log deployment attempt
 sudo mkdir -p $(dirname "$DEPLOY_LOG")
 echo "$(date '+%Y-%m-%d %H:%M:%S %Z') | $ENVIRONMENT | $(whoami) | STARTED" | sudo tee -a "$DEPLOY_LOG" > /dev/null
@@ -87,12 +147,7 @@ fi
 echo ""
 
 echo "Step 2: Cleaning previous build..."
-sudo rm -rf "$BUILD_DIR"
-sudo rm -rf "$APP_DIR/obj"
-sudo rm -rf "$APP_DIR/bin"
-sudo rm -rf "$APP_DIR/Tests/obj"
-sudo rm -rf "$APP_DIR/Tests/bin"
-echo "✓ Previous build cleaned"
+echo "✓ Previous build was cleaned during preflight"
 echo ""
 
 echo "Step 3: Ensuring deployment directory exists..."
@@ -143,6 +198,7 @@ BACKUP_FILE="$DB_PATH.backup-$(date +%Y%m%d-%H%M%S)"
 if [ -f "$DB_PATH" ]; then
     cp "$DB_PATH" "$BACKUP_FILE"
     echo "✓ Database backed up to: $BACKUP_FILE"
+    prune_database_backups
 else
     echo "⚠ No database file found at: $DB_PATH (first deployment?)"
 fi
@@ -244,7 +300,7 @@ if command -v dotnet-ef &> /dev/null; then
     cd "$APP_DIR"
     # Use the same connection string as the production service
     export ConnectionStrings__DefaultConnection="$DB_CONNECTION"
-    dotnet ef database update
+    dotnet ef database update --no-build --configuration Release
     
     # After migration, ensure database file has correct permissions for www-data
     if [ -f "$DB_PATH" ]; then
